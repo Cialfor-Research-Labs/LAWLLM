@@ -87,7 +87,7 @@ def _get_bedrock_client(region_name: str) -> Any:
     session = boto3.session.Session(**session_kwargs)
 
     read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "300"))
-    connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "10"))
+    connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "100"))
     retries = int(os.getenv("BEDROCK_MAX_RETRIES", "100"))
     cfg = Config(
         read_timeout=read_timeout,
