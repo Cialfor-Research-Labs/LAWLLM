@@ -86,9 +86,11 @@ def _get_bedrock_client(region_name: str) -> Any:
     # web identity, shared config, etc.). No static secrets in code.
     session = boto3.session.Session(**session_kwargs)
 
-    read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "300"))
-    connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "100"))
-    retries = int(os.getenv("BEDROCK_MAX_RETRIES", "100"))
+    # Much more reasonable values
+    read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "30"))  # 30 seconds
+    connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "10"))  # 10 seconds  
+    retries = int(os.getenv("BEDROCK_MAX_RETRIES", "3"))  # Only 3 retries
+
     cfg = Config(
         read_timeout=read_timeout,
         connect_timeout=connect_timeout,
