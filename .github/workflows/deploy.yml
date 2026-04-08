@@ -1,0 +1,38 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: SSH and Deploy
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          cd /opt/vidhi-ai/LAWLLM
+          git pull origin main
+
+          # Backend
+          cd backend
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+          # Frontend
+          cd ../ui
+          npm install
+          npm run build
+
+          # Restart services
+          sudo systemctl restart vidhi-backend
+          sudo systemctl restart nginx
