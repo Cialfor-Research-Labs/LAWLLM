@@ -4,7 +4,7 @@
 
 # Run frontend with your Legal RAG backend
 
-This frontend now uses `src/components/LegalChat.tsx` as the default module and calls your FastAPI backend at `/query`.
+This frontend now uses `src/components/LegalChat.tsx` as the default module and calls your backend through `/api` by default.
 
 ## Run locally
 
@@ -14,7 +14,7 @@ This frontend now uses `src/components/LegalChat.tsx` as the default module and 
    `npm install`
 2. Optional: set backend URL in `.env.local`:
    `VITE_API_BASE_URL=http://localhost:8000`
-   If you do not set this, the frontend will automatically call `http://<current-browser-host>:8000`.
+   If you do not set this, the frontend will call `/api` (recommended with reverse proxy).
 3. Start the frontend:
    `npm run dev`
 4. Start backend (from `New code` folder):
@@ -22,12 +22,9 @@ This frontend now uses `src/components/LegalChat.tsx` as the default module and 
 
 ## Share with teammates on the same network
 
-1. Start backend on all interfaces:
-   `uvicorn retrieval_api:app --host 0.0.0.0 --port 8000`
+1. Configure your reverse proxy to route `/api/*` to your backend service.
 2. Start frontend:
    `npm run dev`
-3. Share your machine IP and Vite port:
-   `http://10.16.140.253:3000`
+3. Share your frontend URL.
 
-Because the frontend now resolves the backend from the browser host, users opening the UI from your IP will automatically hit:
-`http://10.16.140.253:8000`
+The frontend keeps API endpoints configurable via `VITE_API_BASE_URL` and does not hardcode server IP/port in source files.
