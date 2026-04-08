@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import { getApiBase } from '../lib/api';
 import {
   FileText,
   Plus,
@@ -40,23 +41,6 @@ type Tone = 'firm' | 'aggressive' | 'polite';
 
 // ---- API ----
 
-function resolveApiBase() {
-  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
-  const browserHost = window.location.hostname || 'localhost';
-  const browserIsLocal = ['localhost', '127.0.0.1'].includes(browserHost);
-  if (configured) {
-    try {
-      const configuredUrl = new URL(configured);
-      const configuredIsLocal = ['localhost', '127.0.0.1'].includes(configuredUrl.hostname);
-      if (!(configuredIsLocal && !browserIsLocal)) return configured.replace(/\/$/, '');
-    } catch {
-      return configured.replace(/\/$/, '');
-    }
-  }
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-  return `${protocol}//${browserHost}:8000`;
-}
-
 const markdownComponents: Components = {
   strong: ({ children }) => <strong className="font-extrabold text-primary">{children}</strong>,
   p: ({ children }) => <p className="mb-3 last:mb-0 leading-7">{children}</p>,
@@ -85,7 +69,7 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 // ---- Component ----
 
 export const DocumentGenerator = () => {
-  const apiBase = useMemo(() => resolveApiBase(), []);
+  const apiBase = useMemo(() => getApiBase(), []);
 
   // Form state
   const [senderName, setSenderName] = useState('');

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import { getApiBase } from '../lib/api';
 import { 
   CheckCircle2, 
   Loader2, 
@@ -110,27 +111,6 @@ const markdownComponents: Components = {
   li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
 };
 
-function resolveApiBase() {
-  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
-  const browserHost = window.location.hostname || 'localhost';
-  const browserIsLocal = ['localhost', '127.0.0.1'].includes(browserHost);
-
-  if (configured) {
-    try {
-      const configuredUrl = new URL(configured);
-      const configuredIsLocal = ['localhost', '127.0.0.1'].includes(configuredUrl.hostname);
-      if (!(configuredIsLocal && !browserIsLocal)) {
-        return configured.replace(/\/$/, '');
-      }
-    } catch {
-      return configured.replace(/\/$/, '');
-    }
-  }
-
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-  return `${protocol}//${browserHost}:8000`;
-}
-
 function formatInterviewResponse(data: InterviewChatResponse) {
     const out = data.legal_output;
     
@@ -184,7 +164,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 
 
 export const LegalChat = () => {
-    const apiBase = useMemo(() => resolveApiBase(), []);
+    const apiBase = useMemo(() => getApiBase(), []);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState<Message[]>([
         {
