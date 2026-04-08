@@ -1,0 +1,386 @@
+{
+  "core_fields": [
+    { "key": "parties_involved", "question": "Who are the parties involved?" },
+    { "key": "incident_description", "question": "What exactly happened?" },
+    { "key": "incident_datetime", "question": "When did this incident happen (date/time if known)?" },
+    { "key": "harm_or_loss", "question": "What harm, loss, or impact did you suffer?" },
+    { "key": "evidence_available", "question": "What evidence do you currently have?" }
+  ],
+  "domains": {
+    "consumer": {
+      "classifier_hints": ["defective", "refund", "seller", "warranty", "service", "product", "ordered", "bought", "invoice", "replacement"],
+      "fields": [
+        { "key": "purchase_proof", "question": "Do you have invoice/receipt or order proof?" },
+        { "key": "seller_response", "question": "How did the seller/manufacturer respond?" },
+        { "key": "remedy_preference", "question": "What remedy do you want: refund, replacement, repair, compensation?" },
+        { "key": "platform_name", "question": "Which platform/store was used for purchase?" }
+      ]
+    },
+    "employment": {
+      "classifier_hints": ["termination", "salary", "employer", "employee", "gratuity"],
+      "fields": [
+        { "key": "employment_role", "question": "What was your role and employment type?" },
+        { "key": "dues_pending", "question": "Which dues are pending (salary, gratuity, notice pay)?" },
+        { "key": "employment_documents", "question": "Do you have appointment letter/salary slips/work records?" },
+        { "key": "employer_response", "question": "How did the employer respond to your grievance?" }
+      ]
+    },
+    "criminal": {
+      "classifier_hints": ["assault", "threat", "theft", "cheating", "police", "fir"],
+      "fields": [
+        { "key": "accused_identity", "question": "Do you know the accused identity?" },
+        { "key": "police_status", "question": "Have you approached police or filed any complaint/FIR?" },
+        { "key": "immediate_risk", "question": "Is there any immediate threat to your safety?" },
+        { "key": "incident_location", "question": "Where did the incident happen?" }
+      ]
+    },
+    "property": {
+      "classifier_hints": ["landlord", "tenant", "lease", "eviction", "possession", "rent"],
+      "fields": [
+        { "key": "property_relationship", "question": "What is your relationship to the property (owner/tenant/landlord)?" },
+        { "key": "property_documents", "question": "Do you have agreement/title/lease documents?" },
+        { "key": "possession_status", "question": "Who currently has possession of the property?" },
+        { "key": "property_value_range", "question": "What is the approximate value/rent amount involved?" }
+      ]
+    },
+    "family": {
+      "classifier_hints": ["divorce", "maintenance", "custody", "domestic violence", "marriage"],
+      "fields": [
+        { "key": "family_relationship", "question": "What is the family relationship involved?" },
+        { "key": "children_involved", "question": "Are children involved in this dispute?" },
+        { "key": "interim_relief_needed", "question": "Do you need urgent interim relief?" },
+        { "key": "current_living_arrangement", "question": "What is the current living arrangement?" }
+      ]
+    },
+    "contract": {
+      "classifier_hints": ["agreement", "breach", "contract", "damages", "performance"],
+      "fields": [
+        { "key": "contract_type", "question": "What type of contract/agreement is involved?" },
+        { "key": "breach_details", "question": "What exact breach occurred?" },
+        { "key": "notice_sent", "question": "Have you sent a legal/contractual notice?" },
+        { "key": "contract_value", "question": "What is the approximate contract value?" }
+      ]
+    },
+    "cyber": {
+      "classifier_hints": ["online", "phishing", "hacked", "otp", "cyber", "digital fraud"],
+      "fields": [
+        { "key": "platform_channel", "question": "Which app/platform/channel was used?" },
+        { "key": "digital_evidence", "question": "Do you have screenshots, emails, logs, or transaction IDs?" },
+        { "key": "reporting_status", "question": "Have you reported this to cybercrime portal/police/bank?" },
+        { "key": "account_compromise", "question": "Were any accounts/devices compromised?" }
+      ]
+    },
+    "financial": {
+      "classifier_hints": ["loan", "interest", "recovery", "bank", "emi", "debt"],
+      "fields": [
+        { "key": "financial_instrument", "question": "What financial instrument is involved (loan, credit card, etc.)?" },
+        { "key": "amount_involved", "question": "What amount is involved?" },
+        { "key": "institution_response", "question": "How did the bank/financial institution respond?" },
+        { "key": "payment_default_status", "question": "Is there any payment default history?" }
+      ]
+    },
+    "insurance": {
+      "classifier_hints": ["insurance", "claim", "insurer", "policy", "premium"],
+      "fields": [
+        { "key": "policy_type", "question": "What type of insurance policy is involved?" },
+        { "key": "claim_status", "question": "Was the claim rejected, delayed, or partially settled?" },
+        { "key": "insurer_communication", "question": "Do you have written communication from the insurer?" }
+      ]
+    },
+    "tax_regulatory": {
+      "classifier_hints": ["gst", "income tax", "notice", "assessment", "penalty", "regulatory"],
+      "fields": [
+        { "key": "issuing_authority", "question": "Which authority issued the notice/order?" },
+        { "key": "notice_reference", "question": "Do you have the notice number/reference?" },
+        { "key": "compliance_status", "question": "Have you filed any reply/appeal so far?" }
+      ]
+    },
+    "personal_injury_tort": {
+      "classifier_hints": ["negligence", "accident", "injury claim", "medical malpractice", "compensation"],
+      "fields": [
+        { "key": "injury_cause", "question": "What caused the injury or loss?" },
+        { "key": "responsible_party", "question": "Who do you believe is responsible?" },
+        { "key": "medical_or_repair_cost", "question": "What medical/repair costs have you incurred?" }
+      ]
+    },
+    "corporate_commercial": {
+      "classifier_hints": ["shareholder", "board", "oppression", "mismanagement", "corporate compliance", "nclt"],
+      "fields": [
+        { "key": "entity_type", "question": "What type of entity is involved (private/public/LLP)?" },
+        { "key": "stakeholder_role", "question": "What is your role (shareholder/director/creditor)?" },
+        { "key": "commercial_relief_sought", "question": "What commercial relief are you seeking?" }
+      ]
+    },
+    "general": {
+      "classifier_hints": ["legal", "dispute", "issue"],
+      "fields": [
+        { "key": "desired_outcome", "question": "What result are you seeking?" }
+      ]
+    }
+  },
+  "signals": {
+    "injury": {
+      "detector_hints": ["injury", "injured", "burn", "fracture", "hospital"],
+      "fields": [
+        { "key": "injury_type", "question": "What type of injury occurred?" },
+        { "key": "injury_severity", "question": "How severe is the injury (minor/moderate/severe)?" },
+        { "key": "medical_records", "question": "Do you have medical records or treatment papers?" },
+        { "key": "medical_expenses", "question": "What medical expenses have you incurred?" }
+      ],
+      "strategy_hints": [
+        "Include compensation and liability pathways.",
+        "Ask for injury proof, treatment documents, and expense computation."
+      ]
+    },
+    "death": {
+      "detector_hints": ["died", "death", "deceased", "fatal", "postmortem"],
+      "fields": [
+        { "key": "cause_of_death", "question": "What was the reported cause of death?" },
+        { "key": "dependents", "question": "Are there dependents of the deceased?" },
+        { "key": "postmortem_or_medical_report", "question": "Is a postmortem or medical report available?" }
+      ],
+      "strategy_hints": [
+        "Prioritize urgent procedural and compensation tracks.",
+        "Capture dependent details and official reports."
+      ]
+    },
+    "fraud": {
+      "detector_hints": ["fraud", "cheated", "misrepresentation", "scam", "forgery"],
+      "fields": [
+        { "key": "misrepresentation_details", "question": "What false representation was made?" },
+        { "key": "money_or_property_transferred", "question": "Did you transfer money/property due to this?" },
+        { "key": "amount_lost", "question": "What amount/value was lost?" },
+        { "key": "transaction_mode", "question": "How was the transaction made (UPI/bank/card/cash)?" }
+      ],
+      "strategy_hints": [
+        "Add criminal and recovery routes in parallel.",
+        "Prioritize transaction evidence and traceability details."
+      ]
+    },
+    "harassment": {
+      "detector_hints": ["harass", "harassment", "threaten", "abuse", "stalking"],
+      "fields": [
+        { "key": "harassment_frequency", "question": "How often has the harassment occurred?" },
+        { "key": "harassment_evidence", "question": "Do you have call logs/messages/recordings/witnesses?" },
+        { "key": "harassment_location_context", "question": "Where and in what context did this happen?" }
+      ],
+      "strategy_hints": [
+        "Assess urgency and immediate protection options.",
+        "Structure evidence timeline for repeated incidents."
+      ]
+    },
+    "termination": {
+      "detector_hints": ["terminated", "dismissed", "fired", "removed"],
+      "fields": [
+        { "key": "termination_notice", "question": "Were you given written notice or termination letter?" },
+        { "key": "termination_reason", "question": "What reason was stated for termination?" },
+        { "key": "employment_duration", "question": "How long were you employed?" }
+      ],
+      "strategy_hints": [
+        "Prioritize reinstatement/dues/compensation analysis.",
+        "Check notice compliance and contractual terms."
+      ]
+    },
+    "defect": {
+      "detector_hints": ["defect", "defective", "malfunction", "broken", "exploded"],
+      "fields": [
+        { "key": "product_name", "question": "What product/service is defective?" },
+        { "key": "defect_details", "question": "What is the exact defect/problem?" },
+        { "key": "usage_context", "question": "How was it being used when the defect appeared?" }
+      ],
+      "strategy_hints": [
+        "Prioritize refund/replacement/repair first.",
+        "Escalate to liability only if injury or major damage is present."
+      ]
+    },
+    "non_payment": {
+      "detector_hints": ["not paid", "unpaid", "non-payment", "dues pending", "salary pending"],
+      "fields": [
+        { "key": "amount_due", "question": "What amount remains unpaid?" },
+        { "key": "due_date", "question": "When did the payment become due?" },
+        { "key": "payment_obligation_source", "question": "What document/arrangement created this payment obligation?" }
+      ],
+      "strategy_hints": [
+        "Include recovery pathway and interest/compensation considerations."
+      ]
+    },
+    "delay": {
+      "detector_hints": ["delay", "delayed", "late", "postponed", "possession delayed"],
+      "fields": [
+        { "key": "expected_timeline", "question": "What was the promised timeline?" },
+        { "key": "actual_delay", "question": "How much delay has occurred?" },
+        { "key": "delay_loss", "question": "What loss did this delay cause?" }
+      ],
+      "strategy_hints": [
+        "Include delay compensation and timeline breach analysis."
+      ]
+    },
+    "document_exists": {
+      "detector_hints": ["invoice", "agreement", "contract", "receipt", "document"],
+      "fields": [
+        { "key": "document_list", "question": "Which key documents do you have?" }
+      ],
+      "strategy_hints": [
+        "Leverage documentary evidence to strengthen grounds."
+      ]
+    },
+    "no_response": {
+      "detector_hints": ["ignored", "no response", "not responding", "refused", "silent"],
+      "fields": [
+        { "key": "communication_attempts", "question": "How many times did you contact them, and through which channels?" }
+      ],
+      "strategy_hints": [
+        "Include escalation after non-response and communication log use."
+      ]
+    },
+    "partial_payment": {
+      "detector_hints": ["partial payment", "partly paid", "balance amount", "remaining amount"],
+      "fields": [
+        { "key": "amount_paid", "question": "How much has already been paid?" },
+        { "key": "balance_amount", "question": "How much balance is still unpaid?" }
+      ],
+      "strategy_hints": [
+        "Differentiate admitted liability from disputed balance."
+      ]
+    },
+    "verbal_agreement": {
+      "detector_hints": ["verbal", "oral promise", "spoken agreement", "without contract"],
+      "fields": [
+        { "key": "verbal_terms", "question": "What terms were agreed verbally?" },
+        { "key": "verbal_witnesses", "question": "Were any witnesses present during this verbal agreement?" }
+      ],
+      "strategy_hints": [
+        "Prioritize corroborative evidence and conduct-based proof."
+      ]
+    },
+    "online_transaction": {
+      "detector_hints": ["online payment", "upi", "wallet", "card", "internet banking"],
+      "fields": [
+        { "key": "online_platform", "question": "Which platform/payment rail was used?" },
+        { "key": "transaction_reference", "question": "Do you have transaction reference IDs?" }
+      ],
+      "strategy_hints": [
+        "Use transaction traceability and platform complaint channels."
+      ]
+    },
+    "police_involved": {
+      "detector_hints": ["fir", "police complaint", "police station", "nc report"],
+      "fields": [
+        { "key": "fir_or_complaint_number", "question": "What is the FIR/complaint number, if available?" }
+      ],
+      "strategy_hints": [
+        "Align civil strategy with existing criminal procedural status."
+      ]
+    },
+    "legal_notice_sent": {
+      "detector_hints": ["legal notice", "notice sent", "advocate notice"],
+      "fields": [
+        { "key": "legal_notice_date", "question": "When was the legal notice sent?" },
+        { "key": "legal_notice_response", "question": "Was there any response to the legal notice?" }
+      ],
+      "strategy_hints": [
+        "Incorporate pre-litigation conduct into final strategy."
+      ]
+    },
+    "court_case_exists": {
+      "detector_hints": ["case filed", "court case", "pending case", "case number"],
+      "fields": [
+        { "key": "existing_case_number", "question": "What is the existing case number, if any?" },
+        { "key": "existing_case_stage", "question": "What stage is the existing case currently at?" }
+      ],
+      "strategy_hints": [
+        "Avoid conflicting remedies and account for pending proceedings."
+      ]
+    },
+    "threat": {
+      "detector_hints": ["threat", "threatened", "intimidation", "blackmail"],
+      "fields": [
+        { "key": "threat_type", "question": "What kind of threat was made?" },
+        { "key": "threat_urgency", "question": "Is there immediate urgency or safety concern?" }
+      ],
+      "strategy_hints": [
+        "Prioritize immediate protection and emergency procedural steps."
+      ]
+    },
+    "repeat_offense": {
+      "detector_hints": ["again", "repeated", "multiple times", "repeat incident"],
+      "fields": [
+        { "key": "previous_incidents", "question": "How many previous incidents occurred and when?" }
+      ],
+      "strategy_hints": [
+        "Build a chronology and pattern evidence for stronger relief."
+      ]
+    },
+    "property_dispute": {
+      "detector_hints": ["eviction", "possession", "encroachment", "landlord", "tenant"],
+      "fields": [
+        { "key": "notice_status", "question": "Was any notice served before the dispute escalated?" },
+        { "key": "property_location", "question": "Where is the property located?" }
+      ],
+      "strategy_hints": [
+        "Prioritize possession status, notices, and title/tenancy evidence."
+      ]
+    }
+  },
+  "signal_strategy_map": {
+    "injury": ["compensation_pathway", "liability_pathway"],
+    "death": ["urgent_procedural_track", "dependent_compensation_track"],
+    "fraud": ["criminal_track", "recovery_track"],
+    "harassment": ["protection_track", "evidence_timeline_track"],
+    "termination": ["employment_relief_track", "dues_recovery_track"],
+    "defect": ["consumer_remedy_track", "liability_if_harm_track"],
+    "non_payment": ["recovery_track", "interest_track"],
+    "delay": ["delay_compensation_track"],
+    "document_exists": ["document_strength_track"],
+    "no_response": ["escalation_track"],
+    "partial_payment": ["admitted_liability_track"],
+    "verbal_agreement": ["corroboration_track"],
+    "online_transaction": ["traceability_track"],
+    "police_involved": ["procedural_alignment_track"],
+    "legal_notice_sent": ["pre_litigation_track"],
+    "court_case_exists": ["conflict_avoidance_track"],
+    "threat": ["urgent_protection_track"],
+    "repeat_offense": ["pattern_evidence_track"],
+    "property_dispute": ["title_possession_track"]
+  },
+  "signal_domain_boost": {
+    "defect": ["consumer"],
+    "online_transaction": ["consumer", "cyber", "financial"],
+    "injury": ["personal_injury_tort", "consumer", "criminal"],
+    "fraud": ["criminal", "financial", "cyber", "consumer"],
+    "termination": ["employment"],
+    "non_payment": ["employment", "contract", "financial"],
+    "delay": ["consumer", "property", "contract"],
+    "property_dispute": ["property"],
+    "harassment": ["criminal", "employment", "family"],
+    "threat": ["criminal"],
+    "court_case_exists": ["general"]
+  },
+  "tasks": {
+    "intake": {
+      "required_fields": [],
+      "critical_fields": [],
+      "task_hints": ["intake", "collect details", "ask questions first"]
+    },
+    "advice": {
+      "required_fields": ["incident_description", "harm_or_loss"],
+      "critical_fields": [],
+      "task_hints": ["legal advice", "what can I do", "remedy", "rights", "legal options"]
+    },
+    "draft_notice": {
+      "required_fields": ["parties_involved", "incident_description", "harm_or_loss", "evidence_available"],
+      "critical_fields": ["parties_involved", "incident_description"],
+      "task_hints": ["draft notice", "legal notice", "send notice", "notice format", "prepare notice"]
+    },
+    "file_complaint": {
+      "required_fields": ["parties_involved", "incident_description", "harm_or_loss", "evidence_available", "incident_datetime"],
+      "critical_fields": ["parties_involved", "incident_description"],
+      "task_hints": ["file complaint", "complaint format", "where to file", "consumer complaint", "draft complaint"]
+    },
+    "estimate_claim": {
+      "required_fields": ["harm_or_loss", "evidence_available"],
+      "critical_fields": ["harm_or_loss"],
+      "task_hints": ["estimate claim", "how much compensation", "claim amount", "damages amount", "valuation"]
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schemas": [
+    {
+      "case_type": "consumer_defect",
+      "required_fields": [
+        {
+          "key": "product_type",
+          "question": "What product or service is involved?"
+        },
+        {
+          "key": "purchase_proof",
+          "question": "Do you have proof of purchase (invoice/receipt)?"
+        },
+        {
+          "key": "defect_or_harm",
+          "question": "What defect, failure, or harm occurred?"
+        },
+        {
+          "key": "seller_response",
+          "question": "How did the seller or manufacturer respond?"
+        },
+        {
+          "key": "remedy_sought",
+          "question": "What outcome do you want (refund, replacement, compensation, etc.)?"
+        }
+      ]
+    },
+    {
+      "case_type": "employment_termination",
+      "required_fields": [
+        {
+          "key": "employment_role",
+          "question": "What was your job role and employment type?"
+        },
+        {
+          "key": "termination_details",
+          "question": "How were you terminated, and was any reason provided?"
+        },
+        {
+          "key": "dues_pending",
+          "question": "What dues are pending (salary, gratuity, notice pay, etc.)?"
+        },
+        {
+          "key": "employment_proof",
+          "question": "Do you have appointment letter, salary slips, or other employment proof?"
+        },
+        {
+          "key": "employer_response",
+          "question": "Has the employer responded to your request for dues or reinstatement?"
+        }
+      ]
+    },
+    {
+      "case_type": "criminal_complaint",
+      "required_fields": [
+        {
+          "key": "incident_summary",
+          "question": "What happened, in brief?"
+        },
+        {
+          "key": "accused_known",
+          "question": "Do you know who committed the act (name/identity), or is it unknown?"
+        },
+        {
+          "key": "evidence_available",
+          "question": "What evidence is available (messages, recordings, witnesses, documents)?"
+        },
+        {
+          "key": "police_status",
+          "question": "Have you approached police or filed any complaint/FIR?"
+        },
+        {
+          "key": "immediate_risk",
+          "question": "Is there any immediate threat to your safety right now?"
+        }
+      ]
+    }
+  ]
+}

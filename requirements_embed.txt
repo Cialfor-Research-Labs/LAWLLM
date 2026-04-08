@@ -1,0 +1,7 @@
+# Requirements for embed_acts.py pipeline
+# Install: pip install -r requirements_embed.txt
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.24.0
+torch>=2.0.0
+tqdm>=4.64.0

@@ -1,0 +1,138 @@
+USER: Section 18 BNSS
+SYSTEM:
+Section 18 – Public Prosecutors
+
+(1) For every High Court, the Central Government or the State Government shall, after consultation with the High Court, appoint a Public Prosecutor and may also appoint one or more Additional Public Prosecutors, for conducting in such Court, any prosecution, appeal or other proceeding on behalf of the Central Government or the State Government, as the case may be:
+proviso_1 Provided that for National Capital Territory of Delhi, the Central Government shall, after consultation with the High Court of Delhi, appoint the Public Prosecutor or Additional Public Prosecutors for the purposes of this sub-section.
+(2) The Central Government may appoint one or more Public Prosecutors for the purpose of conducting any case in any district or local area.
+(3) For every district, the State Government shall appoint a Public Prosecutor and may also appoint one or more Additional Public Prosecutors for the district:
+proviso_2 Provided that the Public Prosecutor or Additional Public Prosecutor appointed for one district may be appointed also to be a Public Prosecutor or an Additional Public Prosecutor, as the case may be, for another district.
+(4) The District Magistrate shall, in consultation with the Sessions Judge, prepare a panel of names of persons, who are, in his opinion fit to be appointed as Public Prosecutors or Additional Public Prosecutors for the district.
+(5) No person shall be appointed by the State Government as the Public Prosecutor or Additional Public Prosecutor for the district unless his name appears in the panel of names prepared by the District Magistrate under sub-section (4).
+(6) Notwithstanding anything in sub-section (5), where in a State there exists a regular Cadre of Prosecuting Officers, the State Government shall appoint a Public Prosecutor or an Additional Public Prosecutor only from among the persons constituting such Cadre:
+proviso_3 Provided that where, in the opinion of the State Government, no suitable person is available in such Cadre for such appointment, that Government may appoint a person as Public Prosecutor or Additional Public Prosecutor, as the case may be, from the panel of names prepared by the District Magistrate under sub-section (4).
+
+Explanation. - For the purposes of this sub-section,-
+    (a) "regular Cadre of Prosecuting Officers" means a Cadre of Prosecuting Officers which includes therein the post of Public Prosecutor, by whatever name called, and which provides for promotion of Assistant Public Prosecutors, by whatever name called, to that post;
+    (b) "Prosecuting Officer" means a person, by whatever name called, appointed to perform the functions of a Public Prosecutor, Special Public Prosecutor, Additional Public Prosecutor or Assistant Public Prosecutor under this Sanhita.
+(7) A person shall be eligible to be appointed as a Public Prosecutor or an Additional Public Prosecutor under sub-section (1) or sub-section (2) or sub-section (3) or sub-section (6), only if he has been in practice as an advocate for not less than seven years.
+(8) The Central Government or the State Government may appoint, for the purposes of any case or class of cases, a person who has been in practice as an advocate for not less than ten years as a Special Public Prosecutor:
+proviso_4 Provided that the Court may permit the victim to engage an advocate of his choice to assist the prosecution under this sub-section.
+(9) For the purposes of sub-section (7) and sub-section (8), the period during which a person has been in practice as an advocate, or has rendered (whether before or after the commencement of this Sanhita) service as a Public Prosecutor or as an Additional Public Prosecutor or Assistant Public Prosecutor or other Prosecuting Officer, by whatever name called, shall be deemed to be the period during which such person has been in practice as an advocate.
+
+==================================================
+USER: Who appoints Public Prosecutor
+SYSTEM:
+
+
+============================================================Section 18 – Public Prosecutors
+
+(1) For every High Court, the Central Government or the State Government shall, after consultation with the High Court, appoint a Public Prosecutor and may also appoint one or more Additional Public Prosecutors, for conducting in such Court, any prosecution, appeal or other proceeding on behalf of the Central Government or the State Government, as the case may be:
+proviso_1 Provided that for National Capital Territory of Delhi, the Central Government shall, after consultation with the High Court of Delhi, appoint the Public Prosecutor or Additional Public Prosecutors for the purposes of this sub-section.
+(2) The Central Government may appoint one or more Public Prosecutors for the purpose of conducting any case in any district or local area.
+(3) For every district, the State Government shall appoint a Public Prosecutor and may also appoint one or more Additional Public Prosecutors for the district:
+proviso_2 Provided that the Public Prosecutor or Additional Public Prosecutor appointed for one district may be appointed also to be a Public Prosecutor or an Additional Public Prosecutor, as the case may be, for another district.
+(4) The District Magistrate shall, in consultation with the Sessions Judge, prepare a panel of names of persons, who are, in his opinion fit to be appointed as Public Prosecutors or Additional Public Prosecutors for the district.
+(5) No person shall be appointed by the State Government as the Public Prosecutor or Additional Public Prosecutor for the district unless his name appears in the panel of names prepared by the District Magistrate under sub-section (4).
+(6) Notwithstanding anything in sub-section (5), where in a State there exists a regular Cadre of Prosecuting Officers, the State Government shall appoint a Public Prosecutor or an Additional Public Prosecutor only from among the persons constituting such Cadre:
+proviso_3 Provided that where, in the opinion of the State Government, no suitable person is available in such Cadre for such appointment, that Government may appoint a person as Public Prosecutor or Additional Public Prosecutor, as the case may be, from the panel of names prepared by the District Magistrate under sub-section (4).
+
+Explanation. - For the purposes of this sub-section,-
+    (a) "regular Cadre of Prosecuting Officers" means a Cadre of Prosecuting Officers which includes therein the post of Public Prosecutor, by whatever name called, and which provides for promotion of Assistant Public Prosecutors, by whatever name called, to that post;
+    (b) "Prosecuting Officer" means a person, by whatever name called, appointed to perform the functions of a Public Prosecutor, Special Public Prosecutor, Additional Public Prosecutor or Assistant Public Prosecutor under this Sanhita.
+(7) A person shall be eligible to be appointed as a Public Prosecutor or an Additional Public Prosecutor under sub-section (1) or sub-section (2) or sub-section (3) or sub-section (6), only if he has been in practice as an advocate for not less than seven years.
+(8) The Central Government or the State Government may appoint, for the purposes of any case or class of cases, a person who has been in practice as an advocate for not less than ten years as a Special Public Prosecutor:
+proviso_4 Provided that the Court may permit the victim to engage an advocate of his choice to assist the prosecution under this sub-section.
+(9) For the purposes of sub-section (7) and sub-section (8), the period during which a person has been in practice as an advocate, or has rendered (whether before or after the commencement of this Sanhita) service as a Public Prosecutor or as an Additional Public Prosecutor or Assistant Public Prosecutor or other Prosecuting Officer, by whatever name called, shall be deemed to be the period during which such person has been in practice as an advocate.
+
+Section 19 – Assistant Public Prosecutors
+
+(1) The State Government shall appoint in every district one or more Assistant Public Prosecutors for conducting prosecutions in the Courts of Magistrates.
+(2) The Central Government may appoint one or more Assistant Public Prosecutors for the purpose of conducting any case or class of cases in the Courts of Magistrates.
+(3) Without prejudice to provisions contained in sub-sections (1) and (2), where no Assistant Public Prosecutor is available for the purposes of any particular case, the District Magistrate may appoint any other person to be the Assistant Public Prosecutor in charge of that case after giving notice of fourteen days to the State Government:
+proviso_1 Provided that no police officer shall be eligible to be appointed as an Assistant Public Prosecutor, if he-
+    (a) has taken any part in the investigation into the offence with respect to which the accused is being prosecuted; or
+    (b) is below the rank of Inspector.
+
+============================================================
+
+==================================================
+USER: What is bail
+SYSTEM:
+
+
+============================================================Section 480 – When bail may be taken in case of non-bailable offence
+
+(1) When any person accused of, or suspected of, the commission of any non-bailable offence is arrested or detained without warrant by an officer in charge of a police station or appears or is brought before a Court other than the High Court or Court of Session, he may be released on bail, but-
+    (i) such person shall not be so released if there appear reasonable grounds for believing that he has been guilty of an offence punishable with death or imprisonment for life;
+        (ii) such person shall not be so released if such offence is a cognizable offence and he had been previously convicted of an offence punishable with death, imprisonment for life or imprisonment for seven years or more, or he had been previously convicted on two or more occasions of a cognizable offence punishable with imprisonment for three years or more but less than seven years:
+proviso_1 Provided that the Court may direct that a person referred to in clause (i) or clause (ii) be released on bail if such person is a child or is a woman or is sick or infirm:
+proviso_2 Provided further that the Court may also direct that a person referred to in clause (ii) be released on bail if it is satisfied that it is just and proper so to do for any other special reason: Provided also that the mere fact that an accused person may be required for being identified by witnesses during investigation or for police custody beyond the first fifteen days shall not be sufficient ground for refusing to grant bail if he is otherwise entitled to be released on bail and gives an undertaking that he shall comply with such directions as may be given by the Court: Provided also that no person shall, if the offence alleged to have been committed by him is punishable with death, imprisonment for life, or imprisonment for seven years or more, be released on bail by the Court under this sub-section without giving an opportunity of hearing to the Public Prosecutor.
+(2) If it appears to such officer or Court at any stage of the investigation, inquiry or trial, as the case may be, that there are not reasonable grounds for believing that the accused has committed a non-bailable offence, but that there are sufficient grounds for further inquiry into his guilt, the accused shall, subject to the provisions of section 492 and pending such inquiry, be released on bail, or, at the discretion of such officer or Court, on the execution by him of a bond for his appearance as hereinafter provided.
+(3) When a person accused or suspected of the commission of an offence punishable with imprisonment which may extend to seven years or more or of an offence under or of the Bharatiya Nyaya Sanhita, 2023 or abetment of, or conspiracy or attempt to commit, any such offence, is released on bail under sub-section (1), the Court shall impose the conditions,-
+    (a) that such person shall attend in accordance with the conditions of the bond executed under this Chapter;
+    (b) that such person shall not commit an offence similar to the offence of which he is accused, or suspected, of the commission of which he is suspected; and
+    (c) that such person shall not directly or indirectly make any inducement, threat or promise to any person acquainted with the facts of the case so as to dissuade him from disclosing such facts to the Court or to any police officer or tamper with the evidence, and may also impose, in the interests of justice, such other conditions as it considers necessary.
+(4) An officer or a Court releasing any person on bail under sub-section (1) or sub-section (2), shall record in writing his or its reasons or special reasons for so doing.
+(5) Any Court which has released a person on bail under sub-section (1) or sub-section (2), may, if it considers it necessary so to do, direct that such person be arrested and commit him to custody.
+(6) If, in any case triable by a Magistrate, the trial of a person accused of any non-bailable offence is not concluded within a period of sixty days from the first date fixed for taking evidence in the case, such person shall, if he is in custody during the whole of the said period, be released on bail to the satisfaction of the Magistrate, unless for reasons to be recorded in writing, the Magistrate otherwise directs.
+(7) If, at any time, after the conclusion of the trial of a person accused of a non-bailable offence and before judgment is delivered, the Court is of opinion that there are reasonable grounds for believing that the accused is not guilty of any such offence, it shall release the accused, if he is in custody, on the execution by him of a bond for his appearance to hear judgment delivered.
+
+Section 483 – Special powers of High Court or
+
+(1) A High Court or Court of Session may direct,-
+    (a) that any person accused of an offence and in custody be released on bail, and if the offence is of the nature specified in sub-section (3) of section 480, may impose any condition which it considers necessary for the purposes mentioned in that sub-section;
+    (b) that any condition imposed by a Magistrate when releasing any person on bail be set aside or modified:
+proviso_1 Provided that the High Court or the Court of Session shall, before granting bail to a person who is accused of an offence which is triable exclusively by the Court of Session or which, though not so triable, is punishable with imprisonment for life, give notice of the application for bail to the Public Prosecutor unless it is, for reasons to be recorded in writing, of opinion that it is not practicable to give such notice:
+proviso_2 Provided further that the High Court or the Court of Session shall, before granting bail to a person who is accused of an offence triable under section 65 or sub-section (2) of section 70 of the Bharatiya Nyaya Sanhita, 2023, give notice of the application for bail to the Public Prosecutor within a period of fifteen days from the date of receipt of the notice of such application.
+(2) The presence of the informant or any person authorised by him shall be obligatory at the time of hearing of the application for bail to the person under section 65 or sub-section (2) of section 70 of the Bharatiya Nyaya Sanhita, 2023.
+(3) A High Court or Court of Session may direct that any person who has been released on bail under this Chapter be arrested and commit him to custody.
+
+============================================================
+
+==================================================
+USER: Explain courts
+SYSTEM:
+
+
+============================================================Section 447 – Power of High Court to transfer cases and appeals
+
+(1) Whenever it is made to appear to the High Court-
+    (a) that a fair and impartial inquiry or trial cannot be had in any Criminal Court subordinate thereto; or
+    (b) that some question of law of unusual difficulty is likely to arise; or
+    (c) that an order under this section is required by any provision of this Sanhita, or will tend to the general convenience of the parties or witnesses, or is expedient for the ends of justice, it may order-
+    (i) that any offence be inquired into or tried by any Court not qualified under sections 197 to 205 (both inclusive), but in other respects competent to inquire into or try such offence;
+        (ii) that any particular case or appeal, or class of cases or appeals, be transferred from a Criminal Court subordinate to its authority to any other such Criminal Court of equal or superior jurisdiction;
+        (iii) that any particular case be committed for trial to a Court of Session; or
+        (iv) that any particular case or appeal be transferred to and tried before itself.
+(2) The High Court may act either on the report of the lower Court, or on the application of a party interested, or on its own initiative:
+proviso_1 Provided that no application shall lie to the High Court for transferring a case from one Criminal Court to another Criminal Court in the same sessions division, unless an application for such transfer has been made to the Sessions Judge and rejected by him.
+(3) Every application for an order under sub-section (1) shall be made by motion, which shall, except when the applicant is the Advocate-General of the State, be supported by affidavit or affirmation.
+(4) When such application is made by an accused person, the High Court may direct him to execute a bond or bail bond for the payment of any compensation which the High Court may award under sub-section (7).
+(5) Every accused person making such application shall give to the Public Prosecutor notice in writing of the application, together with a copy of the grounds on which it is made; and no order shall be made on the merits of the application unless at least twenty-four hours have elapsed between the giving of such notice and the hearing of the application.
+(6) Where the application is for the transfer of a case or appeal from any subordinate Court, the High Court may, if it is satisfied that it is necessary so to do in the interest of justice, order that, pending the disposal of the application the proceedings in the subordinate Court shall be stayed, on such terms as the High Court may think fit to impose:
+proviso_2 Provided that such stay shall not affect the subordinate Court's power of remand under section 346.
+(7) Where an application for an order under sub-section (1) is dismissed, the High Court may, if it is of opinion that the application was frivolous or vexatious, order the applicant to pay by way of compensation to any person who has opposed the application such sum as it may consider proper in the circumstances of the case.
+(8) When the High Court orders under sub-section (1) that a case be transferred from any Court for trial before itself, it shall observe in such trial the same procedure which that Court would have observed if the case had not been so transferred.
+(9) Nothing in this section shall be deemed to affect any order of the Government under section 218.
+
+Section 21 – Courts by which offences are triable
+
+Subject to the other provisions of this Sanhita,-
+    (a) any offence under the Bharatiya Nyaya Sanhita, 2023 may be tried by-
+    (i) the High Court; or
+        (ii) the Court of Session; or
+        (iii) any other Court by which such offence is shown in the First Schedule to be triable:
+proviso_1 Provided that any offence under section 64, section 65, section 66, section 67, section 68, section 69, section 70 or section 71 of the Bharatiya Nyaya Sanhita, 2023 shall be tried as far as practicable by a Court presided over by a woman;
+    (b) any offence under any other law shall, when any Court is mentioned in this behalf in such law, be tried by such Court and when no Court is so mentioned, may be tried by-
+    (i) the High Court; or
+        (ii) any other Court by which such offence is shown in the First Schedule to be triable.
+
+============================================================
+
+==================================================
+USER: Random unrelated question
+SYSTEM:
+The query does not match any provision in the BNSS dataset.
+
+==================================================

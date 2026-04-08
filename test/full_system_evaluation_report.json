@@ -1,0 +1,5158 @@
+{
+  "summary": {
+    "top1_accuracy": 0.3846,
+    "top3_accuracy": 0.6154,
+    "over_criminalization_rate": 0.0,
+    "irrelevant_law_per_case": 0.4103,
+    "total_cases": 39
+  },
+  "details": [
+    {
+      "case_id": "emp_01",
+      "input": "Company hasn't paid my salary for 2 months.",
+      "expected_top": "Payment of Wages Act, 1936",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "failed to disburse salary",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 did not pay P1's salary for the first month.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "failed to disburse salary",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 did not pay P1's salary for the second consecutive month.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose salary has not been paid by the company for two months.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The company that failed to pay P1's salary for two months.",
+            "relationship_to_client": "employer"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Unpaid salary for 2 months (no specific amount mentioned)",
+            "status": "missing"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "emp_02",
+      "input": "Boss terminated me suddenly without notice.",
+      "expected_top": "Industrial Disputes Act, 1947",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "initiated termination discussion",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 informed P1 of their termination in an abrupt manner.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "employment_ended"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "delivered termination without notice",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 terminated P1's employment without providing prior warning or notice period.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "employment_ended",
+              "forced_exit"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who was terminated without notice by their employer.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The employer (boss) who terminated P1 without notice.",
+            "relationship_to_client": "employer"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "employment_ended",
+          "forced_exit"
+        ],
+        "interpretations": [
+          {
+            "label": "employment_ended",
+            "conf": 0.9
+          },
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 2A",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "emp_03",
+      "input": "Company refusing to pay my gratuity after 5 years.",
+      "expected_top": "Payment of Gratuity Act, 1972",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "Narrative summary",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "Company refusing to pay my gratuity after 5 years.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "gratuity_dispute"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who worked for the company for 5 years and is seeking unpaid gratuity (e.g., bonus, commission, or other deferred compensation).",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The company (employer) refusing to pay the gratuity after 5 years of service.",
+            "relationship_to_client": "employer"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "A labor attorney or legal representative (if consulted) assisting P1 in pursuing the unpaid gratuity.",
+            "relationship_to_client": "legal advisor"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "A labor board, court, or regulatory agency (e.g., Department of Labor, Equal Employment Opportunity Commission) where P1 may file a complaint or seek resolution.",
+            "relationship_to_client": "regulatory body"
+          },
+          {
+            "id": "P5",
+            "name": null,
+            "role": "witness",
+            "description": "Former or current employees of the company who may corroborate P1\u2019s claims about unpaid gratuity or working conditions.",
+            "relationship_to_client": "potential witness"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Gratuity amount (not explicitly stated in the narrative, but implied as a financial claim after 5 years of service)",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "gratuity_dispute"
+        ],
+        "interpretations": [
+          {
+            "label": "gratuity_dispute",
+            "conf": 1.0
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Gratuity Act, 1972",
+          "section": "Sec 4",
+          "score": 0.847,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Score adjusted for evidence density. Formula trace: Base(0.98) x Interp(1.0) x Evidence(1.0) x Context(0.8) x Sanity(0.6)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "emp_04",
+      "input": "Manager harassed me at the workplace.",
+      "expected_top": "Sexual Harassment of Women at Workplace Act, 2013",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "made unwelcome comments or advances toward P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 engaged in behavior perceived as harassing by P1, including inappropriate remarks or physical proximity.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "reported the behavior to HR or a supervisor",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 formally or informally communicated the harassment to a third party (e.g., HR, compliance officer).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "denied the allegations or provided a conflicting account",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 responded to the report by disputing P1\u2019s claims or offering an alternative explanation.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "false_statement_made"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual experiencing workplace harassment by their manager.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The manager accused of harassing P1 at the workplace.",
+            "relationship_to_client": "harasser (manager)"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "harassment",
+          "false_statement_made"
+        ],
+        "interpretations": [
+          {
+            "label": "sexual_harassment",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "emp_05",
+      "input": "Firm is not contributing to my PF account.",
+      "expected_top": "Employees' Provident Funds and Miscellaneous Provisions Act, 1952",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "Failed to make required contributions to P1's personal pension (PF) account",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 did not deposit the mandatory employer contributions into P1's PF account as per the agreed or legally required terms.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "pf_not_contributed"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "Noticed the absence of contributions in their PF account",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 observed that their PF account statement or records showed no employer contributions from P2.",
+            "certainty": "certain",
+            "event_type": "state",
+            "semantic_tags": [
+              "pf_not_contributed"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "Attempted to verify or confirm the issue with P2",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 reached out to P2 (e.g., HR, payroll, or management) to inquire about the missing contributions.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "Provided a response (if any) to P1's inquiry",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 either acknowledged the issue, denied it, or provided an explanation (e.g., administrative error, miscommunication).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "Filed a complaint or escalated the matter to P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 submitted a formal complaint to P3 (e.g., labor department, pension authority) regarding P2's failure to contribute.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "pf_dispute"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P3",
+            "action": "Initiated an investigation into P2's compliance",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 reviewed P2's records, payroll systems, or PF contributions to verify the alleged non-compliance.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "pf_dispute"
+            ]
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P3",
+            "action": "Issued a decision or directive regarding P2's obligations",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 either ordered P2 to rectify the issue (e.g., back-pay contributions), imposed penalties, or took further enforcement action.",
+            "certainty": "alleged",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "pf_dispute"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose personal pension (PF) account is not being contributed to by their employer.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The firm/employer (P1's employer) failing to contribute to P1's personal pension (PF) account as required.",
+            "relationship_to_client": "employer"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "Relevant labor or pension regulatory body (e.g., government labor department, pension fund authority) responsible for enforcing employer contributions to PF accounts.",
+            "relationship_to_client": "regulatory body"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "pf_not_contributed",
+          "pf_dispute"
+        ],
+        "interpretations": [
+          {
+            "label": "pf_dispute",
+            "conf": 1.0
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Employees' Provident Funds and Miscellaneous Provisions Act, 1952",
+          "section": "Sec 6",
+          "score": 0.792,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(1.0) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "emp_06",
+      "input": "Employee stole company trade secrets before quitting.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "accessed and/or copied company trade secrets",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (former employee) obtained proprietary information belonging to P3 (company) prior to resignation.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "unauthorized_access",
+              "possession_removed"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "quit employment",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 resigned from P3, allegedly taking trade secrets with them.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "employment_ended",
+              "possession_removed"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "reported trade secret theft to P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 (current employee) informed P3 of the alleged theft by P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P3",
+            "action": "initiated investigation into trade secret theft",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 began internal review of P2\u2019s actions regarding trade secrets.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P3",
+            "action": "reported allegations to P4",
+            "target_id": "P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 escalated the matter to P4 (legal/regulatory body) for formal adjudication.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P4",
+            "action": "opened investigation into trade secret theft",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 launched an official probe into P2\u2019s alleged theft of P3\u2019s trade secrets.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The employee who alleges trade secrets were stolen by a former colleague before quitting.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The former employee accused of stealing company trade secrets before quitting.",
+            "relationship_to_client": "former colleague"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "The company whose trade secrets were allegedly stolen.",
+            "relationship_to_client": "employer"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Legal or regulatory body (e.g., court, prosecutor, or law enforcement) investigating or adjudicating the theft of trade secrets.",
+            "relationship_to_client": "external authority"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "unauthorized_access",
+          "possession_removed",
+          "employment_ended",
+          "fraud_signal"
+        ],
+        "interpretations": [
+          {
+            "label": "employment_ended",
+            "conf": 0.9
+          },
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          },
+          {
+            "label": "unauthorized_access",
+            "conf": 0.9
+          },
+          {
+            "label": "cyber_crime",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 2A",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general). Formula trace: Base(0.9) x Interp(0.9) x Evidence(0.8) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "emp_07",
+      "input": "Was made to work 14 hours a day without overtime pay.",
+      "expected_top": "Factories Act, 1948",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "imposed 14-hour workdays without overtime pay",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 required P1 to work extended hours (14-hour days) without compensating for overtime.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "overtime_work"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "became aware of unpaid overtime violation",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 recognized that the 14-hour workdays constituted unpaid overtime under applicable labor laws.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "overtime_work"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "alleged violation to P3 (e.g., labor department, court)",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 reported P2 to P3 for enforcing unpaid overtime, seeking enforcement or remedy.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "overtime_work",
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P3",
+            "action": "investigated alleged overtime violation",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 reviewed P2's labor practices to verify compliance with wage/hour laws regarding overtime pay.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "overtime_work"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P3",
+            "action": "determined violation (or dismissed claim)",
+            "target_id": "P2|P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 ruled on whether P2 violated overtime laws, potentially ordering corrective action (e.g., back pay) or dismissing the claim.",
+            "certainty": "uncertain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "overtime_work",
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who was subjected to unpaid overtime (14-hour workdays without overtime pay).",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The employer or entity responsible for enforcing the 14-hour workday without compensating for overtime.",
+            "relationship_to_client": "employer"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "Labor department, court, or regulatory body overseeing wage and hour laws (e.g., Department of Labor, Wage and Hour Division).",
+            "relationship_to_client": "regulatory body"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "overtime_work",
+          "agreement_signal_present",
+          "money_not_paid"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "breach_of_contract",
+            "conf": 0.85
+          },
+          {
+            "label": "overtime_dispute",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Factories Act, 1948",
+          "section": "Sec 59",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "emp_08",
+      "input": "Employer refusing to let me take maternity leave.",
+      "expected_top": "Maternity Benefit Act, 1961",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "submitted a request for maternity leave",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 formally requested maternity leave from P2, likely in writing or via company policy channels.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "maternity_leave_request"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "denied P1\u2019s maternity leave request",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 explicitly refused P1\u2019s request for maternity leave, either verbally, in writing, or through policy enforcement.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "maternity_leave_request"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "alleged further communication or escalation regarding the denial",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 may have followed up with P2 (e.g., emails, HR, or legal channels) to challenge or seek clarification on the denial.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "maternity_leave_request"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The pregnant employee seeking maternity leave.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The employer denying the employee's request for maternity leave.",
+            "relationship_to_client": "employer"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "maternity_leave_request"
+        ],
+        "interpretations": [
+          {
+            "label": "maternity_benefit",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Maternity Benefit Act, 1961",
+          "section": "Sec 5",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_01",
+      "input": "Someone hacked my bank account and stole money.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "Narrative summary",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "Someone hacked my bank account and stole money.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "unauthorized_access",
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose bank account was hacked and from whom money was stolen.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The unidentified hacker(s) responsible for unauthorized access to P1's bank account and theft of funds.",
+            "relationship_to_client": "perpetrator"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "The bank or financial institution where P1 holds the compromised account.",
+            "relationship_to_client": "service provider"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Law enforcement agencies (e.g., FBI, local police) or cybercrime units investigating the hack.",
+            "relationship_to_client": "regulatory/enforcement body"
+          },
+          {
+            "id": "P5",
+            "name": null,
+            "role": "third-party",
+            "description": "Cybersecurity experts or forensic investigators hired to analyze the breach and assist in recovery.",
+            "relationship_to_client": "consultant/expert"
+          },
+          {
+            "id": "P6",
+            "name": null,
+            "role": "authority",
+            "description": "Financial regulatory bodies (e.g., FDIC, CFPB) overseeing bank accountability and consumer protection.",
+            "relationship_to_client": "regulatory body"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "unauthorized_access",
+          "money_not_paid"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "unauthorized_access",
+            "conf": 0.9
+          },
+          {
+            "label": "cyber_crime",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 0.923,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 0.923,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66",
+          "score": 0.7,
+          "rank": 3,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.9) x Interp(0.9) x Evidence(0.8) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 0.684,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence, Score adjusted for evidence density. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(0.6)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_02",
+      "input": "Threatened to release my private WhatsApp chats.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "sent a threat to release private WhatsApp chats",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 communicated to P1 that they would disclose P1's private WhatsApp messages to others.",
+            "certainty": "certain",
+            "event_type": "threat",
+            "semantic_tags": [
+              "data_privacy_threat",
+              "harassment"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose private WhatsApp chats were threatened to be released.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The party threatening to release P1's private WhatsApp chats.",
+            "relationship_to_client": "threatening party"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "data_privacy_threat",
+          "harassment"
+        ],
+        "interpretations": [
+          {
+            "label": "sexual_harassment",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 0.762,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Score adjusted for evidence density. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(0.6)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_03",
+      "input": "They used my photos without permission on social media.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "took photos",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 created or obtained photos (e.g., selfies, personal images).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "acquired P1's photos",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 obtained P1's photos (e.g., via sharing, scraping, or unauthorized access).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "unauthorized_access"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "posted photos on social media",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 uploaded P1's photos to a social media platform without P1's permission.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "discovered unauthorized use",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 became aware that P2 had posted their photos without permission.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose photos were used without permission on social media.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The party (individual, organization, or entity) that posted P1's photos on social media without permission.",
+            "relationship_to_client": "defendant/perpetrator"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "unauthorized_access",
+          "data_privacy_threat"
+        ],
+        "interpretations": [
+          {
+            "label": "unauthorized_access",
+            "conf": 0.9
+          },
+          {
+            "label": "cyber_crime",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general). Formula trace: Base(0.9) x Interp(0.9) x Evidence(0.8) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_04",
+      "input": "I received an OTP and money disappeared.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "Narrative summary",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "I received an OTP and money disappeared.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The primary user/narrator who received an OTP (One-Time Password) and reported missing money.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "third-party",
+            "description": "The entity (e.g., bank, financial service, or platform) that sent the OTP and where the money was allegedly deducted or disappeared.",
+            "relationship_to_client": "service provider (e.g., bank, app, or payment platform)"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "Regulatory or law enforcement body (e.g., banking ombudsman, consumer protection agency, or police) that may investigate fraud or unauthorized transactions.",
+            "relationship_to_client": "external authority for dispute resolution or legal recourse"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Money disappeared (unspecified amount, no conversion needed)",
+            "status": "missing"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "fraud_signal"
+        ],
+        "interpretations": []
+      },
+      "phase3_ranked_laws": [],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_05",
+      "input": "Someone is blackmailing me with my private videos.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "obtained private videos of P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 acquired unauthorized recordings or footage involving P1.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "unauthorized_access",
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "initiated contact with P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 reached out to P1 (e.g., via message, email, or call) to begin blackmail.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "threat_made",
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "demanded payment or compliance from P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 requested money, favors, or other concessions in exchange for not disclosing the videos.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal",
+              "threat_made"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "received blackmail threats from P2",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 confirmed receiving demands tied to the private videos.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "threat_made",
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "attempted to respond to P2 (e.g., negotiation, refusal, or reporting)",
+            "target_id": "P2|null",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 took action (if any) in response to the blackmail (e.g., contacting authorities, engaging with P2, or ignoring).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual being blackmailed with private videos.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The party blackmailing P1 with private videos.",
+            "relationship_to_client": "blackmailer"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "unauthorized_access",
+          "data_privacy_threat",
+          "threat_made",
+          "harassment",
+          "fraud_signal"
+        ],
+        "interpretations": [
+          {
+            "label": "unauthorized_access",
+            "conf": 0.9
+          },
+          {
+            "label": "sexual_harassment",
+            "conf": 0.9
+          },
+          {
+            "label": "cyber_crime",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66",
+          "score": 1.0,
+          "rank": 4,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general). Formula trace: Base(0.9) x Interp(0.9) x Evidence(0.8) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_06",
+      "input": "E-commerce site leaked my credit card details.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "experienced a data breach",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2's systems were compromised, resulting in unauthorized access to stored credit card details.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "account_compromised",
+              "unauthorized_access",
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "failed to secure credit card data",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2's security measures were insufficient to prevent the exposure of P1's credit card details.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "account_compromised",
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "leaked credit card details",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P1's credit card details were exposed due to the breach at P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat",
+              "unauthorized_access"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P3",
+            "action": "accessed leaked credit card details",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "Third-party entities (P3) exploited the breach to obtain P1's credit card data from P2's compromised systems.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "unauthorized_access",
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "discovered credit card details were leaked",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 became aware that their credit card details were compromised due to P2's breach.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P1",
+            "action": "reported breach to P6",
+            "target_id": "P6",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 notified their credit card company or bank (P6) about the potential fraud risk due to the leaked data.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P6",
+            "action": "initiated fraud investigation",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P6 began investigating potential fraudulent transactions linked to P1's compromised credit card.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P4",
+            "action": "received breach notification (alleged)",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "Regulatory bodies (P4) were allegedly notified of the breach by P2 or P1.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 9,
+            "actor_id": "P5",
+            "action": "launched investigation into breach (alleged)",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "Law enforcement (P5) may have initiated an investigation into P2's breach or potential misuse of P1's data by P3.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 10,
+            "actor_id": "P2",
+            "action": "responded to breach (alleged)",
+            "target_id": "P4|P5|P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 may have taken steps to address the breach, such as notifying affected parties (P1), cooperating with regulators (P4), or assisting law enforcement (P5).",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose credit card details were leaked by an e-commerce site.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The e-commerce site responsible for the data breach (leaked credit card details).",
+            "relationship_to_client": "defendant/party-at-fault"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "Potential third-party entities (e.g., hackers, cybercriminals, or intermediaries) who may have exploited or accessed the leaked data.",
+            "relationship_to_client": "unrelated (but relevant to harm)"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Regulatory bodies (e.g., FTC, GDPR enforcers, or financial authorities) overseeing data protection and breach notifications.",
+            "relationship_to_client": "regulatory oversight"
+          },
+          {
+            "id": "P5",
+            "name": null,
+            "role": "authority",
+            "description": "Law enforcement agencies (e.g., FBI, local police) investigating the breach or potential fraud.",
+            "relationship_to_client": "investigative support"
+          },
+          {
+            "id": "P6",
+            "name": null,
+            "role": "third-party",
+            "description": "Credit card companies or banks (e.g., Visa, Mastercard, or issuing banks) handling fraud claims or liability.",
+            "relationship_to_client": "financial/liability intermediary"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "account_compromised",
+          "unauthorized_access",
+          "data_privacy_threat",
+          "fraud_signal"
+        ],
+        "interpretations": [
+          {
+            "label": "unauthorized_access",
+            "conf": 0.9
+          },
+          {
+            "label": "cyber_crime",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.9) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43A",
+          "score": 1.0,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "cyb_07",
+      "input": "Someone created a fake profile in my name to scam others.",
+      "expected_top": "Information Technology Act, 2000",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "created a fake profile using P1\u2019s identity",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2 fabricated a profile impersonating P1, including personal details (e.g., name, photos, or other identifying information).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "used the fake profile to initiate contact with P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 reached out to P3 (e.g., via messaging, calls, or social media) under the guise of P1\u2019s identity.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "conducted scam operations against P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 engaged P3 in fraudulent schemes (e.g., romance scams, investment fraud, or impersonation-based deception) to extract money, data, or other valuables.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "discovered the fake profile and scam activity",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 became aware of the impersonation and the scam\u2019s existence, likely through alerts, reports from P3, or platform notifications.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "reported the fake profile to relevant platforms or authorities",
+            "target_id": "P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 filed a complaint with social media platforms, cybercrime units (P4), or regulatory bodies (e.g., FTC) to remove the profile and investigate.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P4",
+            "action": "investigated the fake profile and scam claims",
+            "target_id": "P2|P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 (law enforcement/regulatory bodies) gathered evidence (e.g., digital footprints, transaction records) to identify P2 and assess P1\u2019s involvement (if any).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P4",
+            "action": "alleged P2\u2019s actions as fraudulent and pursued legal action",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 charged P2 with criminal offenses (e.g., identity theft, fraud) or issued warnings to P2 and platforms to cease activity.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P4|platforms",
+            "action": "removed the fake profile and mitigated further harm",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 or social media platforms terminated the fake profile and took steps to prevent P2 from creating new impersonations.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 9,
+            "actor_id": "P3",
+            "action": "reported losses or sought restitution",
+            "target_id": "P4|P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 filed complaints with P4 or P1 (if P1 was a secondary victim) to recover financial losses or hold P2 accountable.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_returned"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose identity was used to create a fake profile for scamming others.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The person(s) who created and used the fake profile in P1\u2019s name to scam others.",
+            "relationship_to_client": "perpetrator"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "Victims of the scam (individuals targeted or defrauded by the fake profile).",
+            "relationship_to_client": "unrelated (potential victims)"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Relevant law enforcement (e.g., police, cybercrime units) or regulatory bodies (e.g., FTC, social media platforms) investigating or addressing the scam.",
+            "relationship_to_client": "external support"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "fraud_signal",
+          "money_not_returned"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "fraud_like_behavior",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66D",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.8) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "cyb_08",
+      "input": "I am being stalked online by an ex-colleague.",
+      "expected_top": "Bharatiya Nyaya Sanhita, 2023",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "initiated online contact with P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 began engaging with P1 on social media or other online platforms after their professional relationship ended.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "sent unsolicited messages to P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 sent direct messages, comments, or emails to P1 without P1's consent or invitation.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "monitored P1's online activity",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 viewed P1's social media profiles, posts, or other online presence repeatedly or without P1's knowledge.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "shared P1's personal information online",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 disclosed P1's private details (e.g., location, photos, work details) on public or private platforms.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "data_privacy_threat"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P2",
+            "action": "created or shared fake profiles impersonating P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 made or distributed accounts pretending to be P1 to harass or deceive others.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P2",
+            "action": "harassed P1 through online interactions",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 engaged in persistent, unwanted, or threatening behavior toward P1 via online platforms.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P1",
+            "action": "reported stalking behavior to authorities or platforms",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 documented and reported P2's actions to law enforcement, social media companies, or other relevant entities.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P1",
+            "action": "blocked or restricted P2 on online platforms",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 took steps to prevent further contact by P2 on social media or other digital channels.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 9,
+            "actor_id": "P2",
+            "action": "continued stalking despite P1's restrictions",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 persisted in monitoring or contacting P1 even after P1's attempts to block or distance themselves.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 10,
+            "actor_id": "P1",
+            "action": "sought legal or professional support",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 pursued legal action, counseling, or other resources to address the stalking.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual experiencing online stalking by an ex-colleague.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The ex-colleague stalking P1 online.",
+            "relationship_to_client": "ex-colleague"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "harassment",
+          "data_privacy_threat",
+          "fraud_signal"
+        ],
+        "interpretations": [
+          {
+            "label": "sexual_harassment",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "fin_01",
+      "input": "I gave a loan but he is not returning the money.",
+      "expected_top": "Indian Contract Act, 1872",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "provided a loan",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 extended a monetary loan to P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "received the loan",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 accepted the loan from P1.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "requested repayment",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 sought repayment from P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "failed to repay",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 did not return the loan or interest to P1.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_returned"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The narrator who provided a loan and is seeking repayment.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The individual who borrowed money from P1 and has not repaid the loan.",
+            "relationship_to_client": "debtor"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Loan amount not specified in the narrative (user mentioned 'I gave a loan' but no value provided).",
+            "status": "missing"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_returned"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "fin_02",
+      "input": "My cheque was returned by the bank for insufficient funds.",
+      "expected_top": "Negotiable Instruments Act, 1881",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "issued a cheque",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 wrote and issued a cheque to P2 (the bank) for payment.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "processed the cheque",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (the bank) received and began processing the cheque from P1.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "detected insufficient funds",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 identified that P1's account lacked sufficient funds to cover the cheque amount.",
+            "certainty": "certain",
+            "event_type": "state",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "returned the cheque",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 returned the cheque to P1 (or the payee) as unpaid due to insufficient funds.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "cheque_bounce",
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose cheque was returned by the bank for insufficient funds.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "authority",
+            "description": "The bank that processed the cheque and returned it due to insufficient funds.",
+            "relationship_to_client": "third-party (service provider)"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Cheque returned for insufficient funds (implied amount unknown)",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid",
+          "cheque_bounce"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "cheque_bounce",
+            "conf": 0.95
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Negotiable Instruments Act, 1881",
+          "section": "Sec 138",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.99) x Interp(0.95) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "fin_03",
+      "input": "A credit card agent lied about charges.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "discovered unauthorized or misleading charges on their credit card account",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 noticed discrepancies in their credit card statement, including charges they did not recognize or were inaccurately described.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "contacted P2 (credit card agent) to report the unauthorized or misleading charges",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 reached out to P2 to inquire about the charges and seek clarification or resolution.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "provided false or misleading statements about the charges on P1's account",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 allegedly gave P1 incorrect information or misrepresented the nature of the charges, failing to address P1's concerns accurately.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "false_statement_made",
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "escalated the issue to P3 (credit card company) due to unresolved or misleading responses from P2",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 formally reported the issue to P3, citing P2's alleged misconduct and requesting an investigation or resolution.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P3",
+            "action": "initiated an internal investigation into P1's dispute and P2's actions",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 reviewed P1's claim and P2's statements to determine the validity of the charges and whether P2 acted improperly.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P3",
+            "action": "communicated findings to P1 regarding the charges and P2's conduct",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 provided P1 with a resolution (e.g., charge reversal, explanation, or disciplinary action against P2) based on the investigation.",
+            "certainty": "uncertain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P1",
+            "action": "filed a complaint with P4 (regulatory body) if unresolved or dissatisfied with P3's response",
+            "target_id": "P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 reported the issue to P4, alleging misconduct by P2 or P3, seeking further oversight or intervention.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P4",
+            "action": "reviewed P1's complaint and may have taken enforcement action against P2 or P3",
+            "target_id": "P2|P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 investigated the allegations and could impose penalties, require corrective actions, or refer the case for further legal proceedings.",
+            "certainty": "uncertain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who discovered unauthorized or misleading charges on their credit card and is seeking resolution.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The credit card agent who allegedly made false or misleading statements about charges on P1's account.",
+            "relationship_to_client": "credit card company representative"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "The credit card company (employer of P2) that may be responsible for resolving the dispute or investigating P2's actions.",
+            "relationship_to_client": "issuer of the credit card"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Regulatory bodies (e.g., Consumer Financial Protection Bureau, Federal Trade Commission) that oversee credit card practices and can intervene in disputes.",
+            "relationship_to_client": "external regulatory body"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "fraud_signal",
+          "false_statement_made"
+        ],
+        "interpretations": []
+      },
+      "phase3_ranked_laws": [],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "fin_04",
+      "input": "Company took money for investment and shut down.",
+      "expected_top": "Bharatiya Nyaya Sanhita, 2023",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "transferred funds",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 entrusted money to P2 for investment purposes.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "acknowledged receipt of funds",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 confirmed acceptance of P1's investment funds.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "ceased operations",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2 shut down, halting all business activities.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "attempted to access funds",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 tried to retrieve their invested money from P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P2",
+            "action": "failed to provide access to funds",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 was unable or unwilling to return P1's money after shutdown.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_returned"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual or entity who entrusted money to the company for investment purposes.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The company that accepted the investment funds and subsequently shut down, leaving P1 without access to their money.",
+            "relationship_to_client": "investment recipient (defendant/breach of contract)"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Company took money for investment (no specific amount mentioned in the narrative)",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_returned"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "fin_05",
+      "input": "Bank is charging high interest contrary to the agreement.",
+      "expected_top": "Indian Contract Act, 1872",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "entered into a financial agreement with P2",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 engaged with P2 (the bank) to establish a loan or credit agreement with specified interest terms.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "applied interest charges exceeding the agreed terms",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 imposed interest rates or fees higher than those outlined in the original agreement with P1.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "noticed discrepancies in interest charges",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 identified that the interest charges from P2 did not align with the agreed-upon terms.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "documented the excessive charges",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 gathered evidence (e.g., statements, emails) to support the claim of overcharging by P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "filed a complaint against P2",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 formally raised the issue with P2, either internally (e.g., customer service) or externally (e.g., regulatory body).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P2",
+            "action": "responded to the complaint (if any)",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 acknowledged or disputed P1\u2019s claim regarding the excessive interest charges.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual or entity filing the complaint about the bank's high interest charges.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": "Bank",
+            "role": "opponent",
+            "description": "The financial institution accused of charging excessive interest contrary to the agreed terms.",
+            "relationship_to_client": "defendant"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Bank is charging high interest contrary to the agreement (no specific amount mentioned in the narrative).",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "agreement_signal_present",
+          "fraud_signal"
+        ],
+        "interpretations": []
+      },
+      "phase3_ranked_laws": [],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "fin_06",
+      "input": "Insurance company is not settling my claim from a fire accident.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "filed an insurance claim for fire-related damages",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 submitted a formal claim to P2 for property damages caused by a fire accident.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "reviewed the claim submission",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 examined the claim details, evidence, and documentation provided by P1.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "rejected or denied the claim settlement",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 formally refused to settle the claim, citing unspecified reasons (e.g., policy terms, evidence insufficiency, or procedural issues).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "requested clarification or appeal for the claim decision",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 sought further explanation or pursued an appeal process with P2 regarding the denial.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P2",
+            "action": "responded to the appeal or provided additional reasoning for denial",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 either maintained the denial, offered partial settlement, or provided further justification for the refusal.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual filing the insurance claim for damages resulting from a fire accident.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The insurance company refusing to settle the claim related to the fire accident.",
+            "relationship_to_client": "insurance provider"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "fin_07",
+      "input": "Recovery agents are harassing me for a loan I already paid.",
+      "expected_top": "Bharatiya Nyaya Sanhita, 2023",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P3",
+            "action": "issued a loan to P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 provided a loan to P1 (certain)",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "repaid the loan to P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 fully settled the debt with P3 (certain)",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P3",
+            "action": "sold or transferred the debt to P2",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 allegedly transferred the debt to P2 (uncertain)",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "contacted P1 regarding an unpaid loan",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 initiated contact with P1 claiming the debt is unpaid (alleged)",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid",
+              "harassment"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "informed P2 that the loan was already paid",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 disputed the claim and asserted the debt was settled (certain)",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P2",
+            "action": "continued harassing P1 for the alleged unpaid debt",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 persisted in demanding payment despite P1's denial (certain)",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "harassment"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual being harassed by recovery agents for a loan they claim has already been paid.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "Recovery agents (or debt collectors) contacting P1 regarding a loan they allege is unpaid.",
+            "relationship_to_client": "debt collector/opponent"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "The original lender or financial institution that may have sold the debt to P2 (recovery agents).",
+            "relationship_to_client": "original creditor (potential source of debt)"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid",
+          "harassment"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "sexual_harassment",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "fin_08",
+      "error": "1 validation error for Financial\namount\n  Input should be a valid number [type=float_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_type"
+    },
+    {
+      "case_id": "pro_01",
+      "input": "Landlord threw out my stuff and locked the door.",
+      "expected_top": "Specific Relief Act, 1963",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "removed belongings",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 allegedly took P1's belongings from the premises.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "possession_removed"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "locked door",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 allegedly locked P1's door after removing belongings.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "forced_exit"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The tenant whose belongings were removed and whose door was locked by the landlord.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The landlord who allegedly threw out P1's belongings and locked the door.",
+            "relationship_to_client": "landlord"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "possession_removed",
+          "forced_exit"
+        ],
+        "interpretations": [
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Specific Relief Act, 1963",
+          "section": "Sec 6",
+          "score": 0.882,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Transfer of Property Act, 1882",
+          "section": "Sec 105",
+          "score": 0.576,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.8) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Transfer of Property Act, 1882"
+      ]
+    },
+    {
+      "case_id": "pro_02",
+      "input": "Tenant is not paying rent for 6 months.",
+      "expected_top": "Transfer of Property Act, 1882",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "failed to pay rent",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 (tenant) did not make rent payments to P2 (landlord) for a continuous 6-month period.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "notified P1 of unpaid rent",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (landlord) sent formal written notice(s) to P1 regarding the unpaid rent.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "initiated eviction or debt claim process",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (landlord) filed a formal eviction or debt recovery claim with P3 (court/legal authority).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "hired debt collection agency or legal representative",
+            "target_id": "P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (landlord) engaged P4 (debt collection agency/legal rep) to assist in recovering unpaid rent.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P4",
+            "action": "attempted debt recovery actions",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 (debt collection agency/legal rep) contacted P1 (tenant) to demand payment or negotiate settlement.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P3",
+            "action": "issued court order or judgment",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 (court/legal authority) ruled in favor of P2 (landlord) and issued an eviction order or debt judgment against P1 (tenant).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P2",
+            "action": "initiated enforcement of judgment",
+            "target_id": "P3|P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (landlord) requested P3 (court/legal authority) to enforce the judgment (e.g., wage garnishment, property seizure) against P1 (tenant).",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P5",
+            "action": "facilitated communication or mediation (if applicable)",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "If P5 (property management company) was involved, they mediated between P1 (tenant) and P2 (landlord) to resolve the dispute.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The tenant who has failed to pay rent for 6 months.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The landlord or property owner to whom the rent is owed.",
+            "relationship_to_client": "landlord/property owner"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "A court or legal authority where the landlord may file an eviction or debt claim against the tenant.",
+            "relationship_to_client": "legal authority"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "third-party",
+            "description": "A debt collection agency or legal representative hired by the landlord to recover unpaid rent.",
+            "relationship_to_client": "debt collector/legal representative (if applicable)"
+          },
+          {
+            "id": "P5",
+            "name": null,
+            "role": "third-party",
+            "description": "A property management company or intermediary handling the rental agreement (if applicable).",
+            "relationship_to_client": "property manager (if applicable)"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Tenant not paying rent for 6 months (no specific amount mentioned in the narrative).",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid",
+          "forced_exit"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "pro_03",
+      "input": "Seller took advance but not registering the plot.",
+      "expected_top": "Specific Relief Act, 1963",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "received advance payment from P1 for the plot",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 accepted an advance payment from P1 for the sale of an unregistered plot.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "failed to register the plot as required by law",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 did not submit the plot for registration with P3 despite receiving payment.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "discovered the plot was not registered",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 became aware that P2 had not registered the plot with P3.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "initiated legal recourse against P2 for non-registration",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 took steps to seek legal remedies from P2 due to the unregistered plot.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "alleged P2 committed a breach of contract/law by not registering the plot",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 claimed P2 violated legal or contractual obligations by failing to register the plot.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P3",
+            "action": "may verify or investigate P2's failure to register the plot",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 could confirm or examine whether P2 complied with registration requirements.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The party seeking legal recourse due to the seller's failure to register the plot after receiving an advance payment.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The seller who took an advance payment for the plot but failed to register it as required by law.",
+            "relationship_to_client": "seller (defendant)"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "The relevant government or regulatory body responsible for property registration (e.g., Sub-Registrar, Revenue Department).",
+            "relationship_to_client": "regulatory body"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 0.0,
+            "currency": "INR",
+            "context": "Seller took advance (amount unspecified in narrative)",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "agreement_signal_present"
+        ],
+        "interpretations": []
+      },
+      "phase3_ranked_laws": [],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "pro_04",
+      "input": "Neighbor has built a wall encroaching on my land.",
+      "expected_top": "Specific Relief Act, 1963",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "built a wall on disputed land",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 constructed a wall that extends onto P1's property, encroaching on their land.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "possession_removed"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "discovered the encroachment",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 noticed the wall built by P2 encroaching onto their land.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "requested boundary verification",
+            "target_id": "P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 hired P4 (a surveyor) to assess and confirm the property boundaries and encroachment.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P4",
+            "action": "conducted a survey",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 surveyed the land and documented the encroachment by P2's wall onto P1's property.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "submitted findings to P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 presented P4's survey results to P3 (local government/municipal authority) to address the encroachment.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P3",
+            "action": "initiated dispute resolution process",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 began formal proceedings to resolve the encroachment dispute between P1 and P2.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P1",
+            "action": "filed a complaint/lawsuit",
+            "target_id": "P5",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 filed a formal complaint or lawsuit against P2 in P5 (court/legal system) regarding the encroachment.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P5",
+            "action": "reviewed evidence and claims",
+            "target_id": "P1|P2|P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P5 examined P4's survey, P1's complaint, and P2's alleged defenses to determine the validity of the encroachment claim.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 9,
+            "actor_id": "P5",
+            "action": "issued a ruling or order",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P5 delivered a decision (e.g., demolition order, boundary adjustment, compensation) regarding the encroachment.",
+            "certainty": "uncertain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose land has been encroached upon by a neighbor's wall.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The neighbor who built the wall encroaching on P1's land.",
+            "relationship_to_client": "neighbor/opponent"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "Local government or municipal authority responsible for land disputes, zoning laws, or property boundaries (e.g., city planning department, surveyor, or court).",
+            "relationship_to_client": "regulatory body"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "third-party",
+            "description": "A surveyor or land expert hired to assess the property boundaries and confirm the encroachment.",
+            "relationship_to_client": "hired professional"
+          },
+          {
+            "id": "P5",
+            "name": null,
+            "role": "authority",
+            "description": "Court or legal system where P1 may file a complaint or lawsuit against P2 for the encroachment.",
+            "relationship_to_client": "legal adjudicator"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "possession_removed",
+          "agreement_signal_present"
+        ],
+        "interpretations": [
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Specific Relief Act, 1963",
+          "section": "Sec 6",
+          "score": 0.706,
+          "rank": 1,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(0.8) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Transfer of Property Act, 1882",
+          "section": "Sec 105",
+          "score": 0.576,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.8) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Transfer of Property Act, 1882"
+      ]
+    },
+    {
+      "case_id": "pro_05",
+      "input": "Builder is delay possession of my flat by 2 years.",
+      "expected_top": "RERA, 2016",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "entered into a contract with P1 for the construction of a flat",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (builder) and P1 (individual) agreed on terms for the construction and possession of the flat.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "commenced construction of the flat",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2 began the construction process as per the agreed timeline.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "delayed completion of the flat beyond the agreed timeline",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 failed to deliver the flat to P1 within the originally agreed possession date.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "service_not_delivered"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "experienced a 2-year delay in possession of the flat",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 has not taken possession of the flat for 2 years beyond the expected completion date.",
+            "certainty": "certain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "service_not_delivered"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual experiencing the delay in possession of their flat.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": "Builder",
+            "role": "opponent",
+            "description": "The party responsible for constructing the flat, currently delaying possession.",
+            "relationship_to_client": "service provider"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "agreement_signal_present",
+          "service_not_delivered"
+        ],
+        "interpretations": [
+          {
+            "label": "breach_of_contract",
+            "conf": 0.85
+          },
+          {
+            "label": "service_not_delivered",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(11)",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 37",
+          "score": 0.765,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.9) x Interp(0.85) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Specific Relief Act, 1963",
+          "section": "Sec 10",
+          "score": 0.68,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.8) x Interp(0.85) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "pro_06",
+      "input": "Co-owner sold the property without my consent.",
+      "expected_top": "Transfer of Property Act, 1882",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "entered into a sale agreement for the property",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (co-owner) initiated or agreed to sell the property without P1's involvement.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "executed the sale of the property",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P2 completed the sale transaction (e.g., signed deeds, transferred title, or received payment).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "possession_removed"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "discovered the sale of the property",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 became aware that the property had been sold without their consent.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "alleged lack of consent in the sale",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 claims P2 acted without their consent, as required by co-ownership rules.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "false_statement_made"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose consent was not obtained before the property was sold by the co-owner.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The co-owner who sold the property without P1's consent.",
+            "relationship_to_client": "co-owner"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "agreement_signal_present",
+          "possession_removed",
+          "false_statement_made"
+        ],
+        "interpretations": [
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Specific Relief Act, 1963",
+          "section": "Sec 6",
+          "score": 0.706,
+          "rank": 1,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(0.8) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Transfer of Property Act, 1882",
+          "section": "Sec 105",
+          "score": 0.576,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.8) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Transfer of Property Act, 1882"
+      ]
+    },
+    {
+      "case_id": "pro_07",
+      "input": "Landlord is not returning my 50k security deposit.",
+      "expected_top": "Indian Contract Act, 1872",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "paid a $50,000 security deposit",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 provided P2 with a $50,000 security deposit as part of the tenancy agreement.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "received the $50,000 security deposit",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 acknowledged receipt of the $50,000 deposit from P1.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "completed tenancy obligations and vacated the property",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 fulfilled all lease terms and moved out of the property.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "failed to return the $50,000 security deposit",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 withheld the full $50,000 deposit without providing a written explanation or refund.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_returned"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "requested the return of the $50,000 deposit",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 formally demanded the deposit's return from P2, with no response or resolution.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P1",
+            "action": "initiated a dispute with a relevant legal/regulatory body (P3)",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 filed a complaint with P3 (e.g., tenant rights agency, small claims court) alleging P2's unjustified withholding of the deposit.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P3",
+            "action": "investigated the dispute between P1 and P2",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 reviewed evidence, lease terms, and communications to assess the validity of P2's withholding.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 8,
+            "actor_id": "P3",
+            "action": "issued a ruling or decision on the deposit dispute",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 determined whether P2's withholding was justified or unjustified, potentially ordering repayment or penalties.",
+            "certainty": "uncertain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The tenant who paid a $50,000 security deposit and is disputing its non-return by the landlord.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The landlord who is withholding the $50,000 security deposit without justification.",
+            "relationship_to_client": "landlord"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "A relevant legal or regulatory body (e.g., tenant rights agency, small claims court, or housing authority) that could adjudicate the dispute over the deposit.",
+            "relationship_to_client": "governing body"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 50000.0,
+            "currency": "INR",
+            "context": "Security deposit not returned by landlord",
+            "status": "missing"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_returned",
+          "agreement_signal_present",
+          "money_not_paid"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "breach_of_contract",
+            "conf": 0.85
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "pro_08",
+      "input": "Forced to vacate without the required notice period.",
+      "expected_top": "Transfer of Property Act, 1882",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "issued a demand for P1 to vacate the property",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 communicated (verbally or in writing) that P1 must leave the property immediately or within a period shorter than the legally required notice.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "forced_exit",
+              "threat_made"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "attempted to comply or resist the demand",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 either tried to negotiate, ignored the demand, or prepared to leave but was pressured to do so faster than legally required.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": [
+              "forced_exit"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "physically or coercively enforced the vacate demand",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 took actions (e.g., changing locks, removing belongings, or pressuring P1) to force P1 out before the legally required notice period expired.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "forced_exit",
+              "threat_made"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "vacated the property under duress",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 left the property without the legally required notice period, either due to coercion or fear of further action by P2.",
+            "certainty": "certain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "possession_removed"
+            ]
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P1",
+            "action": "reported the incident to P3",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 filed a complaint or initiated a dispute resolution process with P3, alleging violation of notice period laws by P2.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P3",
+            "action": "initiated an investigation or review of the dispute",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 examined the evidence, communications, and actions of P1 and P2 to determine compliance with notice period laws.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P3",
+            "action": "issued a ruling or decision on the dispute",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 determined whether P2 violated notice period laws and, if so, prescribed remedies (e.g., penalties, reinstatement, or compensation for P1).",
+            "certainty": "uncertain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who was forced to vacate a property without the legally required notice period.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The landlord or property owner who allegedly violated the notice period requirement by forcing P1 to vacate.",
+            "relationship_to_client": "landlord/property owner"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "The relevant legal or regulatory body (e.g., housing authority, tenant rights board, or court) responsible for enforcing notice period laws and adjudicating disputes.",
+            "relationship_to_client": "government/regulatory body"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "forced_exit",
+          "threat_made",
+          "possession_removed",
+          "agreement_signal_present"
+        ],
+        "interpretations": [
+          {
+            "label": "illegal_dispossession",
+            "conf": 0.9
+          },
+          {
+            "label": "sexual_harassment",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Specific Relief Act, 1963",
+          "section": "Sec 6",
+          "score": 0.882,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Transfer of Property Act, 1882",
+          "section": "Sec 105",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.8) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Transfer of Property Act, 1882"
+      ]
+    },
+    {
+      "case_id": "con_01",
+      "input": "The mobile I bought is defective and company refuses replacement.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "purchased a mobile device",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 acquired a mobile device from P2 (company).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "discovered the mobile device is defective",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "P1 identified the purchased mobile device as malfunctioning or not working as intended.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "product_defective"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "requested a replacement for the defective mobile device",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 formally or informally asked P2 to replace the defective device.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P2",
+            "action": "refused to replace the defective mobile device",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 declined P1's request for a replacement of the defective device.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who purchased a defective mobile device and is seeking a replacement from the company.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The company that sold the defective mobile device and is refusing to replace it.",
+            "relationship_to_client": "seller/opponent"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "product_defective",
+          "service_not_delivered"
+        ],
+        "interpretations": [
+          {
+            "label": "service_not_delivered",
+            "conf": 0.9
+          },
+          {
+            "label": "product_defective",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(11)",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(10)",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "con_02",
+      "input": "Airline cancelled flight and refusing refund.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "cancelled flight",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 (airline) cancelled the flight booked by P1 (individual).",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P1",
+            "action": "requested refund",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 requested a refund from P2 due to the cancelled flight.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P2",
+            "action": "refused refund",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 refused to provide a refund to P1.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose flight was cancelled and is seeking a refund.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The airline that cancelled the flight and is refusing to provide a refund.",
+            "relationship_to_client": "opponent"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 3,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "con_03",
+      "input": "Insurance company rejected my medical claim wrongly.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "filed a medical claim",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 submitted a medical claim to P2 for reimbursement or coverage.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "rejected the medical claim",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 denied or rejected P1's submitted medical claim.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "money_not_paid"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "alleged wrongful rejection of the claim",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 asserts that P2's rejection of the claim was incorrect or unjustified.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "false_statement_made"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who filed the medical claim and believes it was wrongly rejected by the insurance company.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The insurance company that rejected the medical claim, allegedly in error.",
+            "relationship_to_client": "insurance provider"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "money_not_paid",
+          "false_statement_made"
+        ],
+        "interpretations": [
+          {
+            "label": "non_payment",
+            "conf": 0.8
+          },
+          {
+            "label": "fraud_like_behavior",
+            "conf": 0.8
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 1.0,
+          "rank": 2,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66D",
+          "score": 1.0,
+          "rank": 3,
+          "reasoning": "Ranked based on: Partial behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.8) x Evidence(0.8) x Context(1.0) x Sanity(1.0)."
+        },
+        {
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "rank": 4,
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": [
+        "Indian Contract Act, 1872"
+      ]
+    },
+    {
+      "case_id": "con_04",
+      "input": "E-commerce site delivered a stone instead of a laptop.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "placed an order for a laptop on an e-commerce site",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 initiated a purchase transaction with P2 for a laptop via the e-commerce platform.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "processed the order and dispatched an item for delivery",
+            "target_id": "P3",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 fulfilled the order by sending an item (allegedly incorrect) to P3 for delivery.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "product_defective"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P3",
+            "action": "delivered a stone to P1 instead of the ordered laptop",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P3 handed over a stone to P1 as the delivered item.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "product_defective"
+            ]
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "notified P2 of the incorrect delivery (stone instead of laptop)",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 reported the discrepancy to P2, claiming the received item was a stone.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 5,
+            "actor_id": "P2",
+            "action": "acknowledged the complaint and initiated an investigation",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 responded to P1\u2019s complaint and began reviewing the issue.",
+            "certainty": "uncertain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 6,
+            "actor_id": "P1",
+            "action": "escalated the dispute to P4 (consumer protection agency/court)",
+            "target_id": "P4",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 filed a formal complaint with P4 (e.g., FTC, small claims court) due to unresolved issues with P2.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          },
+          {
+            "sequence": 7,
+            "actor_id": "P4",
+            "action": "initiated proceedings or mediation between P1 and P2",
+            "target_id": "P1|P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P4 began adjudicating the dispute, potentially involving P2\u2019s response and P1\u2019s claims.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "agreement_signal_present"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who ordered a laptop from the e-commerce site and received a stone instead.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The e-commerce site or seller responsible for delivering the incorrect item (stone instead of laptop).",
+            "relationship_to_client": "seller/opponent"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "Potential courier or logistics provider involved in the delivery process (if distinct from P2).",
+            "relationship_to_client": "delivery agent (if applicable)"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Consumer protection agency, small claims court, or regulatory body (e.g., FTC, local consumer affairs) that could adjudicate the dispute.",
+            "relationship_to_client": "external regulator"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "product_defective",
+          "agreement_signal_present"
+        ],
+        "interpretations": [
+          {
+            "label": "product_defective",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(10)",
+          "score": 1.0,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "con_05",
+      "input": "Hospital charged 2 lakhs extra for surgery without justification.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P2",
+            "action": "conducted surgery for P1",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 performed the surgery on P1 as part of the agreed medical procedure.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 2,
+            "actor_id": "P2",
+            "action": "issued a bill including an unjustified extra charge of \u20b92 lakhs",
+            "target_id": "P1",
+            "timestamp": null,
+            "location": null,
+            "description": "P2 provided P1 with a bill that included \u20b92 lakhs beyond the agreed or justified cost for the surgery.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          },
+          {
+            "sequence": 3,
+            "actor_id": "P1",
+            "action": "discovered the extra \u20b92 lakhs charge in the bill",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 identified the unjustified \u20b92 lakhs charge in the bill provided by P2.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": []
+          },
+          {
+            "sequence": 4,
+            "actor_id": "P1",
+            "action": "alleged the extra \u20b92 lakhs charge was unjustified",
+            "target_id": "P2",
+            "timestamp": null,
+            "location": null,
+            "description": "P1 claimed that the \u20b92 lakhs extra charge was not justified or warranted for the surgery.",
+            "certainty": "alleged",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who underwent the surgery and was charged an unjustified extra \u20b92 lakhs by the hospital.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The hospital that charged the unjustified extra \u20b92 lakhs for the surgery.",
+            "relationship_to_client": "service provider"
+          }
+        ],
+        "financials": [
+          {
+            "amount": 200000.0,
+            "currency": "INR",
+            "context": "Hospital charged extra for surgery without justification",
+            "status": "mentioned"
+          }
+        ]
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "fraud_signal"
+        ],
+        "interpretations": []
+      },
+      "phase3_ranked_laws": [],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "con_06",
+      "input": "A fair skin cream promised results in 7 days but didn't work.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "Narrative summary",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "A fair skin cream promised results in 7 days but didn't work.",
+            "certainty": "certain",
+            "event_type": "outcome",
+            "semantic_tags": [
+              "service_not_delivered"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual who purchased the fair skin cream and experienced no results within the promised 7-day period.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The manufacturer or seller of the fair skin cream, who made the claim of results within 7 days.",
+            "relationship_to_client": "seller/manufacturer"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "Regulatory body (e.g., FDA, consumer protection agency) responsible for overseeing product claims and consumer rights.",
+            "relationship_to_client": "external regulator"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "third-party",
+            "description": "A consumer protection organization or legal representative (e.g., lawyer) assisting P1 in addressing the issue.",
+            "relationship_to_client": "assistant/advocate"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "service_not_delivered"
+        ],
+        "interpretations": [
+          {
+            "label": "service_not_delivered",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(11)",
+          "score": 0.953,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "con_07",
+      "input": "AC installed is not cooling even after 5 repairs.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "Narrative summary",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "AC installed is not cooling even after 5 repairs.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "service_not_delivered"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual whose air conditioning (AC) unit has not been cooling properly despite multiple repair attempts.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The AC repair technician(s) or company responsible for the failed repairs.",
+            "relationship_to_client": "service provider (defective/non-responsive)"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "third-party",
+            "description": "The manufacturer of the AC unit (if involved in warranty claims or product liability).",
+            "relationship_to_client": "potential liability (manufacturer)"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "authority",
+            "description": "Regulatory bodies (e.g., consumer protection agency, local building codes, or industry standards) overseeing AC installation/repair practices.",
+            "relationship_to_client": "regulatory oversight"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "service_not_delivered"
+        ],
+        "interpretations": [
+          {
+            "label": "service_not_delivered",
+            "conf": 0.9
+          }
+        ]
+      },
+      "phase3_ranked_laws": [
+        {
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(11)",
+          "score": 0.953,
+          "rank": 1,
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        }
+      ],
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    },
+    {
+      "case_id": "con_08",
+      "input": "Restaurant charged service tax illegally.",
+      "expected_top": "Consumer Protection Act, 2019",
+      "phase1_facts": {
+        "events": [
+          {
+            "sequence": 1,
+            "actor_id": "P1",
+            "action": "Narrative summary",
+            "target_id": null,
+            "timestamp": null,
+            "location": null,
+            "description": "Restaurant charged service tax illegally.",
+            "certainty": "certain",
+            "event_type": "action",
+            "semantic_tags": [
+              "fraud_signal"
+            ]
+          }
+        ],
+        "parties": [
+          {
+            "id": "P1",
+            "name": null,
+            "role": "client",
+            "description": "The individual or entity (e.g., restaurant customer) who believes they were illegally charged a service tax and is seeking resolution or legal action.",
+            "relationship_to_client": "self"
+          },
+          {
+            "id": "P2",
+            "name": null,
+            "role": "opponent",
+            "description": "The restaurant that allegedly charged an illegal service tax.",
+            "relationship_to_client": "defendant/party being challenged"
+          },
+          {
+            "id": "P3",
+            "name": null,
+            "role": "authority",
+            "description": "The relevant tax authority (e.g., IRS, local tax department) responsible for enforcing tax laws and investigating illegal charges.",
+            "relationship_to_client": "regulatory body"
+          },
+          {
+            "id": "P4",
+            "name": null,
+            "role": "third-party",
+            "description": "A legal representative (e.g., lawyer) assisting P1 in addressing the illegal tax charge.",
+            "relationship_to_client": "legal advisor"
+          },
+          {
+            "id": "P5",
+            "name": null,
+            "role": "witness",
+            "description": "Any individual (e.g., restaurant staff, accountant) who may have knowledge of the tax charging process or dispute.",
+            "relationship_to_client": "potential witness or informant"
+          }
+        ],
+        "financials": []
+      },
+      "phase2_primitives": {
+        "behaviors": [
+          "fraud_signal"
+        ],
+        "interpretations": []
+      },
+      "phase3_ranked_laws": [],
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "over_criminalized": false,
+      "irrelevant_laws": []
+    }
+  ]
+}

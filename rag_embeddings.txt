@@ -1,0 +1,26 @@
+{
+  "chunk_id": "IPC_300_C1",
+
+  "document_id": "IPC_1860",
+  "document_type": "act",
+
+  "act_name": "Indian Penal Code",
+  "section_number": "300",
+  "section_title": "Murder",
+
+  "clause_label": "Firstly",
+  "clause_type": "main",
+
+  "chunk_text": "Culpable homicide is murder if the act is done with intention of causing death...",
+
+  "context_path": "Chapter 16 > Section 300 > Firstly",
+
+  "embedding_ready_text": "IPC Section 300 Firstly murder definition intention to cause death...",
+
+  "metadata": {
+    "jurisdiction": "India",
+    "domain": "criminal",
+    "source_path": "laws_browse/ipc.pdf",
+    "page_number": 214
+  }
+}

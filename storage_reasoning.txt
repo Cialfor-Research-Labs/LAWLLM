@@ -1,0 +1,37 @@
+{
+  "document_id": "IPC_1860",
+  "document_type": "act",
+  "title": "Indian Penal Code",
+  "year": 1860,
+  "jurisdiction": "India",
+
+  "chapters": [
+    {
+      "chapter_id": "CH_16",
+      "chapter_title": "Offences Affecting Human Body",
+
+      "sections": [
+        {
+          "section_id": "IPC_300",
+          "section_number": "300",
+          "section_title": "Murder",
+
+          "clauses": [
+            {
+              "clause_id": "IPC_300_C1",
+              "clause_type": "main",
+              "clause_label": "Firstly",
+              "text": "Culpable homicide is murder if..."
+            },
+            {
+              "clause_id": "IPC_300_EX1",
+              "clause_type": "exception",
+              "clause_label": "Exception 1",
+              "text": "Culpable homicide is not murder if..."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

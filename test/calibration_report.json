@@ -1,0 +1,901 @@
+{
+  "timestamp": "2026-04-07T13:27:43.912181",
+  "metrics": {
+    "top1_accuracy": 24.0,
+    "top3_accuracy": 25.0,
+    "over_criminalization_rate": 0.0,
+    "irrelevant_law_rate": 24.615384615384617
+  },
+  "detail": [
+    {
+      "case_id": "emp_01",
+      "input": "Company hasn't paid my salary for 2 months.",
+      "expected": "Payment of Wages Act, 1936",
+      "predicted": [
+        "Payment of Wages Act, 1936",
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_02",
+      "input": "Boss terminated me suddenly without notice.",
+      "expected": "Industrial Disputes Act, 1947",
+      "predicted": [
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        0.769
+      ]
+    },
+    {
+      "case_id": "emp_03",
+      "input": "Company refusing to pay my gratuity after 5 years.",
+      "expected": "Payment of Gratuity Act, 1972",
+      "predicted": [
+        "Payment of Wages Act, 1936",
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_04",
+      "input": "Manager harassed me at the workplace.",
+      "expected": "Sexual Harassment of Women at Workplace Act, 2013",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_05",
+      "input": "Firm is not contributing to my PF account.",
+      "expected": "Employees' Provident Funds and Miscellaneous Provisions Act, 1952",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_06",
+      "input": "Employee stole company trade secrets before quitting.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_07",
+      "input": "Was made to work 14 hours a day without overtime pay.",
+      "expected": "Factories Act, 1948",
+      "predicted": [
+        "Payment of Wages Act, 1936",
+        "Industrial Disputes Act, 1947",
+        "Factories Act, 1948"
+      ],
+      "scores": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_08",
+      "input": "Employer refusing to let me take maternity leave.",
+      "expected": "Maternity Benefit Act, 1961",
+      "predicted": [
+        "Maternity Benefit Act, 1961"
+      ],
+      "scores": [
+        0.794
+      ]
+    },
+    {
+      "case_id": "emp_09",
+      "input": "Contractor not paying daily wages for construction work.",
+      "expected": "Minimum Wages Act, 1948",
+      "predicted": [
+        "Payment of Wages Act, 1936",
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_10",
+      "input": "Company did not provide the promised bonus after a year.",
+      "expected": "Payment of Bonus Act, 1965",
+      "predicted": [
+        "Payment of Bonus Act, 1965"
+      ],
+      "scores": [
+        0.729
+      ]
+    },
+    {
+      "case_id": "emp_11",
+      "input": "Employer is discriminating based on my caste.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_12",
+      "input": "I was injured while operating machinery at work.",
+      "expected": "Employees' Compensation Act, 1923",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_13",
+      "input": "Company is not paying me minimum wages mandated locally.",
+      "expected": "Minimum Wages Act, 1948",
+      "predicted": [
+        "Payment of Wages Act, 1936",
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_14",
+      "input": "I was sacked for raising concerns about safety at the site.",
+      "expected": "Factories Act, 1948",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_15",
+      "input": "Employer didn't provide notice period before termination.",
+      "expected": "Industrial Disputes Act, 1947",
+      "predicted": [
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        0.769
+      ]
+    },
+    {
+      "case_id": "emp_16",
+      "input": "Salary was withheld due to a minor dispute.",
+      "expected": "Payment of Wages Act, 1936",
+      "predicted": [
+        "Payment of Wages Act, 1936",
+        "Industrial Disputes Act, 1947"
+      ],
+      "scores": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "emp_17",
+      "input": "Was not allowed to enter office after resigning.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_18",
+      "input": "PF balance is not reflecting the monthly deductions.",
+      "expected": "Employees' Provident Funds and Miscellaneous Provisions Act, 1952",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_19",
+      "input": "Manager abused me in front of the whole team.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "emp_20",
+      "input": "Forced to work on Sundays without compensatory off.",
+      "expected": "Factories Act, 1948",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_01",
+      "input": "Someone hacked my bank account and stole money.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.794,
+        0.769,
+        0.769,
+        0.729
+      ]
+    },
+    {
+      "case_id": "cyb_02",
+      "input": "Threatened to release my private WhatsApp chats.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.838,
+        0.677
+      ]
+    },
+    {
+      "case_id": "cyb_03",
+      "input": "They used my photos without permission on social media.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.838,
+        0.677
+      ]
+    },
+    {
+      "case_id": "cyb_04",
+      "input": "I received an OTP and money disappeared.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.794,
+        0.769,
+        0.769,
+        0.729
+      ]
+    },
+    {
+      "case_id": "cyb_05",
+      "input": "Someone is blackmailing me with my private videos.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.838,
+        0.677
+      ]
+    },
+    {
+      "case_id": "cyb_06",
+      "input": "E-commerce site leaked my credit card details.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.838,
+        0.677
+      ]
+    },
+    {
+      "case_id": "cyb_07",
+      "input": "Someone created a fake profile in my name to scam others.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "cyb_08",
+      "input": "I am being stalked online by an ex-colleague.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_09",
+      "input": "A malware encrypted all my work files and asking for ransom.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_10",
+      "input": "Someone is sending me abusive messages on WhatsApp.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_11",
+      "input": "Email account was compromised and password changed.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.794,
+        0.769,
+        0.769,
+        0.729
+      ]
+    },
+    {
+      "case_id": "cyb_12",
+      "input": "Identity was stolen to take a business loan.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_13",
+      "input": "Bank OTP was intercepted by a phishing site.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.794,
+        0.769,
+        0.769,
+        0.729
+      ]
+    },
+    {
+      "case_id": "cyb_14",
+      "input": "Computer was infected with a keylogger.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_15",
+      "input": "Defamatory comments were posted on my Facebook timeline.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_16",
+      "input": "Confidential company data was leaked by a former admin.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.838,
+        0.677
+      ]
+    },
+    {
+      "case_id": "cyb_17",
+      "input": "Unauthorized purchase on my credit card from a foreign IP.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_18",
+      "input": "Hacker is threatening to D-DOS my business website.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "cyb_19",
+      "input": "Nude photos were morphed and leaked on telegram.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        0.838,
+        0.677
+      ]
+    },
+    {
+      "case_id": "cyb_20",
+      "input": "Someone is posing as a customer support rep to get my OTP.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000",
+        "Information Technology Act, 2000"
+      ],
+      "scores": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "case_id": "fin_01",
+      "input": "I gave a loan but he is not returning the money.",
+      "expected": "Indian Contract Act, 1872",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_02",
+      "input": "My cheque was returned by the bank for insufficient funds.",
+      "expected": "Negotiable Instruments Act, 1881",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_03",
+      "input": "A credit card agent lied about charges.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_04",
+      "input": "Company took money for investment and shut down.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_05",
+      "input": "Bank is charging high interest contrary to the agreement.",
+      "expected": "Indian Contract Act, 1872",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_06",
+      "input": "Insurance company is not settling my claim from a fire accident.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_07",
+      "input": "Recovery agents are harassing me for a loan I already paid.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_08",
+      "input": "Borrowed 10 lakhs and the lender is asking for extra commission.",
+      "expected": "Indian Contract Act, 1872",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_09",
+      "input": "Investment platform refused to let me withdraw my funds.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_10",
+      "input": "Signed a guarantee for a friend who defaulted.",
+      "expected": "Indian Contract Act, 1872",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_11",
+      "input": "Bank locked my account without any legal notice.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_12",
+      "input": "Stock broker executed unauthorized trades in my account.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_13",
+      "input": "Lender is using a forged document to claim higher debt.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_14",
+      "input": "Payment gateway deducted money but product not ordered.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_15",
+      "input": "Friend is refusing to pay back the loan despite the written note.",
+      "expected": "Indian Contract Act, 1872",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_16",
+      "input": "Cheque bounce notice was issued falsely.",
+      "expected": "Negotiable Instruments Act, 1881",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_17",
+      "input": "Online payment failed but amount was not refunded after 15 days.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_18",
+      "input": "Loan EMI was deducted twice in the same month.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_19",
+      "input": "Merchant charged extra fee for using credit card.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "fin_20",
+      "input": "Account was debited for a transaction I didn't authorize.",
+      "expected": "Information Technology Act, 2000",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_01",
+      "input": "Landlord threw out my stuff and locked the door.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [
+        "Specific Relief Act, 1963"
+      ],
+      "scores": [
+        0.635
+      ]
+    },
+    {
+      "case_id": "pro_02",
+      "input": "Tenant is not paying rent for 6 months.",
+      "expected": "Transfer of Property Act, 1882",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_03",
+      "input": "Seller took advance but not registering the plot.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_04",
+      "input": "Neighbor has built a wall encroaching on my land.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_05",
+      "input": "Builder is delay possession of my flat by 2 years.",
+      "expected": "RERA, 2016",
+      "predicted": [
+        "RERA, 2016",
+        "Transfer of Property Act, 1882",
+        "Specific Relief Act, 1963"
+      ],
+      "scores": [
+        0.794,
+        0.648,
+        0.635
+      ]
+    },
+    {
+      "case_id": "pro_06",
+      "input": "Co-owner sold the property without my consent.",
+      "expected": "Transfer of Property Act, 1882",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_07",
+      "input": "Landlord is not returning my 50k security deposit.",
+      "expected": "Indian Contract Act, 1872",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_08",
+      "input": "Forced to vacate without the required notice period.",
+      "expected": "Transfer of Property Act, 1882",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_09",
+      "input": "Inherited land is being occupied by a distance relative.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_10",
+      "input": "The registered sale deed was found to be forged.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_11",
+      "input": "Property tax was paid but notice shows arrears.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_12",
+      "input": "Developer abandoned the project halfway.",
+      "expected": "RERA, 2016",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_13",
+      "input": "Tenant damage the property significantly before leaving.",
+      "expected": "Transfer of Property Act, 1882",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_14",
+      "input": "Unauthorized construction happened in the common area.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_15",
+      "input": "Lease was terminated early without compensation.",
+      "expected": "Transfer of Property Act, 1882",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_16",
+      "input": "Flat was sold to two different people by the builder.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "predicted": [
+        "RERA, 2016",
+        "Transfer of Property Act, 1882",
+        "Specific Relief Act, 1963"
+      ],
+      "scores": [
+        0.794,
+        0.648,
+        0.635
+      ]
+    },
+    {
+      "case_id": "pro_17",
+      "input": "Maintenance charges are being hiked exponentially.",
+      "expected": "RERA, 2016",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_18",
+      "input": "Encroachment on the public road in front of my gate.",
+      "expected": "Specific Relief Act, 1963",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_19",
+      "input": "Seller is refusing to provide current occupancy certificate.",
+      "expected": "RERA, 2016",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "pro_20",
+      "input": "Original documents of the plot are lost by the bank.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_01",
+      "input": "The mobile I bought is defective and company refuses replacement.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [
+        "Consumer Protection Act, 2019"
+      ],
+      "scores": [
+        0.794
+      ]
+    },
+    {
+      "case_id": "con_02",
+      "input": "Airline cancelled flight and refusing refund.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [
+        "Consumer Protection Act, 2019"
+      ],
+      "scores": [
+        0.794
+      ]
+    },
+    {
+      "case_id": "con_03",
+      "input": "Insurance company rejected my medical claim wrongly.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_04",
+      "input": "E-commerce site delivered a stone instead of a laptop.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_05",
+      "input": "Hospital charged 2 lakhs extra for surgery without justification.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_06",
+      "input": "A fair skin cream promised results in 7 days but didn't work.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_07",
+      "input": "AC installed is not cooling even after 5 repairs.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_08",
+      "input": "Restaurant charged service tax illegally.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_09",
+      "input": "Travel agency changed hotel at the last minute.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_10",
+      "input": "Furniture delivered is of poor quality compared to demo.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [
+        "Consumer Protection Act, 2019"
+      ],
+      "scores": [
+        0.794
+      ]
+    },
+    {
+      "case_id": "con_11",
+      "input": "Online course content was not as advertised.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_12",
+      "input": "Food poisoning happened after eating at a local chain.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_13",
+      "input": "Courier lost the parcel containing expensive gifts.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_14",
+      "input": "Car engine failed within 1 month of purchase.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_15",
+      "input": "Hidden charges in the apartment maintenance bill.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_16",
+      "input": "Broadband plan speed is much lower than promised.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_17",
+      "input": "Electricity bill is inflated by 10x suddenly.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_18",
+      "input": "Gym refused to refund the membership fee after closing.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [
+        "Consumer Protection Act, 2019"
+      ],
+      "scores": [
+        0.794
+      ]
+    },
+    {
+      "case_id": "con_19",
+      "input": "Pre-ordered game was not delivered on release day.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    },
+    {
+      "case_id": "con_20",
+      "input": "Dry cleaner ruined an expensive silk saree.",
+      "expected": "Consumer Protection Act, 2019",
+      "predicted": [],
+      "scores": []
+    }
+  ]
+}

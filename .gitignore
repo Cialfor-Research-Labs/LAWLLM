@@ -1,0 +1,73 @@
+# macOS metadata
+._*
+.DS_Store
+test_*
+tmp_*
+# Python
+embedding_acts/
+embedding_judgements/
+logs/
+path/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+.vscode/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Project Specific - Data & Large Assets (Not needed for runtime if embeddings exist)
+JSON_acts/
+json_judgements/
+txt_acts/
+laws_old/
+backup codes/
+embeddings_judgements/
+sessions/
+test_judgements/
+test_embedding/
+test_json/
+llama_outputs/
+context_builder_outputs/
+*.zip
+
+# Frontend
+ui/node_modules/
+ui/dist/
+# Note: Keeping ui/src/ in case build is needed on cloud, otherwise ignore if only serving dist.
+
+# Local Test/Eval Reports
+eval_report*.json
+focused_eval_report.json
+eval_cases.json

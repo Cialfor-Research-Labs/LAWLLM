@@ -1,0 +1,14 @@
+--extra-index-url https://download.pytorch.org/whl/cu118
+faiss-cpu
+sentence-transformers
+tqdm
+numpy
+fastapi
+uvicorn
+transformers
+torch
+accelerate
+bitsandbytes
+scipy
+boto3
+botocore[crt]

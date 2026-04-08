@@ -1,0 +1,2639 @@
+import json
+import os
+import re
+import traceback
+import uuid
+from datetime import datetime
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, Body
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from answer_validator import validate_grounding
+from context_builder import build_context_pack, load_acts_chunk_lookup, run_retrieval
+from llama_legal_answer import call_llm, build_llm_prompt, get_model_and_tokenizer, rewrite_query, llm_rerank
+from query_expansion import build_query
+from bedrock_client import DEFAULT_BEDROCK_MODEL_ID
+
+# 🔥 Security & Retrieval Engines
+from dynamic_intake_engine import handle_query as handle_dynamic_intake
+from deterministic_retrieval import search_sections, reconstruct_section, call_qwen as call_qwen_act, load_data as load_act_data, FULL_ACT_NAMES, is_explanation_query
+from legal_router import classify_legal_issue, build_intent_route
+from security_engine import is_valid_query, is_legal_query, validate_output, sanitize_user_input
+from legal_heuristics import match_heuristics, format_heuristics_for_prompt, format_heuristics_for_debug
+from legal_confidence import (
+    compute_confidence, confidence_label, extract_citations, format_citations_for_prompt,
+    validate_answer, build_refinement_prompt, build_confidence_rewrite_prompt,
+    apply_confidence_styling, has_actionable_next_steps,
+)
+from legal_notice_engine import (
+    NOTICE_TYPES, get_available_notice_types, auto_detect_notice_type,
+    build_notice_prompt, build_refinement_prompt as build_notice_refinement_prompt,
+    build_authority_appendix,
+)
+from legal_interview import (
+    detect_issues, extract_facts as extract_facts_heuristic, select_questions, 
+    generate_legal_output,
+    compute_signal_strength, decide_next_step
+)
+from fact_extractor import extract_facts as extract_facts_llm
+from case_model import CaseModel
+from extractor_pipeline import run_case_extractor_pipeline
+from legal_primitives import BehavioralPrimitive, LegalInterpretation, LegalBrain
+from law_engine import ApplicableLaw, LawEngine
+from bedrock_client import call_bedrock_chat
+from phase65_engine import (
+    analyze_interaction_logs,
+    append_interaction_log,
+    build_log_entry,
+    choose_confirmation_question,
+    contradiction_penalty as phase65_contradiction_penalty,
+    derive_confirmed_tags,
+    detect_contradictions,
+    extract_signal_updates,
+    merge_signal_state,
+    normalize_user_confidence,
+    rank_signal_questions,
+    summarize_signal_state,
+)
+
+
+app = FastAPI(title="Vidhi AI API", version="2.5")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 🧠 Session Storage
+SESSIONS: Dict[str, List[Dict[str, str]]] = {}
+LOG_PATH = os.path.join("logs", "query_logs.json")
+DISABLE_EMBEDDING_RETRIEVAL = os.getenv("DISABLE_EMBEDDING_RETRIEVAL", "true").strip().lower() == "true"
+USE_JUDGEMENT_EMBEDDINGS = os.getenv("USE_JUDGEMENT_EMBEDDINGS", "true").strip().lower() == "true"
+# PHASE 1: Score thresholds disabled — no chunk is rejected due to score.
+MIN_RETRIEVAL_SCORE = 0.0
+MIN_ACCEPTABLE_RETRIEVAL_SCORE = 0.0
+MAX_RETRIEVAL_QUERIES = int(os.getenv("MAX_RETRIEVAL_QUERIES", "5"))
+DEFAULT_ALLOWED_DOCS = {"acts", "judgements"}
+LAWYER_SESSIONS: Dict[str, Dict[str, Any]] = {}
+INTERVIEW_SESSIONS: Dict[str, Dict[str, Any]] = {}
+INTERACTION_LOG_PATH = os.path.join("test", "interaction_logs.jsonl")
+
+DOMAIN_FORBIDDEN_QUESTION_TERMS: Dict[str, List[str]] = {
+    "labour": ["landlord", "rent", "property"],
+}
+
+DOMAIN_ALLOWED_VOCABULARY: Dict[str, List[str]] = {
+    "labour": ["employee", "employer", "salary", "wages", "termination", "contract", "labour court"],
+}
+
+INDIAN_STATE_TERMS = [
+    "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh", "goa",
+    "gujarat", "haryana", "himachal pradesh", "jharkhand", "karnataka", "kerala",
+    "madhya pradesh", "maharashtra", "manipur", "meghalaya", "mizoram", "nagaland",
+    "odisha", "orissa", "punjab", "rajasthan", "sikkim", "tamil nadu", "telangana",
+    "tripura", "uttar pradesh", "uttarakhand", "west bengal", "delhi", "new delhi",
+    "jammu and kashmir", "ladakh", "puducherry", "pondicherry", "chandigarh",
+    "andaman and nicobar", "dadra and nagar haveli", "daman and diu", "lakshadweep",
+]
+
+GENERIC_STATE_RENT_HINTS = [
+    "delhi rent act",
+    "maharashtra rent control act",
+    "tamil nadu regulation of rights and responsibilities of landlords and tenants act",
+    "karnataka rent act",
+    "west bengal premises tenancy act",
+    "state rent act",
+    "rent control act",
+]
+
+# =========================
+# REQUEST / RESPONSE MODELS
+# =========================
+
+class QueryRequest(BaseModel):
+    query: str = Field(..., min_length=2)
+    mode: str = "understand_case"  # "understand_case" or "query_act"
+    llm_model: str = DEFAULT_BEDROCK_MODEL_ID
+    llm_timeout_sec: int = 300
+    session_id: Optional[str] = None
+    reset_session: bool = False
+    debug: bool = False
+
+class QueryResponse(BaseModel):
+    ok: bool
+    query: str
+    answer: str
+    reasoning: List[str] = [] 
+    citations: List[Dict[str, Any]]
+    context_blocks: List[Dict[str, Any]]
+    confidence: Optional[float] = None
+    confidence_label: Optional[str] = None
+    meta: Dict[str, Any]
+
+
+class UserModeResponse(BaseModel):
+    ok: bool
+    query: str
+    summary: str
+    what_you_can_do: List[str]
+    legal_options: List[str]
+    notes: str
+    meta: Dict[str, Any] = {}
+
+
+class LawyerInitRequest(BaseModel):
+    query: str = Field(..., min_length=2)
+    llm_model: str = DEFAULT_BEDROCK_MODEL_ID
+    llm_timeout_sec: int = 300
+    session_id: Optional[str] = None
+    reset_session: bool = False
+    debug: bool = False
+
+
+class LawyerRefineRequest(BaseModel):
+    session_id: str = Field(..., min_length=3)
+    answers: Dict[str, str] = Field(default_factory=dict)
+    llm_model: str = DEFAULT_BEDROCK_MODEL_ID
+    llm_timeout_sec: int = 300
+    debug: bool = False
+
+
+class LawyerModeResponse(BaseModel):
+    ok: bool
+    session_id: str
+    facts: str
+    issues: List[str]
+    legal_pathways: List[Dict[str, Any]]
+    questions: List[Dict[str, Any]]
+    final_analysis: Optional[Dict[str, Any]] = None
+    meta: Dict[str, Any] = {}
+
+
+# =====================================================
+# PHASE 2/3 INTERVIEW MODELS
+# =====================================================
+
+class InterviewChatRequest(BaseModel):
+    session_id: Optional[str] = None
+    query: str = Field(..., min_length=2)
+    llm_model: str = DEFAULT_BEDROCK_MODEL_ID
+    # Optional field for when the user confirms/edits the extracted case model
+    case_model_update: Optional[CaseModel] = None
+
+class LegalOutput(BaseModel):
+    analysis: str
+    summary: str
+    severity: str = "medium"
+    applicable_laws: List[str]
+    legal_options: List[str]
+    next_steps: List[str]
+    confidence: float
+    notice_draft: Optional[str] = None
+    case_strategy: List[str] = []
+    evidence_checklist: List[str] = []
+    
+    model_config = {"extra": "ignore"}
+
+class InterviewChatResponse(BaseModel):
+    ok: bool = True
+    session_id: str
+    issue: str
+    secondary_issues: List[str] = []
+    confidence: float
+    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required"
+    is_complete: bool
+    questions: List[str]
+    legal_output: Optional[LegalOutput] = None
+    case_model: Optional[CaseModel] = None
+    behavioral_primitives: List[BehavioralPrimitive] = []
+    interpretations: List[LegalInterpretation] = []
+    applicable_laws: List[ApplicableLaw] = []
+    state_debug: Dict[str, Any]
+
+
+def _domain_forbidden_terms(domain: str) -> List[str]:
+    return DOMAIN_FORBIDDEN_QUESTION_TERMS.get(str(domain or "").lower(), [])
+
+
+def _domain_allowed_terms(domain: str) -> List[str]:
+    return DOMAIN_ALLOWED_VOCABULARY.get(str(domain or "").lower(), [])
+
+
+def _top_law_name(laws: List[ApplicableLaw]) -> Optional[str]:
+    if not laws:
+        return None
+    top = laws[0]
+    return f"{top.law}:{top.section}"
+
+
+def _update_session_facts_from_case_model(case_obj: CaseModel, session_facts: Dict[str, Any]) -> Dict[str, Any]:
+    facts = dict(session_facts or {})
+    for f in case_obj.financials:
+        facts["amount"] = f.amount
+        context = (f.context or "").lower()
+        if "salary" in context:
+            facts["months_unpaid"] = facts.get("months_unpaid", True)
+        if "deposit" in context:
+            facts["issue_type"] = facts.get("issue_type") or "security_deposit"
+    for d in case_obj.documents:
+        low_type = (d.type or "").lower()
+        if "agreement" in low_type or "contract" in low_type or "lease" in low_type:
+            facts["agreement"] = True
+        if low_type in {"screenshot", "email", "receipt", "salary_slip", "bank_statement"}:
+            facts["proof"] = True
+    for evt in case_obj.events:
+        desc = (evt.description or "").lower()
+        if any(token in desc for token in ["terminated", "fired", "resigned", "left the job"]):
+            facts["status"] = True
+        if "notice" in desc:
+            facts["notice"] = True
+        if "salary" in desc:
+            facts["months_unpaid"] = facts.get("months_unpaid", True)
+    return facts
+
+# =========================
+# HELPERS
+# =========================
+
+def build_context_text(context_blocks: List[Dict]) -> str:
+    lines = []
+    for c in context_blocks:
+        ref = c.get("citation_id") or "CTX"
+        corpus = (c.get("corpus") or "unknown").upper()
+        title = c.get("title") or "Legal Document"
+        section_number = c.get("section_number")
+        section_title = c.get("section_title")
+        context_path = c.get("context_path")
+        texts = c.get("texts", {}) or {}
+
+        header = f"[{ref}] Source: {corpus} | Title: {title}"
+        if section_number:
+            header += f" | Section: {section_number}"
+        if section_title:
+            header += f" | Section Title: {section_title}"
+        if context_path:
+            header += f" | Context: {context_path}"
+        lines.append(header)
+        lines.append(f"Content: {texts.get('chunk_text', '')}")
+
+        if texts.get("parent_text"):
+            lines.append(f"Parent Context: {texts.get('parent_text')}")
+        if texts.get("section_text"):
+            lines.append(f"Section Text: {texts.get('section_text')}")
+        if texts.get("court") or texts.get("date"):
+            lines.append(f"Court: {texts.get('court')} | Date: {texts.get('date')}")
+        if texts.get("bench"):
+            lines.append(f"Bench: {texts.get('bench')}")
+        lines.append("")
+
+    return "\n".join(lines).strip()
+
+
+def build_direct_legal_prompt(user_query: str, legal_priors: str = "", citation_text: str = "") -> str:
+    priors_block = f"\n\n{legal_priors}\n" if legal_priors else ""
+    citations_block = f"\n\n{citation_text}\n" if citation_text else ""
+    return (
+        "You are a senior Indian legal expert.\n"
+        "Answer strictly in Indian legal context only.\n"
+        "Use Indian statutes, Indian courts, and Indian legal terminology.\n"
+        "If the question appears to be about another country, still provide an India-focused answer and state that assumption.\n"
+        "Provide a clear general legal-information answer using your own knowledge.\n"
+        "Do not refuse with generic text like 'I can't give legal advice'.\n"
+        "If specific legal advice is requested, provide general legal information, legal options, and procedural next steps.\n"
+        "Do not claim to quote any specific statute unless you are reasonably confident.\n"
+        "If jurisdiction or facts are unclear, state assumptions explicitly.\n"
+        "Be confident and direct — do NOT hedge.\n"
+        "Cite relevant laws and sections where possible.\n"
+        "If citations are available below, refer to them explicitly.\n\n"
+        f"User question:\n{user_query}\n"
+        f"{priors_block}"
+        f"{citations_block}\n"
+        "Return in this FIRAC structure:\n"
+        "Part 1 - Facts and Legal Issue:\n"
+        "Part 2 - Applicable Law:\n"
+        "Part 3 - Analysis:\n"
+        "Part 4 - Remedies and Next Steps:\n"
+        "Part 5 - Limits:\n"
+        "Part 6 - Disclaimer:\n"
+    )
+
+
+def _detect_low_confidence(results: List[Dict[str, Any]]) -> bool:
+    """PHASE 2: Detect when retrieval confidence is too low to rely on."""
+    if not results:
+        return True
+    scores = [float(r.get('final_score', r.get('hybrid_score', 0)) or 0) for r in results]
+    avg_score = sum(scores) / len(scores)
+    return avg_score < 0.3
+
+
+def _build_fallback_prompt(user_query: str, legal_priors: str, citation_text: str = "") -> str:
+    """PHASE 2+3: Fallback prompt — used when retrieval is weak.
+    Gives the LLM permission to reason from legal knowledge + heuristic priors.
+    Phase 3: Also injects citations and enforces FIRAC."""
+    priors_section = f"{legal_priors}\n\n" if legal_priors else ""
+    citations_section = f"{citation_text}\n\n" if citation_text else ""
+    return (
+        "You are an expert Indian lawyer with deep knowledge of Indian statutes and case law.\n\n"
+        "The legal database retrieval did not return strong results for this query.\n"
+        "However, use your legal knowledge combined with the known legal signals below to:\n\n"
+        "1. Identify the legal issue\n"
+        "2. Name the applicable Indian laws and specific sections\n"
+        "3. Suggest concrete legal remedies\n"
+        "4. Explain the exact next steps the person should take\n\n"
+        "Do not refuse with generic text like 'I can't give legal advice'.\n"
+        "Provide general legal information and procedural guidance.\n"
+        "Be confident and direct — do NOT hedge.\n"
+        "If citations are available below, refer to them explicitly.\n"
+        "If jurisdiction or facts are unclear, state assumptions explicitly.\n\n"
+        f"User Facts:\n{user_query}\n\n"
+        f"{priors_section}"
+        f"{citations_section}"
+        "Structure your answer in FIRAC format:\n"
+        "Part 1 - Facts and Legal Issue:\n"
+        "- Restate key facts and identify the legal issue\n\n"
+        "Part 2 - Applicable Law:\n"
+        "- List every applicable Act, section, and judgement\n\n"
+        "Part 3 - Analysis:\n"
+        "- Apply the law to the facts\n\n"
+        "Part 4 - Remedies and Next Steps:\n"
+        "1. <specific immediate action>\n"
+        "2. <specific procedural step>\n"
+        "3. <specific authority to approach>\n\n"
+        "Part 5 - Limits:\n"
+        "<limitations, jurisdictional notes>\n\n"
+        "Part 6 - Disclaimer:\n"
+        "For information only. Consult a professional.\n"
+    )
+
+
+def _build_augmented_context(base_context: str, legal_priors: str) -> str:
+    """PHASE 2: Merge retrieved context with heuristic priors."""
+    if not legal_priors:
+        return base_context
+    return f"{base_context}\n\n---\n{legal_priors}\n" if base_context else legal_priors
+
+
+def _is_legal_advice_refusal(answer: str) -> bool:
+    text = (answer or "").strip().lower()
+    patterns = [
+        "i can't give legal advice",
+        "i cant give legal advice",
+        "cannot give legal advice",
+        "can't provide legal advice",
+        "cannot provide legal advice",
+        "not able to provide legal advice",
+        "i am not a lawyer so i cannot",
+    ]
+    return any(p in text for p in patterns)
+
+
+def _retry_prompt_for_general_info(user_query: str) -> str:
+    return (
+        "You are an Indian legal information assistant.\n"
+        "Do not refuse with 'I can't give legal advice'.\n"
+        "Instead provide:\n"
+        "Part 1 - Acts, Sections and Judgements,\n"
+        "Part 2 - Exact Steps to Follow,\n"
+        "Part 3 - Limits,\n"
+        "Part 4 - Disclaimer.\n"
+        "Give general legal information and practical procedural guidance. Do not assist wrongdoing.\n\n"
+        f"User question:\n{user_query}\n"
+    )
+
+
+def extract_structured_query(user_query: str, model_name: str) -> Dict[str, Any]:
+    prompt = (
+        "Convert the user's legal query into JSON.\n"
+        "Return ONLY valid JSON with this schema:\n"
+        "{\n"
+        '  "domain": "consumer|criminal|contract|property|labour|general",\n'
+        '  "intent": "legal_notice|legal_query",\n'
+        '  "facts": ["fact 1", "fact 2"]\n'
+        "}\n"
+        "Rules:\n"
+        "- Extract atomic facts.\n"
+        "- Do not rely on punctuation splitting alone.\n"
+        "- Use 'legal_notice' only if the user is clearly asking to draft a notice.\n\n"
+        f"User query:\n{user_query}"
+    )
+
+    raw = call_llm(model_name=model_name, prompt=prompt, timeout_sec=20)
+    if raw.startswith("[ERROR]"):
+        raw = ""
+
+    try:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        payload = json.loads(raw[start : end + 1]) if start >= 0 and end > start else {}
+    except Exception:
+        payload = {}
+
+    route = classify_legal_issue(user_query)
+    facts = payload.get("facts")
+    if not isinstance(facts, list) or not facts:
+        facts = [
+            frag.strip(" .")
+            for frag in re.split(r"\b(?:and|but|because|after|when|while)\b|[.;!?]", user_query, flags=re.IGNORECASE)
+            if frag.strip()
+        ]
+    facts = [str(f).strip() for f in facts if str(f).strip()][:5]
+
+    domain = str(payload.get("domain") or route.domain or "general").strip().lower()
+    if domain not in {"consumer", "criminal", "contract", "property", "labour", "general"}:
+        domain = route.domain or "general"
+
+    intent = str(payload.get("intent") or "legal_query").strip().lower()
+    if intent not in {"legal_notice", "legal_query"}:
+        intent = "legal_query"
+
+    return {
+        "domain": domain,
+        "intent": intent,
+        "facts": facts,
+    }
+
+
+def merge_retrieval_results(result_sets: List[List[Dict[str, Any]]], top_k: int) -> List[Dict[str, Any]]:
+    merged: Dict[str, Dict[str, Any]] = {}
+    for results in result_sets:
+        for item in results:
+            key = "|".join(
+                [
+                    str(item.get("corpus") or ""),
+                    str(item.get("chunk_id") or ""),
+                    str(item.get("title") or ""),
+                    str(item.get("section_number") or ""),
+                    str(item.get("context_path") or ""),
+                ]
+            )
+            existing = merged.get(key)
+            current_score = float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0)
+            if not existing or current_score > float(existing.get("final_score", existing.get("hybrid_score", 0.0)) or 0.0):
+                merged[key] = dict(item)
+
+    ranked = list(merged.values())
+    ranked.sort(key=lambda x: float(x.get("final_score", x.get("hybrid_score", 0.0)) or 0.0), reverse=True)
+    return ranked[:top_k]
+
+
+def _extract_json_object(raw: str) -> Dict[str, Any]:
+    text = (raw or "").strip()
+    if not text or text.startswith("[ERROR]"):
+        return {}
+    try:
+        fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, flags=re.DOTALL)
+        if fenced:
+            text = fenced.group(1).strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            text = text[start : end + 1]
+        payload = json.loads(text)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _coerce_string_list(values: Any) -> List[str]:
+    if not isinstance(values, list):
+        return []
+    return [str(v).strip() for v in values if str(v).strip()]
+
+
+def _parse_answer_sections(answer: str) -> Dict[str, str]:
+    normalized = (answer or "").replace("\r\n", "\n").strip()
+    sections: Dict[str, str] = {}
+    patterns = {
+        "part1": r"(?is)(?:\*\*)?Part 1 - Acts, Sections and Judgements(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part 2 - Exact Steps to Follow(?:\*\*)?\s*\n|\Z)",
+        "part2": r"(?is)(?:\*\*)?Part 2 - Exact Steps to Follow(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part 3 - Limits(?:\*\*)?\s*\n|\Z)",
+        "part3": r"(?is)(?:\*\*)?Part 3 - Limits(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part 4 - Disclaimer(?:\*\*)?\s*\n|\Z)",
+        "part4": r"(?is)(?:\*\*)?Part 4 - Disclaimer(?:\*\*)?\s*\n(.*)$",
+    }
+    for key, pattern in patterns.items():
+        match = re.search(pattern, normalized)
+        sections[key] = match.group(1).strip() if match else ""
+    return sections
+
+
+def _extract_numbered_items(text: str) -> List[str]:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    items: List[str] = []
+    for line in lines:
+        cleaned = re.sub(r"^\d+\.\s*", "", line)
+        cleaned = re.sub(r"^[-*•]\s*", "", cleaned)
+        if cleaned:
+            items.append(cleaned)
+    return items
+
+
+def _filter_lawyer_questions(
+    questions: List[Dict[str, Any]],
+    domain: str,
+    legal_pathways: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    forbidden_terms = _domain_forbidden_terms(domain)
+    allowed_terms = _domain_allowed_terms(domain)
+    pathway_laws = {str(p.get("law", "")).strip() for p in legal_pathways if str(p.get("law", "")).strip()}
+
+    filtered: List[Dict[str, Any]] = []
+    seen = set()
+    for index, item in enumerate(questions, start=1):
+        question = str(item.get("question") or item.get("text") or "").strip()
+        affects = _coerce_string_list(item.get("affects"))
+        lowered = question.lower()
+        if not question:
+            continue
+        if any(term in lowered for term in forbidden_terms):
+            continue
+        if affects:
+            affects = [law for law in affects if law in pathway_laws]
+        if not affects:
+            continue
+        if allowed_terms and not any(term in lowered for term in allowed_terms):
+            pathway_text = " ".join(affects).lower()
+            if not any(term in pathway_text for term in allowed_terms):
+                continue
+        key = (question.lower(), tuple(sorted(affects)))
+        if key in seen:
+            continue
+        seen.add(key)
+        filtered.append({"id": f"q{index}", "text": question, "affects": affects})
+    return filtered[:5]
+
+
+def retrieve_for_facts(facts: List[str], base_args: SimpleNamespace) -> List[Dict[str, Any]]:
+    result_sets: List[List[Dict[str, Any]]] = []
+    for fact in facts[:5]:
+        args = SimpleNamespace(**vars(base_args))
+        args.q = fact
+        result_sets.append(run_retrieval(args))
+    return merge_retrieval_results(result_sets, top_k=base_args.top_k)
+
+
+def _extract_json_array(raw: str) -> List[str]:
+    text = (raw or "").strip()
+    if not text or text.startswith("[ERROR]"):
+        return []
+    try:
+        start = text.find("[")
+        end = text.rfind("]")
+        if start >= 0 and end > start:
+            payload = json.loads(text[start : end + 1])
+            if isinstance(payload, list):
+                return [str(item).strip() for item in payload if str(item).strip()]
+    except Exception:
+        pass
+    return []
+
+
+def _clean_law_name(value: str) -> str:
+    text = re.sub(r"\([^)]*\)", "", str(value or ""))
+    text = re.sub(r",\s*\d{4}\b", "", text)
+    text = re.sub(r"\s+", " ", text).strip(" -,:;")
+    return text
+
+
+def _canonical_law_key(value: str) -> str:
+    return re.sub(r"[^a-z]+", " ", _clean_law_name(value).lower()).strip()
+
+
+def _is_security_deposit_tenancy_query(user_query: str, structured_query: Dict[str, Any]) -> bool:
+    q = (user_query or "").lower()
+    if structured_query.get("domain") != "property":
+        return False
+    required_groups = [
+        any(term in q for term in ["landlord", "tenant", "lease", "rent", "vacated", "vacate"]),
+        any(term in q for term in ["security deposit", "deposit"]),
+    ]
+    return all(required_groups)
+
+
+def _deterministic_retrieval_queries(user_query: str, structured_query: Dict[str, Any]) -> List[str]:
+    q = " ".join((user_query or "").split())
+    if _is_security_deposit_tenancy_query(user_query, structured_query):
+        return [
+            "tenant security deposit refund transfer of property act india",
+            "landlord refusing return of security deposit tenant remedy india",
+            "lease security deposit refund breach of contract india",
+            "tenant legal notice for security deposit recovery india",
+            q,
+        ][:MAX_RETRIEVAL_QUERIES]
+    return []
+
+
+def generate_retrieval_queries(
+    user_query: str,
+    structured_query: Dict[str, Any],
+    dense_query: str,
+    rewritten_query: str,
+    model_name: str,
+    timeout_sec: int = 20,
+) -> List[str]:
+    deterministic = _deterministic_retrieval_queries(user_query, structured_query)
+    if deterministic:
+        return deterministic
+
+    facts = structured_query.get("facts") or []
+    prompt = (
+        "Generate at most 5 highly relevant Indian legal search queries.\n"
+        "Avoid unrelated laws, unrelated jurisdictions, and noisy expansion.\n"
+        "Focus only on the core legal issue.\n"
+        "Do not invent statute names, section numbers, penalties, multipliers, or remedies not present in the user query.\n"
+        "Return ONLY a valid JSON array of strings.\n\n"
+        f"User query: {user_query}\n"
+        f"Detected domain: {structured_query.get('domain', 'general')}\n"
+        f"Detected intent: {structured_query.get('intent', 'legal_query')}\n"
+        f"Core facts: {json.dumps(facts[:5], ensure_ascii=False)}\n"
+        f"Dense query seed: {dense_query}\n"
+        f"Rewritten query seed: {rewritten_query}\n"
+    )
+    raw = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec)
+    queries = _extract_json_array(raw)
+
+    fallback = [rewritten_query, dense_query, user_query] + facts[:2]
+    cleaned: List[str] = []
+    seen = set()
+    for candidate in queries + fallback:
+        candidate = " ".join(str(candidate or "").replace("\n", " ").split()).strip()
+        if not candidate:
+            continue
+        bad_markers = [
+            "triple the security deposit",
+            "rental agreement act",
+            "section 11 of the transfer of property act",
+        ]
+        lowered_candidate = candidate.lower()
+        if any(marker in lowered_candidate for marker in bad_markers):
+            continue
+        lowered = lowered_candidate
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        cleaned.append(candidate)
+        if len(cleaned) >= MAX_RETRIEVAL_QUERIES:
+            break
+    return cleaned[:MAX_RETRIEVAL_QUERIES]
+
+
+def generate_relevant_laws(
+    user_query: str,
+    structured_query: Dict[str, Any],
+    model_name: str,
+    timeout_sec: int = 20,
+) -> Dict[str, List[str]]:
+    prompt = (
+        "Given this Indian legal issue, list the most relevant laws for retrieval.\n"
+        "Return ONLY valid JSON with this schema:\n"
+        "{\n"
+        '  "relevant_laws": ["law 1", "law 2"],\n'
+        '  "preferred_laws": ["law 1"],\n'
+        '  "disallowed_law_hints": ["irrelevant law hint"]\n'
+        "}\n"
+        "Rules:\n"
+        "- Keep lists short and precise.\n"
+        "- Focus on Indian laws only.\n"
+        "- If state is not mentioned, prefer central laws and avoid state-specific rent laws.\n\n"
+        f"User query: {user_query}\n"
+        f"Detected domain: {structured_query.get('domain', 'general')}\n"
+        f"Detected intent: {structured_query.get('intent', 'legal_query')}\n"
+    )
+    raw = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec)
+    parsed: Dict[str, Any] = {}
+    if raw and not raw.startswith("[ERROR]"):
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start >= 0 and end > start:
+                parsed = json.loads(raw[start : end + 1])
+        except Exception:
+            parsed = {}
+
+    relevant_laws = [str(x).strip() for x in parsed.get("relevant_laws", []) if str(x).strip()]
+    preferred_laws = [str(x).strip() for x in parsed.get("preferred_laws", []) if str(x).strip()]
+    disallowed_law_hints = [str(x).strip() for x in parsed.get("disallowed_law_hints", []) if str(x).strip()]
+    relevant_laws = [_clean_law_name(x) for x in relevant_laws if _clean_law_name(x)]
+    preferred_laws = [_clean_law_name(x) for x in preferred_laws if _clean_law_name(x)]
+    disallowed_law_hints = [_clean_law_name(x) for x in disallowed_law_hints if _clean_law_name(x)]
+
+    q = (user_query or "").lower()
+    if structured_query.get("domain") == "property" and any(
+        term in q for term in ["landlord", "tenant", "lease", "rent", "deposit", "security deposit", "vacated"]
+    ):
+        relevant_keys = [_canonical_law_key(x) for x in relevant_laws]
+        preferred_keys = [_canonical_law_key(x) for x in preferred_laws]
+        for law in ["transfer of property act", "indian contract act", "specific relief act"]:
+            if law not in relevant_keys:
+                relevant_laws.append(law)
+                relevant_keys.append(law)
+        for law in ["transfer of property act", "indian contract act", "specific relief act"]:
+            if law not in preferred_keys:
+                preferred_laws.append(law)
+                preferred_keys.append(law)
+        preferred_laws = [x for x in preferred_laws if "consumer protection act" not in _canonical_law_key(x)]
+        if not _query_mentions_specific_state(user_query):
+            for hint in GENERIC_STATE_RENT_HINTS:
+                if hint not in [x.lower() for x in disallowed_law_hints]:
+                    disallowed_law_hints.append(hint)
+
+    return {
+        "relevant_laws": relevant_laws[:8],
+        "preferred_laws": preferred_laws[:5],
+        "disallowed_law_hints": disallowed_law_hints[:8],
+    }
+
+
+def _result_score(item: Dict[str, Any]) -> float:
+    return float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0)
+
+
+def _result_summary(item: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "corpus": item.get("corpus"),
+        "title": item.get("title"),
+        "document_id": item.get("document_id"),
+        "section_number": item.get("section_number"),
+        "context_path": item.get("context_path"),
+        "chunk_id": item.get("chunk_id"),
+        "score": round(_result_score(item), 4),
+        "dense_score": round(float(item.get("dense_score", 0.0) or 0.0), 4),
+        "bm25_score": round(float(item.get("bm25_score", 0.0) or 0.0), 4),
+        "rerank_score": item.get("rerank_score"),
+        "rerank_raw_score": item.get("rerank_raw_score"),
+        "text_preview": str(item.get("chunk_text") or "")[:200],
+    }
+
+
+def _apply_result_quality_controls(
+    results: List[Dict[str, Any]],
+    allowed_docs: set[str],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """PHASE 1: No chunk is rejected due to score or BM25.
+    All chunks pass through. We only log diagnostic info."""
+    kept: List[Dict[str, Any]] = []
+    rejected: List[Dict[str, Any]] = []
+
+    for item in results:
+        adjusted = dict(item)
+        log_notes: List[str] = []
+        corpus = str(adjusted.get("corpus") or "").strip().lower()
+
+        # PHASE 1: corpus type mismatch is the ONLY hard rejection
+        if corpus not in allowed_docs:
+            log_notes.append(f"rejected_doc_type:{corpus or 'unknown'}")
+            rejected.append({**_result_summary(adjusted), "reasons": log_notes})
+            continue
+
+        # PHASE 1: Use dense_score as the primary signal, ignore BM25/rerank noise
+        dense_score = float(adjusted.get("dense_score", 0.0) or 0.0)
+        bm25_score = float(adjusted.get("bm25_score", 0.0) or 0.0)
+
+        # Log but NEVER block based on BM25 or rerank
+        if bm25_score == 0.0:
+            log_notes.append("bm25_zero_note")  # logged, not penalized
+
+        # PHASE 1: final_score = dense_score (simplified scoring)
+        adjusted["quality_score"] = dense_score
+        adjusted["final_score"] = dense_score
+        adjusted["hybrid_score"] = dense_score
+
+        # PHASE 1: ALL chunks pass — no score gating
+        kept.append(adjusted)
+
+    kept.sort(key=_result_score, reverse=True)
+    return kept, rejected
+
+
+def retrieve_for_queries(
+    queries: List[str],
+    base_args: SimpleNamespace,
+    allowed_docs: set[str],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    result_sets: List[List[Dict[str, Any]]] = []
+    debug_runs: List[Dict[str, Any]] = []
+
+    for query in queries[:MAX_RETRIEVAL_QUERIES]:
+        args = SimpleNamespace(**vars(base_args))
+        args.q = query
+        raw_results = run_retrieval(args)
+        filtered_results, rejected_results = _apply_result_quality_controls(raw_results, allowed_docs)
+        result_sets.append(filtered_results)
+        debug_runs.append(
+            {
+                "query": query,
+                "retrieved_chunks": [_result_summary(item) for item in raw_results],
+                "filtered_chunks": [_result_summary(item) for item in filtered_results],
+                "rejected_chunks": rejected_results,
+            }
+        )
+
+    merged = merge_retrieval_results(result_sets, top_k=base_args.top_k)
+    return merged, {"expanded_queries": queries[:MAX_RETRIEVAL_QUERIES], "runs": debug_runs}
+
+
+def retrieve_with_keyword_fallback(
+    user_query: str,
+    base_args: SimpleNamespace,
+    allowed_docs: set[str],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    q = (user_query or "").lower()
+    keyword_queries: List[str] = []
+
+    if any(term in q for term in ["deposit", "security deposit"]):
+        keyword_queries.append("deposit tenant refund")
+    if any(term in q for term in ["landlord", "tenant"]):
+        keyword_queries.append("landlord tenant refund")
+    if any(term in q for term in ["lease", "vacated", "vacate"]):
+        keyword_queries.append("lease vacated deposit refund")
+
+    if not keyword_queries:
+        tokens = [tok for tok in re.findall(r"[a-z0-9]{4,}", q) if tok not in {"what", "india", "legal", "remedy"}]
+        keyword_queries.append(" ".join(tokens[:3]) or q)
+
+    keyword_queries = keyword_queries[:3]
+    fallback_args = SimpleNamespace(**vars(base_args))
+    fallback_args.rerank = False
+    fallback_args.top_k = max(getattr(base_args, "top_k", 5), 5)
+    results, debug = retrieve_for_queries(keyword_queries, fallback_args, allowed_docs)
+    debug["fallback"] = True
+    return results, debug
+
+
+def _build_user_mode_response(base: QueryResponse) -> UserModeResponse:
+    if not base.answer or "Insufficient legal context found" in base.answer:
+        return UserModeResponse(
+            ok=base.ok,
+            query=base.query,
+            summary=base.answer or "I could not find enough legal material to answer reliably.",
+            what_you_can_do=[],
+            legal_options=[],
+            notes="Share more facts, agreement terms, dates, amounts, and location for a stronger answer.",
+            meta=base.meta,
+        )
+
+    sections = _parse_answer_sections(base.answer)
+    legal_options = _extract_numbered_items(sections.get("part1", ""))
+    if not legal_options:
+        legal_options = [line for line in sections.get("part1", "").splitlines() if line.strip()]
+    steps = _extract_numbered_items(sections.get("part2", ""))
+    summary_parts = []
+    if legal_options:
+        summary_parts.append("Possible legal basis: " + "; ".join(legal_options[:3]))
+    if steps:
+        summary_parts.append("Best next move: " + steps[0])
+    summary = " ".join(summary_parts).strip() or sections.get("part2") or base.answer
+    return UserModeResponse(
+        ok=base.ok,
+        query=base.query,
+        summary=summary,
+        what_you_can_do=steps[:5],
+        legal_options=legal_options[:5],
+        notes=sections.get("part3") or sections.get("part4") or "",
+        meta=base.meta,
+    )
+
+
+def _generate_lawyer_init_payload(
+    user_query: str,
+    structured_query: Dict[str, Any],
+    law_focus: Dict[str, List[str]],
+    model_name: str,
+    timeout_sec: int,
+) -> Dict[str, Any]:
+    domain = str(structured_query.get("domain", "general")).lower()
+    prompt = (
+        "You are assisting a lawyer in issue-spotting under Indian law.\n"
+        "Return ONLY valid JSON with this schema:\n"
+        "{\n"
+        '  "facts": "short fact summary",\n'
+        '  "issues": ["issue 1", "issue 2"],\n'
+        '  "legal_pathways": [\n'
+        "    {\n"
+        '      "law": "Real Indian law only",\n'
+        '      "applicability": "high|medium|low",\n'
+        '      "reason": "why it may apply",\n'
+        '      "conditions_needed": ["fact 1", "fact 2"]\n'
+        "    }\n"
+        "  ],\n"
+        '  "questions": [\n'
+        "    {\n"
+        '      "question": "question text",\n'
+        '      "affects": ["law name from legal_pathways"]\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "Rules:\n"
+        "- Only use real Indian laws.\n"
+        "- Do not invent law names.\n"
+        "- Give top 3 to 5 legal pathways.\n"
+        "- Given the following case facts and legal pathways, generate 3 to 5 clarification questions.\n"
+        "- Questions MUST relate ONLY to these pathways.\n"
+        "- Each question must help confirm or eliminate a pathway.\n"
+        f"- Domain lock: {domain}.\n"
+        f"- Forbidden question terms for this domain: {json.dumps(_domain_forbidden_terms(domain), ensure_ascii=False)}.\n"
+        f"- Allowed domain vocabulary for this domain: {json.dumps(_domain_allowed_terms(domain), ensure_ascii=False)}.\n"
+        "- Do not introduce unrelated domains.\n"
+        "- Do not give final advice yet.\n\n"
+        f"User query: {user_query}\n"
+        f"Structured query: {json.dumps(structured_query, ensure_ascii=False)}\n"
+        f"Relevant laws: {json.dumps(law_focus, ensure_ascii=False)}\n"
+    )
+    parsed = _extract_json_object(call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec))
+    issues = _coerce_string_list(parsed.get("issues"))
+    questions_raw = parsed.get("questions") if isinstance(parsed.get("questions"), list) else []
+    legal_pathways = parsed.get("legal_pathways") if isinstance(parsed.get("legal_pathways"), list) else []
+    cleaned_pathways: List[Dict[str, Any]] = []
+    for pathway in legal_pathways[:5]:
+        if not isinstance(pathway, dict):
+            continue
+        law = _clean_law_name(pathway.get("law", ""))
+        if not law:
+            continue
+        cleaned_pathways.append(
+            {
+                "law": law,
+                "applicability": str(pathway.get("applicability", "medium")).strip().lower() or "medium",
+                "reason": str(pathway.get("reason", "")).strip(),
+                "conditions_needed": _coerce_string_list(pathway.get("conditions_needed")),
+            }
+        )
+    if not cleaned_pathways:
+        cleaned_pathways = [
+            {
+                "law": law,
+                "applicability": "medium",
+                "reason": "Preliminary pathway based on the reported facts.",
+                "conditions_needed": ["Further agreement and payment facts"],
+            }
+            for law in law_focus.get("preferred_laws", [])[:3]
+        ]
+    questions = _filter_lawyer_questions(questions_raw, domain=domain, legal_pathways=cleaned_pathways)
+    if not questions:
+        fallback_questions = [
+            {
+                "question": "Was there a written agreement or contract supporting the claim?",
+                "affects": [cleaned_pathways[0]["law"]] if cleaned_pathways else [],
+            },
+            {
+                "question": "Do you have documentary proof supporting payment, salary, wages, or the disputed amount?",
+                "affects": [cleaned_pathways[0]["law"]] if cleaned_pathways else [],
+            },
+            {
+                "question": "Has the other side stated any damage, deduction, misconduct, or breach justification?",
+                "affects": [cleaned_pathways[0]["law"]] if cleaned_pathways else [],
+            },
+        ]
+        questions = _filter_lawyer_questions(fallback_questions, domain=domain, legal_pathways=cleaned_pathways)
+    if not questions:
+        questions = [
+            {
+                "id": "q1",
+                "text": "Please share the agreement, documentary proof, and the stated reason for refusal, deduction, or termination.",
+                "affects": [cleaned_pathways[0]["law"]] if cleaned_pathways else [],
+            }
+        ]
+    return {
+        "facts": str(parsed.get("facts") or "; ".join(structured_query.get("facts", [])[:3]) or user_query).strip(),
+        "issues": issues[:5] or [structured_query.get("domain", "general")],
+        "legal_pathways": cleaned_pathways[:5],
+        "questions": questions[:5],
+    }
+
+
+def _build_lawyer_retrieval_inputs(session: Dict[str, Any], answers: Dict[str, str]) -> tuple[List[str], Dict[str, List[str]], Dict[str, Any]]:
+    user_query = session.get("query", "")
+    structured_query = session.get("structured_query", {})
+    law_focus = session.get("law_focus", {})
+    answer_lines = [f"{qid}: {value}" for qid, value in answers.items() if str(value).strip()]
+    combined_text = user_query + ("\n" + "\n".join(answer_lines) if answer_lines else "")
+    refined_structured = dict(structured_query)
+    refined_structured["facts"] = list(structured_query.get("facts", [])) + answer_lines
+    retrieval_queries = generate_retrieval_queries(
+        user_query=combined_text,
+        structured_query=refined_structured,
+        dense_query=build_query(combined_text).expanded_query,
+        rewritten_query=combined_text,
+        model_name=session.get("llm_model", DEFAULT_BEDROCK_MODEL_ID),
+        timeout_sec=min(int(session.get("llm_timeout_sec", 300)), 20),
+    )
+    return retrieval_queries, law_focus, refined_structured
+
+
+def _generate_lawyer_final_analysis(
+    session: Dict[str, Any],
+    answers: Dict[str, str],
+    context_blocks: List[Dict[str, Any]],
+    model_name: str,
+    timeout_sec: int,
+) -> Dict[str, Any]:
+    q_lookup = {q["id"]: q["text"] for q in session.get("questions", []) if isinstance(q, dict)}
+    answer_lines = [f"{q_lookup.get(qid, qid)}: {value}" for qid, value in answers.items() if str(value).strip()]
+    prompt = (
+        "You are preparing a lawyer-mode preliminary applicability analysis under Indian law.\n"
+        "Return ONLY valid JSON with this schema:\n"
+        "{\n"
+        '  "applicable_laws": [{"law": "...", "reason": "...", "confidence": "high|medium|low"}],\n'
+        '  "rejected_laws": [{"law": "...", "reason": "..."}],\n'
+        '  "question_impact": [{"question_id": "q1", "law": "...", "effect": "increase|decrease|neutral", "reason": "..."}],\n'
+        '  "reasoning": ["point 1", "point 2"],\n'
+        '  "next_steps": ["step 1", "step 2"],\n'
+        '  "summary": "short analysis"\n'
+        "}\n"
+        "Rules:\n"
+        "- Only use real Indian laws.\n"
+        "- Distinguish clearly between applicable and not-yet-applicable laws.\n"
+        "- If facts are incomplete, say so in reasoning.\n"
+        "- Use only the provided legal context when citing authorities.\n\n"
+        f"Original query: {session.get('query', '')}\n"
+        f"Questions and answers: {json.dumps(answer_lines, ensure_ascii=False)}\n"
+        f"Initial pathways: {json.dumps(session.get('legal_pathways', []), ensure_ascii=False)}\n"
+        f"Retrieved legal context:\n{build_context_text(context_blocks)}\n"
+    )
+    parsed = _extract_json_object(call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec))
+    applicable = parsed.get("applicable_laws") if isinstance(parsed.get("applicable_laws"), list) else []
+    rejected = parsed.get("rejected_laws") if isinstance(parsed.get("rejected_laws"), list) else []
+    question_impact = parsed.get("question_impact") if isinstance(parsed.get("question_impact"), list) else []
+    return {
+        "summary": str(parsed.get("summary", "")).strip(),
+        "applicable_laws": applicable[:6],
+        "rejected_laws": rejected[:6],
+        "question_impact": [item for item in question_impact[:20] if isinstance(item, dict)],
+        "reasoning": _coerce_string_list(parsed.get("reasoning"))[:8],
+        "next_steps": _coerce_string_list(parsed.get("next_steps"))[:5],
+        "citations": [
+            {
+                "title": block.get("title"),
+                "section_number": block.get("section_number"),
+                "corpus": block.get("corpus"),
+            }
+            for block in context_blocks[:6]
+        ],
+    }
+
+
+def append_query_log(entry: Dict[str, Any]) -> None:
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    records: List[Dict[str, Any]] = []
+    if os.path.exists(LOG_PATH):
+        try:
+            with open(LOG_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, list):
+                records = loaded[-199:]
+        except Exception:
+            records = []
+    records.append(entry)
+    with open(LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(records[-200:], f, ensure_ascii=False, indent=2)
+
+
+def build_authority_summary(context_blocks: List[Dict[str, Any]]) -> str:
+    authorities: Dict[str, set[str]] = {}
+    for block in context_blocks:
+        title = str(block.get("title") or "").strip()
+        section = str(block.get("section_number") or "").strip()
+        if not title:
+            continue
+        authorities.setdefault(title, set())
+        if section:
+            authorities[title].add(section)
+
+    if not authorities:
+        return ""
+
+    lines = ["Retrieved Authorities:"]
+    for title, sections in authorities.items():
+        if sections:
+            section_list = ", ".join(sorted(sections, key=lambda x: (len(x), x)))
+            lines.append(f"- {title}, Section {section_list}")
+        else:
+            lines.append(f"- {title}")
+    return "\n".join(lines)
+
+
+def _allowed_section_numbers(context_blocks: List[Dict[str, Any]]) -> List[str]:
+    sections = []
+    for block in context_blocks:
+        sec = str(block.get("section_number") or "").strip()
+        if sec and sec not in sections:
+            sections.append(sec)
+    return sections
+
+
+def _build_grounding_repair_prompt(original_prompt: str, invalid_sections: List[str], allowed_sections: List[str]) -> str:
+    allowed = ", ".join(allowed_sections) if allowed_sections else "none"
+    invalid = ", ".join(invalid_sections) if invalid_sections else "none"
+    return (
+        f"{original_prompt}\n\n"
+        "IMPORTANT GROUNDING FIX:\n"
+        f"- You used disallowed section references: {invalid}\n"
+        f"- You may use ONLY these section numbers: {allowed}\n"
+        "- If exact section support is insufficient, keep the answer general and do not add new section numbers.\n"
+        "- Rewrite the full answer in the required format.\n"
+    )
+
+
+def _build_context_grounded_fallback(user_query: str, context_blocks: List[Dict[str, Any]]) -> str:
+    act_authorities = []
+    judgement_authorities = []
+    seen = set()
+    for block in context_blocks:
+        title = str(block.get("title") or "").strip()
+        sec = str(block.get("section_number") or "").strip()
+        corpus = str(block.get("corpus") or "").strip().lower()
+        if not title:
+            continue
+        key = (corpus, title, sec)
+        if key in seen:
+            continue
+        seen.add(key)
+        if corpus == "judgements":
+            judgement_authorities.append(f"- **{title}**")
+        else:
+            act_authorities.append(f"- **{title}**, Section {sec}" if sec else f"- **{title}**")
+
+    snippets = []
+    for block in context_blocks[:3]:
+        txt = str(((block.get("texts") or {}).get("chunk_text") or "")).strip()
+        if txt:
+            snippets.append(txt[:280].strip())
+
+    part_1_lines = []
+    if act_authorities:
+        part_1_lines.append("Relevant Acts and Sections:")
+        part_1_lines.extend(act_authorities)
+    if judgement_authorities:
+        if part_1_lines:
+            part_1_lines.append("")
+        part_1_lines.append("Relevant Judgements:")
+        part_1_lines.extend(judgement_authorities)
+    if not part_1_lines:
+        part_1_lines.append("No specific statute or judgement was identified with high confidence from the retrieved context.")
+
+    if snippets:
+        part_1_lines.append("")
+        part_1_lines.append("Context Notes:")
+        part_1_lines.extend(f"- {s}" for s in snippets)
+
+    next_steps = (
+        "1. File a written complaint with the local Cyber Crime Police Station or portal with all digital evidence.\n"
+        "2. Preserve logs, emails, screenshots, and account access history to support investigation.\n"
+        "3. Consult an Indian legal professional for case-specific drafting and forum strategy."
+    )
+    limits = (
+        "This answer is constrained to the retrieved context and avoids citing any Act, section number, or judgement outside that context. Forum, jurisdiction, and remedy may change based on missing facts."
+    )
+    return (
+        "**Part 1 - Acts, Sections and Judgements**\n"
+        f"{chr(10).join(part_1_lines)}\n\n"
+        "**Part 2 - Exact Steps to Follow**\n"
+        f"{next_steps}\n\n"
+        "**Part 3 - Limits**\n"
+        f"{limits}\n\n"
+        "**Part 4 - Disclaimer**\n"
+        "For information only. Consult a professional."
+    )
+
+def get_static_greeting(text: str) -> Optional[str]:
+    clean = text.lower().strip("?!. ")
+    greetings = {"hi", "hello", "hey", "hi there", "hello there", "namaste"}
+    if clean in greetings:
+        return f"{text.strip()}! I am your Vidhi AI assistant. How can I help you today?"
+    if any(h in clean for h in ["good morning", "good afternoon", "good evening"]):
+        return f"{text.strip()}! How can I assist you with your legal research today?"
+    return None
+
+
+def _bold_authorities(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
+    act_titles = []
+    for block in context_blocks:
+        if block.get("corpus") != "acts":
+            continue
+        title = (block.get("title") or "").strip()
+        if title and title not in act_titles:
+            act_titles.append(title)
+
+    for title in sorted(act_titles, key=len, reverse=True):
+        pattern = rf"(?<!\*)\b{re.escape(title)}\b(?!\*)"
+        answer = re.sub(pattern, f"**{title}**", answer)
+    return answer
+
+
+def _strip_context_markers(answer: str) -> str:
+    answer = re.sub(r"\s*\[C\d+\]", "", answer, flags=re.IGNORECASE)
+    answer = re.sub(r"\(\s*\)", "", answer)
+    answer = re.sub(r",\s*(?=\n|$)", "", answer)
+    answer = re.sub(r"[ \t]{2,}", " ", answer)
+    return answer
+
+
+def _sanitize_section_artifacts(answer: str) -> str:
+    # Fix malformed section references generated by the model.
+    answer = re.sub(r"\bSection\s+s\s+(\d+[A-Z]?)", r"Sections \1", answer, flags=re.IGNORECASE)
+    answer = re.sub(r"\bSections?\s+(\d+[A-Z]?)\*\*", r"Section \1", answer, flags=re.IGNORECASE)
+    answer = re.sub(r"\bSection\s*\.\s*$", "", answer, flags=re.IGNORECASE | re.MULTILINE)
+    answer = re.sub(r"(?m)^([^\n-][^\n]*?)\s*-\s*$", r"\1", answer)
+    answer = re.sub(r"\*\*(?=[\s.,;:])", "", answer)
+    return answer
+
+
+def _normalize_heading_breaks(answer: str) -> str:
+    headings = [
+        "Applicable Law",
+        "How It Applies",
+        "Next Steps",
+        "Limits",
+        "Disclaimer",
+        "Part 1 - Acts, Sections and Judgements",
+        "Part 2 - Exact Steps to Follow",
+        "Part 3 - Limits",
+        "Part 4 - Disclaimer",
+    ]
+    for heading in headings:
+        answer = re.sub(
+            rf"(?<!\n)(\*\*{re.escape(heading)}\*\*)",
+            r"\n\n\1",
+            answer,
+        )
+        answer = re.sub(
+            rf"(?<!\n)({re.escape(heading)})(?=\n|:| )",
+            r"\n\n\1",
+            answer,
+        )
+    answer = re.sub(r"\n{3,}", "\n\n", answer)
+    return answer.strip()
+
+
+def _remove_existing_disclaimer_sections(answer: str) -> str:
+    patterns = [
+        r"(?ms)\n*\*\*Part 4 - Disclaimer\*\*\s*\n.*$",
+        r"(?ms)\n*\*\*Disclaimer\*\*\s*\n.*$",
+        r"(?ms)\n*Part 4 - Disclaimer\s*:?\s*\n.*$",
+        r"(?ms)\n*Disclaimer\s*:?\s*\n.*$",
+        r"(?ms)\n*---\s*\n\*\*Part 4 - Disclaimer\*\*\s*\n.*$",
+        r"(?ms)\n*---\s*\n\*\*Disclaimer\*\*\s*\n.*$",
+    ]
+    trimmed = answer
+    for pattern in patterns:
+        trimmed = re.sub(pattern, "", trimmed)
+    return trimmed.strip()
+
+
+def _bold_headings(answer: str) -> str:
+    heading_map = {
+        "Applicable Law": "Part 1 - Acts, Sections and Judgements",
+        "How It Applies": "Part 2 - Exact Steps to Follow",
+        "Next Steps": "Part 2 - Exact Steps to Follow",
+        "Limits": "Part 3 - Limits",
+        "Disclaimer": "Part 4 - Disclaimer",
+        "Part 1 - Acts, Sections and Judgements": "Part 1 - Acts, Sections and Judgements",
+        "Part 2 - Exact Steps to Follow": "Part 2 - Exact Steps to Follow",
+        "Part 3 - Limits": "Part 3 - Limits",
+        "Part 4 - Disclaimer": "Part 4 - Disclaimer",
+    }
+    for heading, canonical in heading_map.items():
+        answer = re.sub(
+            rf"(?m)^\s*\**{re.escape(heading)}\**\s*:\s*$",
+            f"**{canonical}**",
+            answer,
+        )
+        answer = re.sub(
+            rf"(?m)^\s*\**{re.escape(heading)}\**\s*$",
+            f"**{canonical}**",
+            answer,
+        )
+    return answer
+
+
+def _rebuild_applicable_law(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
+    authorities: Dict[str, set[str]] = {}
+    judgements: List[str] = []
+    for block in context_blocks:
+        title = str(block.get("title") or "").strip()
+        section = str(block.get("section_number") or "").strip()
+        corpus = str(block.get("corpus") or "").strip().lower()
+        if not title:
+            continue
+        if corpus == "judgements":
+            if title not in judgements:
+                judgements.append(title)
+            continue
+        authorities.setdefault(title, set())
+        if section:
+            authorities[title].add(section)
+
+    if not authorities and not judgements:
+        return answer
+
+    lines = []
+    for title, sections in authorities.items():
+        if sections:
+            for section in sorted(sections, key=lambda x: (len(x), x)):
+                lines.append(f"- **{title}**, Section {section}")
+        else:
+            lines.append(f"- **{title}**")
+    if judgements:
+        if lines:
+            lines.append("")
+        lines.append("Relevant Judgements:")
+        lines.extend(f"- **{title}**" for title in judgements)
+    applicable_body = "\n".join(lines)
+
+    pattern = re.compile(
+        r"(?ms)(^\*\*Part 1 - Acts, Sections and Judgements\*\*\s*\n)(.*?)(?=^\*\*[A-Za-z0-9][A-Za-z0-9\s/\-]+\*\*\s*$|\Z)"
+    )
+    match = pattern.search(answer)
+    if match:
+        return answer[:match.start()] + match.group(1) + applicable_body + "\n\n" + answer[match.end():]
+
+    return f"**Part 1 - Acts, Sections and Judgements**\n{applicable_body}\n\n{answer}".strip()
+
+
+def _align_section_references(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
+    sections = sorted(
+        {
+            str(block.get("section_number") or "").strip()
+            for block in context_blocks
+            if str(block.get("section_number") or "").strip()
+        },
+        key=lambda x: (len(x), x),
+    )
+    if len(sections) != 1:
+        return answer
+
+    allowed_section = sections[0]
+    answer = re.sub(r"\bSections?\s+\d+[A-Z]?(?:\s*,\s*\d+[A-Z]?)+", f"Section {allowed_section}", answer)
+    answer = re.sub(r"\bSection\s+\d+[A-Z]?\b", f"Section {allowed_section}", answer)
+    return answer
+
+
+def _dedupe_disclaimer(answer: str) -> str:
+    answer = re.sub(r"(?ms)\n*---\n\*\*Part 4 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*---\n\*\*Disclaimer\*\*:\s*For information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*\*\*Part 4 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*\*\*Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*Part 4 - Disclaimer:\s*For information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*Disclaimer:\s*For information only\. Consult a professional\.\s*$", "", answer)
+    return answer.strip()
+
+
+def _query_mentions_specific_state(user_query: str) -> bool:
+    q = (user_query or "").lower()
+    return any(term in q for term in INDIAN_STATE_TERMS)
+
+
+def _is_state_specific_result(item: Dict[str, Any]) -> bool:
+    hay = " ".join(
+        [
+            str(item.get("title") or ""),
+            str(item.get("document_id") or ""),
+            str(item.get("context_path") or ""),
+            str(item.get("source_json") or ""),
+            str(item.get("chunk_text") or ""),
+            str(item.get("court") or ""),
+        ]
+    ).lower()
+    return any(term in hay for term in INDIAN_STATE_TERMS)
+
+
+def _filter_state_specific_results(user_query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not results or _query_mentions_specific_state(user_query):
+        return results
+
+    filtered = [item for item in results if not _is_state_specific_result(item)]
+    return filtered
+
+
+def _normalize_markdown_layout(answer: str) -> str:
+    formatted = answer.replace("\r\n", "\n").strip()
+
+    # Put markdown structural markers on their own lines.
+    formatted = re.sub(r"\s+(?=#{1,6}\s)", "\n\n", formatted)
+    formatted = re.sub(r"\s+(?=>\s)", "\n", formatted)
+    formatted = re.sub(r"\s+(?=---)", "\n\n", formatted)
+    formatted = re.sub(r"(?<!\n)(---)", r"\n\n\1", formatted)
+    formatted = re.sub(r"(---)(?!\n)", r"\1\n", formatted)
+    formatted = re.sub(
+        r"\s+(?=(\*\*(?:Section|Official Statutory Text|Legal Answer|Quick Pillars|Limits|Applicable Law|How It Applies|Next Steps|Disclaimer)\*\*))",
+        "\n\n",
+        formatted,
+    )
+
+    # Keep the common "Quick Pillars" fields readable.
+    formatted = re.sub(r"(?m)^\s*Actor:\s*", "- **Actor**: ", formatted)
+    formatted = re.sub(r"(?m)^\s*Offense:\s*", "- **Offense**: ", formatted)
+    formatted = re.sub(r"(?m)^\s*Offence:\s*", "- **Offence**: ", formatted)
+    formatted = re.sub(r"(?m)^\s*Penalty:\s*", "- **Penalty**: ", formatted)
+    formatted = re.sub(r"\s+\|\s+", "\n", formatted)
+
+    # If the model emits inline markdown headings, separate them.
+    formatted = re.sub(r"(?<!\n)(#{1,6}\s)", r"\n\n\1", formatted)
+    formatted = re.sub(r"\n{3,}", "\n\n", formatted)
+    return formatted.strip()
+
+
+def _format_next_steps_section(answer: str) -> str:
+    pattern = re.compile(
+        r"(?ms)(^\*\*Part 2 - Exact Steps to Follow\*\*\s*\n)(.*?)(?=^\*\*[A-Za-z0-9][A-Za-z0-9\s/\-]+\*\*\s*$|\Z)"
+    )
+    match = pattern.search(answer)
+    if not match:
+        return answer
+
+    body = match.group(2).strip()
+    if not body:
+        return answer
+
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    items = []
+    for line in lines:
+        cleaned = re.sub(r"^[-*•]\s*", "", line)
+        cleaned = re.sub(r"^\d+\.\s*", "", cleaned)
+        if cleaned:
+            items.append(cleaned)
+
+    if not items:
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", body) if s.strip()]
+        items = sentences
+
+    numbered = "\n".join(f"{idx}. {item}" for idx, item in enumerate(items, start=1))
+    return answer[:match.start()] + match.group(1) + numbered + "\n\n" + answer[match.end():]
+
+
+def format_final_answer(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
+    formatted = _remove_existing_disclaimer_sections(answer)
+    formatted = _normalize_markdown_layout(formatted)
+    formatted = _strip_context_markers(formatted)
+    formatted = _sanitize_section_artifacts(formatted)
+    formatted = _align_section_references(formatted, context_blocks)
+    formatted = _bold_headings(formatted)
+    formatted = _bold_authorities(formatted, context_blocks)
+    formatted = _rebuild_applicable_law(formatted, context_blocks)
+    formatted = _normalize_heading_breaks(formatted)
+    formatted = _format_next_steps_section(formatted)
+    formatted = re.sub(r"(?m)^Disclaimer\s+(?=For information only\.)", "**Part 4 - Disclaimer**\n", formatted)
+    formatted = re.sub(r"(?m)^Part 4 - Disclaimer\s*:\s*$", "**Part 4 - Disclaimer**", formatted)
+    formatted = _dedupe_disclaimer(formatted)
+    formatted = re.sub(r"\n{3,}", "\n\n", formatted).strip()
+    return formatted
+
+
+def _plain_act_name(act_label: str) -> str:
+    return re.sub(r"\*", "", FULL_ACT_NAMES.get(act_label, act_label)).strip()
+
+
+def _build_query_act_response(user_query: str, results: List[Any], reasoning: List[str], session_id: str, mode: str) -> QueryResponse:
+    top_act, top_sec, top_score = results[0]
+    plain_act_name = _plain_act_name(top_act)
+    section_text = reconstruct_section(top_act, top_sec)
+
+    if is_explanation_query(user_query):
+        answer = call_qwen_act(user_query, section_text, plain_act_name)
+    else:
+        answer = section_text
+
+    context_block = {
+        "citation_id": "C1",
+        "corpus": "acts",
+        "document_id": plain_act_name,
+        "title": plain_act_name,
+        "section_number": str(top_sec),
+        "section_title": None,
+        "context_path": f"Section {top_sec}",
+        "source_file": None,
+        "chunk_id": None,
+        "scores": {
+            "final_score": float(top_score),
+            "hybrid_score": float(top_score),
+            "dense_score": None,
+            "bm25_score": None,
+            "rerank_score": None,
+        },
+        "texts": {
+            "chunk_text": section_text,
+            "parent_text": "",
+            "section_text": section_text,
+            "court": None,
+            "bench": None,
+            "date": None,
+            "chunk_type": "section",
+        },
+    }
+
+    final_answer = format_final_answer(answer, [context_block]) + "\n\n---\n**Part 4 - Disclaimer**\nFor information only. Consult a professional."
+
+    return QueryResponse(
+        ok=True,
+        query=user_query,
+        answer=final_answer,
+        reasoning=reasoning,
+        citations=[
+            {
+                "citation_id": "C1",
+                "title": plain_act_name,
+                "section_number": str(top_sec),
+                "context_path": f"Section {top_sec}",
+                "source_file": None,
+                "chunk_id": None,
+            }
+        ],
+        context_blocks=[context_block],
+        meta={"mode": mode, "score": float(top_score), "session_id": session_id},
+    )
+
+# =========================
+# MAIN STRUCTURED RAG FLOW
+# =========================
+
+@app.post("/query", response_model=QueryResponse)
+def query(payload: QueryRequest) -> QueryResponse:
+    try:
+        raw_query = payload.query
+        reasoning = []
+        debug_trace: Dict[str, Any] = {"query": raw_query}
+        
+        # 🍯 1. Greeting Bypass (No AI, No Filter needed)
+        # Move this to the very top to allow simple human interaction
+        user_query = sanitize_user_input(raw_query)
+        static_answer = get_static_greeting(user_query)
+        if static_answer:
+            return QueryResponse(
+                ok=True, query=user_query, answer=static_answer, 
+                reasoning=["Greeting Optimization: Static response used."],
+                citations=[], context_blocks=[], 
+                meta={"mode": "greeting", "inference": False}
+            )
+
+        # 🛡️ 2. Input Validation Layer (CLEARED as per user request)
+        pass
+        
+        # 🛡️ 3. Domain Classifier (CLEARED as per user request)
+        pass
+        
+        # 🔑 Session Management
+        s_id = payload.session_id or str(uuid.uuid4())
+        if payload.reset_session or s_id not in SESSIONS:
+            SESSIONS[s_id] = []
+        history = SESSIONS[s_id]
+
+        structured_query = extract_structured_query(user_query, payload.llm_model)
+        debug_trace["structured_query"] = structured_query
+        reasoning.append(
+            "Understanding facts: "
+            + "; ".join(structured_query.get("facts", [])[:3])
+            if structured_query.get("facts")
+            else "Understanding facts from the user query."
+        )
+
+        expanded_obj = build_query(user_query)
+        intent_route = build_intent_route(user_query, forced_domain=structured_query.get("domain", ""))
+        debug_trace["intent_route"] = intent_route
+        law_focus = generate_relevant_laws(
+            user_query=user_query,
+            structured_query=structured_query,
+            model_name=payload.llm_model,
+            timeout_sec=min(payload.llm_timeout_sec, 20),
+        )
+        debug_trace["law_focus"] = law_focus
+        if law_focus.get("preferred_laws"):
+            reasoning.append("Preferred laws: " + ", ".join(law_focus["preferred_laws"]))
+        precise_statute_query = bool(expanded_obj.filters.get("section_number") and expanded_obj.filters.get("act"))
+
+        # --- STEP 1: Query Rewriter ---
+        reasoning.append("Step 1: Rewriting query to dense legal keywords...")
+        dense_keywords = expanded_obj.expanded_query
+
+        if precise_statute_query:
+            llm_query = user_query
+            legal_query = dense_keywords
+            reasoning.append("Detected direct act-section lookup; skipped free-form rewrite.")
+        else:
+            llm_query = rewrite_query(user_query, payload.llm_model, timeout_sec=15)
+            llm_query = " ".join((llm_query or "").splitlines()[:1]).strip() or user_query
+            legal_query = " ".join(part for part in [llm_query, dense_keywords] if part).strip()
+
+        reasoning.append(f"Rewritten Query: {llm_query}")
+        reasoning.append(f"Dense Expansion: {dense_keywords}")
+        retrieval_queries = [legal_query] if precise_statute_query else generate_retrieval_queries(
+            user_query=user_query,
+            structured_query=structured_query,
+            dense_query=dense_keywords,
+            rewritten_query=llm_query,
+            model_name=payload.llm_model,
+            timeout_sec=min(payload.llm_timeout_sec, 20),
+        )
+        reasoning.append(f"Retrieval Queries ({len(retrieval_queries)} max {MAX_RETRIEVAL_QUERIES}): " + " | ".join(retrieval_queries))
+        debug_trace["expanded_queries"] = retrieval_queries
+
+        # PHASE 2: Run heuristics BEFORE retrieval — always available
+        heuristic_matches = match_heuristics(user_query)
+        legal_priors_text = format_heuristics_for_prompt(heuristic_matches)
+        debug_trace["heuristics"] = format_heuristics_for_debug(heuristic_matches)
+        if heuristic_matches:
+            reasoning.append(f"Legal priors matched: {', '.join(m['heuristic_key'] for m in heuristic_matches)}")
+
+        # Temporary bypass: direct LLM answer without embedding retrieval.
+        if DISABLE_EMBEDDING_RETRIEVAL and payload.mode != "query_act" and not precise_statute_query:
+            reasoning.append("Embedding retrieval disabled; generating direct model answer with legal priors.")
+            prompt = build_direct_legal_prompt(user_query, legal_priors=legal_priors_text)
+            answer = call_llm(model_name=payload.llm_model, prompt=prompt, timeout_sec=payload.llm_timeout_sec)
+            if _is_legal_advice_refusal(answer):
+                reasoning.append("Detected legal-advice refusal; retrying with general-information instruction.")
+                answer = call_llm(
+                    model_name=payload.llm_model,
+                    prompt=_retry_prompt_for_general_info(user_query),
+                    timeout_sec=payload.llm_timeout_sec,
+                )
+            disclaimer = "\n\n---\n**Part 4 - Disclaimer**\nFor information only. Consult a professional."
+            final_answer = answer.strip() + disclaimer
+
+            SESSIONS[s_id].append({"role": "user", "content": user_query})
+            SESSIONS[s_id].append({"role": "assistant", "content": answer})
+
+            append_query_log(
+                {
+                    "time": datetime.utcnow().isoformat() + "Z",
+                    "user_query": user_query,
+                    "structured_query": structured_query,
+                    "expanded_queries": retrieval_queries,
+                    "retrieved_chunks": [],
+                    "filtered_chunks": [],
+                    "final_context": [],
+                    "final_prompt": prompt,
+                    "llm_output": answer,
+                    "validation": {"valid": True, "mode": "direct_llm_no_retrieval"},
+                    "heuristics": debug_trace.get("heuristics", []),
+                }
+            )
+
+            return QueryResponse(
+                ok=True,
+                query=user_query,
+                answer=final_answer,
+                reasoning=reasoning,
+                citations=[],
+                context_blocks=[],
+                meta={
+                    "mode": payload.mode,
+                    "session_id": s_id,
+                    "structured_query": structured_query,
+                    "retrieval_disabled": True,
+                    **({"debug": debug_trace} if payload.debug else {}),
+                },
+            )
+
+        # --- STEP 2: Rule-Based Metadata Filtering ---
+        domain_filter = None
+        filter_keywords = {"theft", "stole", "murder", "kill", "rape", "assault", "robbery", "police", "fir", "arrest", "bail", "cheating"}
+        if any(w in user_query.lower() for w in filter_keywords):
+            domain_filter = "criminal"
+            reasoning.append("Metadata Filter applied: Domain = Criminal")
+        elif structured_query.get("domain") in {"consumer", "criminal", "contract", "property", "labour"}:
+            domain_filter = structured_query["domain"] if structured_query["domain"] == "criminal" else None
+
+        # --- STEP 3: Deep Retrieval ---
+        reasoning.append("Step 2: Performing deep retrieval...")
+        
+        if payload.mode == "query_act" or precise_statute_query:
+            load_act_data() 
+            results = search_sections(legal_query)
+            max_score = 1.0 if results else 0.0 # Deterministic is binary
+            if not results:
+                missing_section = expanded_obj.filters.get("section_number")
+                missing_act = expanded_obj.filters.get("act")
+                missing_answer = "No relevant statutory section found in the database."
+                if missing_section and missing_act:
+                    missing_answer = f"Section {missing_section} was not found in the available text for {missing_act}."
+                return QueryResponse(
+                    ok=True,
+                    query=user_query,
+                    answer=missing_answer,
+                    reasoning=reasoning,
+                    citations=[],
+                    context_blocks=[],
+                    meta={"mode": payload.mode, "reason": "no_match", "session_id": s_id},
+                )
+            reasoning.append("Detected direct statute query; using deterministic section lookup.")
+            return _build_query_act_response(user_query, results, reasoning, s_id, payload.mode)
+        else:
+            retrieval_corpus = "acts" if precise_statute_query else ("all" if USE_JUDGEMENT_EMBEDDINGS else "acts")
+            allowed_docs = DEFAULT_ALLOWED_DOCS if structured_query.get("intent") == "legal_query" else {"acts"}
+            retrieval_args = SimpleNamespace(
+                q=legal_query, 
+                mode="understand_case",
+                corpus=retrieval_corpus,
+                top_k=5,
+                dense_k=20,
+                bm25_k=20,
+                dense_weight=0.7,
+                bm25_weight=0.3,
+                rerank=True,
+                rerank_top_n=20,
+                rerank_model="cross-encoder/ms-marco-MiniLM-L-2-v2",
+                rerank_batch_size=16,
+                domain_filter=domain_filter,
+                legal_domain=structured_query.get("domain", "auto"),
+                intent_route=intent_route,
+                relevant_laws=law_focus.get("relevant_laws", []),
+                preferred_laws=law_focus.get("preferred_laws", []),
+                disallowed_law_hints=law_focus.get("disallowed_law_hints", []),
+            )
+            results, retrieval_debug = retrieve_for_queries(retrieval_queries, retrieval_args, allowed_docs=allowed_docs)
+            debug_trace["retrieval"] = retrieval_debug
+            if not _query_mentions_specific_state(user_query):
+                reasoning.append("State-specific authorities suppressed because no Indian state was mentioned in the query.")
+                results = _filter_state_specific_results(user_query, results)
+                debug_trace["state_filtered_chunks"] = [_result_summary(item) for item in results]
+            max_score = max([r.get('final_score', r.get('hybrid_score', 0)) for r in results]) if results else 0
+            reasoning.append(
+                "Retrieval corpus: acts + judgements (embedding enabled)."
+                if retrieval_corpus == "all"
+                else "Retrieval corpus: acts only (judgement embeddings disabled)."
+            )
+
+            if not results:
+                reasoning.append("Primary retrieval returned no usable chunks; trying keyword fallback.")
+                fallback_results, fallback_debug = retrieve_with_keyword_fallback(
+                    user_query=user_query,
+                    base_args=retrieval_args,
+                    allowed_docs=allowed_docs,
+                )
+                if fallback_results:
+                    results = fallback_results
+                    debug_trace["keyword_fallback"] = fallback_debug
+                    max_score = max([r.get('final_score', r.get('hybrid_score', 0)) for r in results]) if results else 0
+
+        # PHASE 2: Determine retrieval confidence mode
+        is_low_confidence = _detect_low_confidence(results)
+        retrieval_mode = "fallback" if (not results or is_low_confidence) else "normal"
+        debug_trace["retrieval_mode"] = retrieval_mode
+        debug_trace["heuristics_used"] = bool(heuristic_matches)
+        reasoning.append(f"PHASE 2: Retrieval mode = {retrieval_mode} (results={len(results)}, max_score={max_score:.2f})")
+
+        # PHASE 2+3: FALLBACK MODE — no results at all
+        if not results:
+            reasoning.append("PHASE 2: No retrieval results; using fallback prompt with legal priors.")
+            if legal_priors_text:
+                prompt = _build_fallback_prompt(user_query, legal_priors_text)
+                reasoning.append("Fallback: Using heuristic-augmented expert prompt.")
+            else:
+                prompt = build_direct_legal_prompt(user_query)
+                reasoning.append("Fallback: No heuristic match; using direct legal prompt.")
+
+            # PHASE 3: Dual-generation — Pass 1: Draft
+            reasoning.append("PHASE 3: Dual-generation Pass 1 — generating draft...")
+            draft_answer = call_llm(model_name=payload.llm_model, prompt=prompt, timeout_sec=payload.llm_timeout_sec)
+            if _is_legal_advice_refusal(draft_answer):
+                draft_answer = call_llm(
+                    model_name=payload.llm_model,
+                    prompt=_retry_prompt_for_general_info(user_query),
+                    timeout_sec=payload.llm_timeout_sec,
+                )
+
+            # PHASE 3: Answer validation
+            validation = validate_answer(draft_answer)
+            if validation["needs_refinement"]:
+                reasoning.append(f"PHASE 3: Draft has issues ({', '.join(validation['issues'])}); refining...")
+                refine_prompt = build_refinement_prompt(draft_answer, user_query, legal_priors_text)
+                answer = call_llm(model_name=payload.llm_model, prompt=refine_prompt, timeout_sec=payload.llm_timeout_sec)
+            else:
+                answer = draft_answer
+
+            # PHASE 3: Confidence scoring
+            conf_score = compute_confidence([], heuristic_matches, retrieval_mode)
+            conf_level = confidence_label(conf_score)
+            reasoning.append(f"PHASE 3: Confidence = {conf_score} ({conf_level})")
+
+            # PHASE 3: Mode-aware styling
+            answer = apply_confidence_styling(answer.strip(), conf_score, retrieval_mode)
+            disclaimer = "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
+            final_answer = answer + disclaimer
+
+            append_query_log(
+                {
+                    "time": datetime.utcnow().isoformat() + "Z",
+                    "user_query": user_query,
+                    "structured_query": structured_query,
+                    "expanded_queries": retrieval_queries,
+                    "retrieved_chunks": debug_trace.get("retrieval", {}).get("runs", []),
+                    "filtered_chunks": [],
+                    "final_context": [],
+                    "validation": {"valid": True, "mode": "phase3_fallback", "score": max_score},
+                    "heuristics": debug_trace.get("heuristics", []),
+                    "retrieval_mode": retrieval_mode,
+                    "confidence": conf_score,
+                    "answer_validation": validation,
+                }
+            )
+            return QueryResponse(
+                ok=True, query=user_query,
+                answer=final_answer,
+                reasoning=reasoning,
+                citations=[], context_blocks=[],
+                confidence=conf_score,
+                confidence_label=conf_level,
+                meta={
+                    "mode": payload.mode,
+                    "score": max_score,
+                    "session_id": s_id,
+                    "retrieval_mode": retrieval_mode,
+                    "heuristics_matched": len(heuristic_matches),
+                    "confidence": conf_score,
+                    "confidence_label": conf_level,
+                    **({"debug": debug_trace} if payload.debug else {}),
+                }
+            )
+
+        # --- STEP 4: LLM Re-ranking ---
+        if (
+            payload.mode == "understand_case"
+            and len(results) > 3
+            and not precise_statute_query
+            and not any(item.get("rerank_score") is not None for item in results)
+        ):
+            reasoning.append(f"Step 3: AI Re-ranking {len(results)} chunks to top 3...")
+            results = llm_rerank(user_query, results, payload.llm_model, timeout_sec=20)
+
+        # 📜 Process Context Pack
+        reasoning.append(f"Step 4: Extracting best context (Max Score: {max_score:.2f})...")
+        acts_lookup = load_acts_chunk_lookup("JSON_acts")
+        pack = build_context_pack(query=user_query, results=results, acts_lookup=acts_lookup, max_chars=14000)
+        context_blocks = pack.get("context_blocks", [])
+        debug_trace["final_context"] = pack.get("citations", [])
+
+        # PHASE 3: Extract citations for prompt injection
+        structured_citations = extract_citations(context_blocks)
+        citation_text = format_citations_for_prompt(structured_citations)
+
+        # 🧠 PHASE 2+3: Build prompt — augment with heuristic priors + citations
+        authority_summary = build_authority_summary(context_blocks)
+        base_context = pack.get("prompt_context") or build_context_text(context_blocks)
+        context_text = f"{authority_summary}\n\n{base_context}".strip() if authority_summary else base_context
+
+        # PHASE 2: ALWAYS inject heuristic priors into context (even in normal mode)
+        context_text = _build_augmented_context(context_text, legal_priors_text)
+
+        # PHASE 3: Inject citation summary into context
+        if citation_text:
+            context_text = f"{context_text}\n\n{citation_text}"
+
+        if retrieval_mode == "fallback":
+            reasoning.append("PHASE 2: Low-confidence retrieval; using fallback prompt with heuristic priors + weak context.")
+            prompt = _build_fallback_prompt(user_query, legal_priors_text, citation_text)
+            # Append the weak context as supplementary
+            prompt += f"\n\nSupplementary Retrieved Context (low confidence):\n{context_text}\n"
+        else:
+            reasoning.append("Step 5: Preparing analysis with retrieved documents + legal priors + citations...")
+            _, tokenizer = get_model_and_tokenizer(payload.llm_model)
+            prompt = build_llm_prompt(user_query, context_text, history=history, tokenizer=tokenizer)
+
+        # 🤖 PHASE 3: Dual-generation — Pass 1: Draft
+        reasoning.append("Step 6: PHASE 3 — Dual-generation Pass 1 (draft)...")
+        draft_answer = call_llm(model_name=payload.llm_model, prompt=prompt, timeout_sec=payload.llm_timeout_sec)
+        if _is_legal_advice_refusal(draft_answer):
+            reasoning.append("Detected legal-advice refusal; retrying with stronger response instruction.")
+            retry_prompt = (
+                f"{prompt}\n\n"
+                "IMPORTANT:\n"
+                "Do not refuse with 'I can't give legal advice'.\n"
+                "Provide general legal information from the given Indian context and practical next steps.\n"
+            )
+            draft_answer = call_llm(model_name=payload.llm_model, prompt=retry_prompt, timeout_sec=payload.llm_timeout_sec)
+
+        # PHASE 3: Answer validation on draft
+        draft_validation = validate_answer(draft_answer)
+        debug_trace["draft_validation"] = draft_validation
+
+        if draft_validation["needs_refinement"]:
+            # PHASE 3: Dual-generation — Pass 2: Refine
+            reasoning.append(f"Step 7: PHASE 3 — Dual-generation Pass 2 (refine) — issues: {', '.join(draft_validation['issues'])}")
+            refine_prompt = build_refinement_prompt(draft_answer, user_query, legal_priors_text)
+            answer = call_llm(model_name=payload.llm_model, prompt=refine_prompt, timeout_sec=payload.llm_timeout_sec)
+            # Validate refined answer
+            refined_validation = validate_answer(answer)
+            if not refined_validation["valid"] and refined_validation.get("issues"):
+                # If still weak, try confidence rewrite
+                reasoning.append("PHASE 3: Refined answer still weak; applying confidence rewrite...")
+                answer = call_llm(
+                    model_name=payload.llm_model,
+                    prompt=build_confidence_rewrite_prompt(answer),
+                    timeout_sec=payload.llm_timeout_sec,
+                )
+        else:
+            answer = draft_answer
+            reasoning.append("Step 7: Draft answer passed validation — skipping refinement pass.")
+        grounding = validate_grounding(answer, pack)
+        if not grounding.get("valid", False) and grounding.get("invalid_sections"):
+            reasoning.append("Grounding mismatch detected; retrying with strict allowed-section repair prompt.")
+            repair_prompt = _build_grounding_repair_prompt(
+                original_prompt=prompt,
+                invalid_sections=[str(s) for s in grounding.get("invalid_sections", [])],
+                allowed_sections=_allowed_section_numbers(context_blocks),
+            )
+            repaired_answer = call_llm(
+                model_name=payload.llm_model,
+                prompt=repair_prompt,
+                timeout_sec=payload.llm_timeout_sec,
+            )
+            repaired_grounding = validate_grounding(repaired_answer, pack)
+            if repaired_grounding.get("valid", False):
+                answer = repaired_answer
+                grounding = repaired_grounding
+                reasoning.append("Grounding repaired successfully after one retry.")
+
+        if not grounding.get("valid", False):
+            conservative_answer = _build_context_grounded_fallback(user_query, context_blocks)
+            append_query_log(
+                {
+                    "time": datetime.utcnow().isoformat() + "Z",
+                    "user_query": user_query,
+                    "structured_query": structured_query,
+                    "expanded_queries": retrieval_queries,
+                    "retrieved_chunks": pack.get("citations", []),
+                    "filtered_chunks": debug_trace.get("retrieval", {}).get("runs", []),
+                    "final_context": pack.get("citations", []),
+                    "final_prompt": prompt,
+                    "llm_output": answer,
+                    "fallback_output": conservative_answer,
+                    "validation": grounding,
+                }
+            )
+            return QueryResponse(
+                ok=True,
+                query=user_query,
+                answer=conservative_answer,
+                reasoning=reasoning + ["Post-generation validation failed; returned context-grounded conservative fallback."],
+                citations=pack.get("citations", []),
+                context_blocks=context_blocks,
+                meta={
+                    "mode": payload.mode,
+                    "score": max_score,
+                    "session_id": s_id,
+                    "validation": grounding,
+                    **({"debug": debug_trace} if payload.debug else {}),
+                },
+            )
+
+        # PHASE 3: Confidence scoring
+        conf_score = compute_confidence(context_blocks, heuristic_matches, retrieval_mode)
+        conf_level = confidence_label(conf_score)
+        reasoning.append(f"PHASE 3: Confidence = {conf_score} ({conf_level})")
+
+        # PHASE 3: Mode-aware styling
+        answer = apply_confidence_styling(answer, conf_score, retrieval_mode)
+
+        # 🤝 Safe Return
+        disclaimer = "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
+        final_answer = format_final_answer(answer, context_blocks) + disclaimer
+        append_query_log(
+            {
+                "time": datetime.utcnow().isoformat() + "Z",
+                "user_query": user_query,
+                "structured_query": structured_query,
+                "expanded_queries": retrieval_queries,
+                "retrieved_chunks": pack.get("citations", []),
+                "filtered_chunks": debug_trace.get("retrieval", {}).get("runs", []),
+                "final_context": pack.get("citations", []),
+                "final_prompt": prompt,
+                "llm_output": answer,
+                "validation": grounding,
+                "heuristics": debug_trace.get("heuristics", []),
+                "retrieval_mode": debug_trace.get("retrieval_mode", "normal"),
+                "confidence": conf_score,
+                "draft_validation": debug_trace.get("draft_validation"),
+            }
+        )
+
+        SESSIONS[s_id].append({"role": "user", "content": user_query})
+        SESSIONS[s_id].append({"role": "assistant", "content": answer})
+
+        return QueryResponse(
+            ok=True, query=user_query, answer=final_answer, reasoning=reasoning,
+            citations=pack.get("citations", []),
+            context_blocks=context_blocks,
+            confidence=conf_score,
+            confidence_label=conf_level,
+            meta={
+                "mode": payload.mode,
+                "score": max_score,
+                "session_id": s_id,
+                "structured_query": structured_query,
+                "retrieval_mode": debug_trace.get("retrieval_mode", "normal"),
+                "heuristics_matched": len(heuristic_matches),
+                "confidence": conf_score,
+                "confidence_label": conf_level,
+                **({"debug": debug_trace} if payload.debug else {}),
+            }
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})
+
+
+@app.post("/query/user", response_model=UserModeResponse)
+def query_user(payload: QueryRequest) -> UserModeResponse:
+    base = query(payload)
+    return _build_user_mode_response(base)
+
+
+# =====================================================
+# PHASE 2: INTELLIGENT LEGAL INTERVIEW
+# =====================================================
+@app.post("/query/interview/chat", response_model=InterviewChatResponse)
+def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatResponse:
+    try:
+        s_id = payload.session_id or str(uuid.uuid4())
+        
+        # 0. Initialize/Load Case Model from Session
+        if s_id not in INTERVIEW_SESSIONS:
+            INTERVIEW_SESSIONS[s_id] = {
+                "issue": "unknown",
+                "active_issues": [],
+                "facts": {},
+                "asked_questions": [],
+                "case_model": None,
+                "signals": {},
+                "pending_confirmation": None,
+                "contradictions": [],
+                "last_top_law": None,
+            }
+        session = INTERVIEW_SESSIONS[s_id]
+
+        status = "interviewing"
+        fact_progress = False
+        user_confidence = None
+        previous_top_law = session.get("last_top_law")
+
+        # 1. NEW Case Model Redesign (Phase 1)
+        # If the user is providing a confirmed/edited model from the UI
+        if payload.case_model_update:
+            session["case_model"] = payload.case_model_update.dict()
+            status = "interviewing" # User confirmed, proceed to analysis
+            fact_progress = True
+        else:
+            # Run the new multi-step pipeline
+            new_case = run_case_extractor_pipeline(payload.query, payload.llm_model)
+            
+            # Merge logic (Lossless)
+            if not session.get("case_model"):
+                session["case_model"] = new_case.dict()
+                if new_case.events or new_case.parties:
+                    fact_progress = True
+            else:
+                current_model = CaseModel(**session["case_model"])
+                prev_event_count = len(current_model.events)
+                # Add new parties/events that aren't duplicates
+                for p in new_case.parties:
+                    if not any(cp.id == p.id for cp in current_model.parties):
+                        current_model.parties.append(p)
+                        fact_progress = True
+                
+                new_events = [e for e in new_case.events if e.sequence > prev_event_count]
+                if new_events:
+                    current_model.events.extend(new_events)
+                    fact_progress = True
+
+                current_model.financials.extend(new_case.financials)
+                current_model.documents.extend(new_case.documents)
+                current_model.meta.intents = list(set(current_model.meta.intents + new_case.meta.intents))
+                current_model.meta.claims = list(set(current_model.meta.claims + new_case.meta.claims))
+                current_model.missing_information = new_case.missing_information
+                session["case_model"] = current_model.dict()
+
+            # Detection of 'review_required' (New events/parties found)
+            if fact_progress:
+                status = "review_required"
+
+        case_obj = CaseModel(**session["case_model"])
+        
+        # 2. Incident Classification (Keep existing for issue tracking)
+        extracted_data = extract_facts_llm(payload.query, payload.llm_model, 30)
+        candidates = sorted(extracted_data.incident_type_candidates, key=lambda x: x.confidence, reverse=True)
+        top_incident = candidates[0].type if candidates else "unknown"
+        top_confidence = candidates[0].confidence if candidates else 0.0
+        
+        # Update issues
+        if session["issue"] == "unknown" or top_confidence > 0.8:
+            session["issue"] = top_incident
+        for c in candidates:
+            if c.confidence >= 0.7 and c.type not in session["active_issues"]:
+                session["active_issues"].append(c.type)
+        
+        issue = session["issue"]
+        active_issues = session.get("active_issues", [issue])
+        subtype = "general"
+
+        # 3. Persist heuristic facts from both the case model and raw user turn
+        session["facts"] = _update_session_facts_from_case_model(case_obj, session["facts"])
+        session["facts"] = extract_facts_heuristic(payload.query, issue, session["facts"])
+
+        # 4. PHASE 6.5: Signal accumulation + confidence handling
+        signal_updates = extract_signal_updates(payload.query)
+        pending_confirmation = session.get("pending_confirmation")
+        if pending_confirmation:
+            user_confidence = normalize_user_confidence(payload.query)
+            if user_confidence is not None:
+                signal_name = pending_confirmation["signal_name"]
+                existing_payload = dict(session["signals"].get(signal_name, {}))
+                if existing_payload:
+                    existing_payload["user_confidence"] = user_confidence
+                    existing_payload["confirmed"] = user_confidence >= 0.6
+                    existing_payload["source"] = "user_confirmation"
+                    session["signals"][signal_name] = existing_payload
+                session["pending_confirmation"] = None
+
+        session["signals"] = merge_signal_state(session.get("signals", {}), signal_updates)
+
+        contradictions = detect_contradictions(session["signals"], session["facts"], case_obj)
+        session["contradictions"] = contradictions
+        contradictions_present = bool(contradictions)
+
+        # 5. Phase 2: Legal Primitive Detection (Candidate Legal Meanings)
+        def bedrock_wrapper(prompt_text: str) -> str:
+             return call_bedrock_chat(
+                 messages=[{"role": "user", "content": prompt_text}],
+                 model_id=payload.llm_model
+             )
+        
+        brain = LegalBrain(llm_fn=bedrock_wrapper)
+        brain_response = brain.detect_primitives(case_obj)
+
+        # Attempt to detect domain/relationship from case model for better mapping
+        if not case_obj.domain:
+            if any(b.name in ["access_without_permission", "account_compromised"] for b in brain_response.behavioral_primitives):
+                case_obj.domain = "cyber"
+            elif any(b.name == "employment_ended" for b in brain_response.behavioral_primitives):
+                case_obj.domain = "employment"
+            elif any(b.name in ["possession_removed", "forced_exit"] for b in brain_response.behavioral_primitives):
+                case_obj.domain = "property"
+            elif any(b.name in ["money_not_paid", "money_not_returned"] for b in brain_response.behavioral_primitives):
+                case_obj.domain = "financial"
+
+        if not case_obj.detected_relationship:
+             for p in case_obj.parties:
+                 rel = (p.relationship_to_client or "").lower()
+                 if "employer" in rel:
+                     case_obj.detected_relationship = "employer-employee"
+                 if "landlord" in rel:
+                     case_obj.detected_relationship = "landlord-tenant"
+
+        confirmed_tags, confirmed_tag_confidence = derive_confirmed_tags(session["signals"])
+        contradiction_penalty = phase65_contradiction_penalty(contradictions)
+        law_engine = LawEngine(llm_fn=bedrock_wrapper)
+        laws_response = law_engine.map_laws(
+            case_obj,
+            brain_response,
+            confirmed_tags=confirmed_tags,
+            confirmed_tag_confidence=confirmed_tag_confidence,
+            contradiction_penalty=contradiction_penalty,
+        )
+
+        # 6. Signal Strength & Decision Engine
+        strength = compute_signal_strength(
+            issue,
+            session["facts"],
+            signals=session["signals"],
+            contradictions=contradictions,
+        )
+        decision = decide_next_step(issue, session["facts"], strength, contradictions=contradictions)
+        
+        # Progress Guard: If we got new facts, don't stall in CLARIFY
+        if decision == "CLARIFY" and fact_progress:
+            decision = "INTERVIEW"
+
+        if decision == "CLARIFY":
+            return InterviewChatResponse(
+                ok=True,
+                session_id=s_id,
+                issue=issue,
+                secondary_issues=active_issues[1:] if len(active_issues) > 1 else [],
+                confidence=strength,
+                status="clarification_required",
+                is_complete=False,
+                questions=["Could you please describe the situation in more detail? I'm having trouble identifying the specific legal issue."],
+                legal_output=None,
+                case_model=case_obj,
+                state_debug={
+                    "strength": strength, 
+                    "decision": "CLARIFY",
+                    "top_confidence": top_confidence,
+                    "fact_progress": fact_progress
+                }
+            )
+
+        # 6. Branching Logic (INTERVIEW vs ASSESS)
+        is_complete = (decision == "ASSESS")
+        
+        final_questions_text = []
+        if not is_complete:
+            if contradictions_present:
+                final_questions_text.append(contradictions[0]["clarification_question"])
+
+            if not final_questions_text:
+                confirmation_question = choose_confirmation_question(session["signals"], session["asked_questions"])
+                if confirmation_question:
+                    session["pending_confirmation"] = confirmation_question
+                    if confirmation_question["id"] not in session["asked_questions"]:
+                        session["asked_questions"].append(confirmation_question["id"])
+                    final_questions_text.append(confirmation_question["question"])
+
+            if not final_questions_text:
+                ranked_signal_questions = rank_signal_questions(
+                    laws_response=laws_response,
+                    case_model=case_obj,
+                    brain_response=brain_response,
+                    law_engine=law_engine,
+                    current_confirmed_tags=confirmed_tags,
+                    confirmed_tag_confidence=confirmed_tag_confidence,
+                    signal_state=session["signals"],
+                    contradictions=contradictions,
+                )
+                if ranked_signal_questions:
+                    chosen_signal_question = ranked_signal_questions[0]
+                    if chosen_signal_question["id"] not in session["asked_questions"]:
+                        session["asked_questions"].append(chosen_signal_question["id"])
+                    final_questions_text.append(chosen_signal_question["question"])
+
+            # INTERVIEW Mode: Get targeted questions for ALL active issues
+            selected_qs = select_questions(
+                issue=issue, 
+                facts=session["facts"], 
+                asked_questions=session["asked_questions"],
+                llm_model=payload.llm_model,
+                subtype=subtype,
+                secondary=active_issues[1:] if len(active_issues) > 1 else []
+            )
+            
+            for q in selected_qs:
+                if q["question"] not in final_questions_text:
+                    final_questions_text.append(q["question"])
+                if q["id"] not in session["asked_questions"]:
+                    session["asked_questions"].append(q["id"])
+                    
+            # If the Case Model has missing info, prioritize its questions
+            if case_obj.missing_information and len(final_questions_text) < 2:
+                for gap in case_obj.missing_information[:2]:
+                    if gap["question"] not in final_questions_text:
+                        final_questions_text.append(gap["question"])
+        
+        # 7. Generate Output
+        output_data = generate_legal_output(issue, subtype, session["facts"], is_complete, payload.llm_model)
+        output_data["confidence"] = strength 
+        legal_output = LegalOutput(**output_data)
+
+        # Final Status determination
+        if is_complete:
+            final_status = "complete"
+        elif contradictions_present or session.get("pending_confirmation"):
+            final_status = "clarification_required"
+        elif status == "review_required":
+            final_status = "review_required"
+        else:
+            final_status = "interviewing"
+        session["last_top_law"] = _top_law_name(laws_response.applicable_laws)
+
+        dashboard_summary = analyze_interaction_logs(INTERACTION_LOG_PATH, days=7)
+        if final_questions_text:
+            append_interaction_log(
+                INTERACTION_LOG_PATH,
+                build_log_entry(
+                    question_id=session["asked_questions"][-1] if session["asked_questions"] else "unknown",
+                    question_text=final_questions_text[0],
+                    signal_state=session["signals"],
+                    contradictions=contradictions,
+                    previous_top_law=previous_top_law,
+                    current_top_law=session["last_top_law"],
+                    user_confidence=user_confidence,
+                ),
+            )
+
+        return InterviewChatResponse(
+            session_id=s_id,
+            issue=issue,
+            secondary_issues=active_issues[1:] if len(active_issues) > 1 else [],
+            confidence=strength,
+            status=final_status,
+            is_complete=is_complete,
+            questions=final_questions_text,
+            legal_output=legal_output,
+            case_model=case_obj,
+            behavioral_primitives=brain_response.behavioral_primitives,
+            interpretations=brain_response.interpretations,
+            applicable_laws=laws_response.applicable_laws,
+            state_debug={
+                "strength": strength,
+                "decision": decision,
+                "behavioral_count": len(brain_response.behavioral_primitives),
+                "interpretation_count": len(brain_response.interpretations),
+                "law_count": len(laws_response.applicable_laws),
+                "active_issues": active_issues,
+                "signals": summarize_signal_state(session["signals"]),
+                "confirmed_tags": confirmed_tags,
+                "confirmed_tag_confidence": confirmed_tag_confidence,
+                "contradictions": contradictions,
+                "contradiction_penalty": contradiction_penalty,
+                "last_top_law": session.get("last_top_law"),
+                "dashboard_summary": dashboard_summary,
+            }
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})
+
+
+# =====================================================
+# PHASE 3: LAWYER MODE (LLM DRIVEN)
+# =====================================================
+@app.post("/query/lawyer/init", response_model=LawyerModeResponse)
+def query_lawyer_init(payload: LawyerInitRequest) -> LawyerModeResponse:
+    user_query = sanitize_user_input(payload.query)
+    session_id = payload.session_id or str(uuid.uuid4())
+    LAWYER_SESSIONS[session_id] = {}
+
+    structured_query = extract_structured_query(user_query, payload.llm_model)
+    law_focus = generate_relevant_laws(
+        user_query=user_query,
+        structured_query=structured_query,
+        model_name=payload.llm_model,
+        timeout_sec=min(payload.llm_timeout_sec, 20),
+    )
+    init_payload = _generate_lawyer_init_payload(
+        user_query=user_query,
+        structured_query=structured_query,
+        law_focus=law_focus,
+        model_name=payload.llm_model,
+        timeout_sec=min(payload.llm_timeout_sec, 30),
+    )
+
+    LAWYER_SESSIONS[session_id] = {
+        "query": user_query,
+        "structured_query": structured_query,
+        "law_focus": law_focus,
+        "issues": init_payload["issues"],
+        "facts": init_payload["facts"],
+        "questions": init_payload["questions"],
+        "legal_pathways": init_payload["legal_pathways"],
+        "llm_model": payload.llm_model,
+        "llm_timeout_sec": payload.llm_timeout_sec,
+    }
+
+    return LawyerModeResponse(
+        ok=True,
+        session_id=session_id,
+        facts=init_payload["facts"],
+        issues=init_payload["issues"],
+        legal_pathways=init_payload["legal_pathways"],
+        questions=init_payload["questions"],
+        final_analysis=None,
+        meta={"debug": LAWYER_SESSIONS[session_id]} if payload.debug else {},
+    )
+
+
+@app.post("/query/lawyer/refine", response_model=LawyerModeResponse)
+def query_lawyer_refine(payload: LawyerRefineRequest) -> LawyerModeResponse:
+    session = LAWYER_SESSIONS.get(payload.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Lawyer session not found. Start with /query/lawyer/init.")
+
+    answers = {str(k): str(v).strip() for k, v in (payload.answers or {}).items() if str(v).strip()}
+    retrieval_queries, law_focus, refined_structured = _build_lawyer_retrieval_inputs(session, answers)
+    intent_route = build_intent_route(session.get("query", ""), forced_domain=refined_structured.get("domain", ""))
+
+    retrieval_args = SimpleNamespace(
+        q=session.get("query", ""),
+        mode="understand_case",
+        corpus="all" if USE_JUDGEMENT_EMBEDDINGS else "acts",
+        top_k=6,
+        dense_k=20,
+        bm25_k=20,
+        dense_weight=0.7,
+        bm25_weight=0.3,
+        rerank=True,
+        rerank_top_n=20,
+        rerank_model="cross-encoder/ms-marco-MiniLM-L-2-v2",
+        rerank_batch_size=16,
+        domain_filter=refined_structured.get("domain") if refined_structured.get("domain") == "criminal" else None,
+        legal_domain=refined_structured.get("domain", "auto"),
+        intent_route=intent_route,
+        relevant_laws=law_focus.get("relevant_laws", []),
+        preferred_laws=law_focus.get("preferred_laws", []),
+        disallowed_law_hints=law_focus.get("disallowed_law_hints", []),
+    )
+
+    results, retrieval_debug = retrieve_for_queries(retrieval_queries, retrieval_args, allowed_docs=DEFAULT_ALLOWED_DOCS)
+    if not _query_mentions_specific_state(session.get("query", "")):
+        results = _filter_state_specific_results(session.get("query", ""), results)
+    if not results:
+        fallback_results, fallback_debug = retrieve_with_keyword_fallback(
+            user_query=session.get("query", ""),
+            base_args=retrieval_args,
+            allowed_docs=DEFAULT_ALLOWED_DOCS,
+        )
+        if fallback_results:
+            results = fallback_results
+            retrieval_debug["keyword_fallback"] = fallback_debug
+
+    acts_lookup = load_acts_chunk_lookup("JSON_acts")
+    pack = build_context_pack(query=session.get("query", ""), results=results, acts_lookup=acts_lookup, max_chars=14000)
+    context_blocks = pack.get("context_blocks", [])
+    final_analysis = _generate_lawyer_final_analysis(
+        session=session,
+        answers=answers,
+        context_blocks=context_blocks,
+        model_name=payload.llm_model,
+        timeout_sec=min(payload.llm_timeout_sec, 40),
+    )
+
+    session["answers"] = answers
+    session["final_analysis"] = final_analysis
+
+    return LawyerModeResponse(
+        ok=True,
+        session_id=payload.session_id,
+        facts=session.get("facts", ""),
+        issues=session.get("issues", []),
+        legal_pathways=session.get("legal_pathways", []),
+        questions=session.get("questions", []),
+        final_analysis=final_analysis,
+        meta={"retrieval": retrieval_debug, "context": pack.get("citations", [])} if payload.debug else {},
+    )
+
+
+@app.get("/health")
+def health():
+    return {"ok": True, "time": datetime.utcnow().isoformat() + "Z"}
+
+
+# =====================================================
+# LEGAL NOTICE GENERATION ENDPOINTS
+# =====================================================
+
+class NoticeRequest(BaseModel):
+    sender_name: str = Field(..., min_length=2)
+    receiver_name: str = Field(..., min_length=2)
+    relationship: str = Field("", description="e.g. employee-employer, landlord-tenant")
+    facts: List[str] = Field(..., min_items=1)
+    claim: str = Field(..., min_length=2)
+    notice_type: str = "auto"  # "auto" or one of NOTICE_TYPES keys
+    jurisdiction: str = "India"
+    tone: str = "firm"  # "firm", "aggressive", "polite"
+    custom_relief: Optional[List[str]] = None
+    custom_deadline: Optional[int] = None
+    llm_model: str = DEFAULT_BEDROCK_MODEL_ID
+    llm_timeout_sec: int = 300
+
+class NoticeResponse(BaseModel):
+    ok: bool
+    notice: str
+    laws_used: List[str]
+    notice_type: str
+    notice_type_label: str
+    confidence: float
+    confidence_label: str
+    meta: Dict[str, Any] = {}
+
+
+@app.get("/generate/notice-types")
+def get_notice_types():
+    """Return available notice types for the frontend dropdown."""
+    return {"ok": True, "types": get_available_notice_types()}
+
+
+@app.post("/generate/notice", response_model=NoticeResponse)
+def generate_notice(payload: NoticeRequest) -> NoticeResponse:
+    """Generate a professional legal notice from structured input."""
+    try:
+        # STEP 1: Determine notice type
+        if payload.notice_type == "auto":
+            detected_type = auto_detect_notice_type(payload.claim, payload.facts)
+        else:
+            detected_type = payload.notice_type if payload.notice_type in NOTICE_TYPES else "general"
+
+        config = NOTICE_TYPES.get(detected_type, NOTICE_TYPES["general"])
+
+        # STEP 2: Get heuristic priors
+        heuristic_matches = match_heuristics(f"{payload.claim} {' '.join(payload.facts)}")
+        legal_priors_text = format_heuristics_for_prompt(heuristic_matches)
+
+        # STEP 3: Retrieve supporting context (optional RAG)
+        retrieved_context = ""
+        try:
+            search_query = f"{payload.claim} legal provisions India {' '.join(config.get('keywords', []))}"
+            retrieval_args = SimpleNamespace(
+                q=search_query,
+                mode="understand_case",
+                corpus="acts",
+                top_k=3,
+                dense_k=10,
+                bm25_k=10,
+                dense_weight=0.7,
+                bm25_weight=0.3,
+                rerank=False,
+                rerank_top_n=5,
+                rerank_model="cross-encoder/ms-marco-MiniLM-L-2-v2",
+                rerank_batch_size=16,
+                domain_filter=None,
+                legal_domain="auto",
+                intent_route=None,
+                relevant_laws=[],
+                preferred_laws=[],
+                disallowed_law_hints=[],
+            )
+            results, _ = retrieve_for_queries([search_query], retrieval_args, allowed_docs={"acts"})
+            if results:
+                chunks_text = []
+                for r in results[:3]:
+                    title = r.get("title", "")
+                    section = r.get("section_number", "")
+                    text = r.get("chunk_text", "")[:300]
+                    chunks_text.append(f"{title} — Section {section}\n{text}")
+                retrieved_context = "\n\n".join(chunks_text)
+        except Exception:
+            pass  # RAG is optional; notice generation works without it
+
+        # STEP 4: Build notice prompt
+        prompt = build_notice_prompt(
+            sender_name=payload.sender_name,
+            receiver_name=payload.receiver_name,
+            relationship=payload.relationship,
+            facts=payload.facts,
+            claim=payload.claim,
+            notice_type=detected_type,
+            jurisdiction=payload.jurisdiction,
+            retrieved_context=retrieved_context,
+            legal_priors=legal_priors_text,
+            custom_relief=payload.custom_relief,
+            custom_deadline=payload.custom_deadline,
+            tone=payload.tone,
+        )
+
+        # STEP 5: Generate draft (Pass 1)
+        draft_notice = call_llm(
+            model_name=payload.llm_model,
+            prompt=prompt,
+            timeout_sec=payload.llm_timeout_sec,
+        )
+
+        # STEP 6: Refine (Pass 2 — mandatory)
+        refine_prompt = build_notice_refinement_prompt(draft_notice, tone=payload.tone)
+        refined_notice = call_llm(
+            model_name=payload.llm_model,
+            prompt=refine_prompt,
+            timeout_sec=payload.llm_timeout_sec,
+        )
+
+        # STEP 7: Append authority section
+        laws_used = config["laws"][:]
+        # Add any laws from heuristic matches not already in the list
+        for match in heuristic_matches:
+            for law in match.get("laws", []):
+                if law not in laws_used:
+                    laws_used.append(law)
+
+        authority_appendix = build_authority_appendix(laws_used)
+        final_notice = refined_notice.strip()
+        if authority_appendix:
+            final_notice += "\n" + authority_appendix
+
+        # STEP 8: Compute confidence
+        has_retrieval = bool(retrieved_context)
+        has_heuristics = bool(heuristic_matches)
+        conf = 0.5  # base
+        if has_retrieval:
+            conf += 0.25
+        if has_heuristics:
+            conf += 0.15
+        if detected_type != "general":
+            conf += 0.10
+        conf = round(min(conf, 1.0), 2)
+        conf_level = confidence_label(conf)
+
+        return NoticeResponse(
+            ok=True,
+            notice=final_notice,
+            laws_used=laws_used,
+            notice_type=detected_type,
+            notice_type_label=config["label"],
+            confidence=conf,
+            confidence_label=conf_level,
+            meta={
+                "tone": payload.tone,
+                "deadline_days": payload.custom_deadline or config["deadline_days"],
+                "heuristics_matched": len(heuristic_matches),
+                "has_retrieval_context": has_retrieval,
+                "detected_type": detected_type,
+            },
+        )
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

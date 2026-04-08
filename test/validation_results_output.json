@@ -1,0 +1,623 @@
+{
+  "summary": {
+    "total_cases": 7,
+    "top1_correct": 5,
+    "top3_correct": 5,
+    "top1_accuracy": 0.714,
+    "top3_accuracy": 0.714,
+    "previously_failed_cases": 4,
+    "now_fixed": 2,
+    "fix_rate": "2/4"
+  },
+  "cases": [
+    {
+      "case_id": "emp_03",
+      "domain": "employment",
+      "input": "Company refusing to pay my gratuity after 5 years of service.",
+      "expected": "Payment of Gratuity Act, 1972",
+      "was_failing_before": true,
+      "previous_failure_reason": "Phase 1 returned NO events; Phase 2 empty; zero laws mapped.",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "completed 5 years of service with P2",
+          "description": "P1 worked for P2 for a continuous period of 5 years.",
+          "event_type": "action",
+          "semantic_tags": []
+        },
+        {
+          "seq": 2,
+          "action": "requested unpaid gratuity from P2",
+          "description": "P1 formally or informally sought payment of gratuity from P2.",
+          "event_type": "action",
+          "semantic_tags": [
+            "money_not_paid"
+          ]
+        },
+        {
+          "seq": 3,
+          "action": "refused to pay gratuity to P1",
+          "description": "P2 denied or failed to process P1's gratuity claim.",
+          "event_type": "action",
+          "semantic_tags": [
+            "money_not_paid"
+          ]
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "employer"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "money_not_paid"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "non_payment",
+          "confidence": 0.8
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 0.95,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "rank": 2,
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 0.912,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "rank": 3,
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "confidence_level": "medium",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "predicted_top": "Payment of Wages Act, 1936",
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "status": "\u274c WRONG",
+      "fixed_by_remediation": false
+    },
+    {
+      "case_id": "emp_04",
+      "domain": "employment",
+      "input": "Manager harassed me at the workplace.",
+      "expected": "Sexual Harassment of Women at Workplace Act, 2013",
+      "was_failing_before": true,
+      "previous_failure_reason": "threat_made detected but interpretation 'sexual_harassment' not triggered; no laws ranked.",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "made unwelcome comments or advances toward P1",
+          "description": "P2 engaged in behavior perceived as harassing by P1, including verbal or non-verbal conduct in the workplace.",
+          "event_type": "action",
+          "semantic_tags": [
+            "harassment"
+          ]
+        },
+        {
+          "seq": 2,
+          "action": "experienced distress or discomfort due to P2's actions",
+          "description": "P1 reported feeling harassed or affected by P2's conduct in the workplace.",
+          "event_type": "action",
+          "semantic_tags": [
+            "harassment"
+          ]
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "harasser (manager)"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "harassment"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "sexual_harassment",
+          "confidence": 0.9
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Sexual Harassment of Women at Workplace Act, 2013",
+          "section": "Sec 9",
+          "score": 1.0,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "predicted_top": "Sexual Harassment of Women at Workplace Act, 2013",
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "status": "\u2705 CORRECT",
+      "fixed_by_remediation": true
+    },
+    {
+      "case_id": "fin_04",
+      "domain": "financial",
+      "input": "Company took my money for investment and suddenly shut down.",
+      "expected": "Bharatiya Nyaya Sanhita, 2023",
+      "was_failing_before": true,
+      "previous_failure_reason": "false_statement_made not extracted; fraud signal missed; wrong law ranked #1.",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "Narrative summary",
+          "description": "Company took my money for investment and suddenly shut down.",
+          "event_type": "action",
+          "semantic_tags": [
+            "money_not_paid",
+            "fraud_signal"
+          ]
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "investment company (defendant/opponent)"
+        },
+        {
+          "id": "P3",
+          "role": "third-party",
+          "relationship": "regulatory/legal authority (potential ally)"
+        },
+        {
+          "id": "P4",
+          "role": "third-party",
+          "relationship": "legal counsel (ally)"
+        },
+        {
+          "id": "P5",
+          "role": "third-party",
+          "relationship": "insurance provider (potential ally)"
+        },
+        {
+          "id": "P6",
+          "role": "third-party",
+          "relationship": "witness (potential ally)"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "money_not_paid",
+        "fraud_signal"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "non_payment",
+          "confidence": 0.8
+        },
+        {
+          "label": "fraud_like_behavior",
+          "confidence": 0.8
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66D",
+          "score": 0.706,
+          "confidence_level": "medium",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.98) x Interp(0.8) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "rank": 2,
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 0.57,
+          "confidence_level": "medium",
+          "reasoning": "Ranked based on: Full behavioral evidence, Score adjusted for evidence density. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(0.6)."
+        },
+        {
+          "rank": 3,
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 0.547,
+          "confidence_level": "medium",
+          "reasoning": "Ranked based on: Full behavioral evidence, Score adjusted for evidence density. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(0.6)."
+        }
+      ],
+      "predicted_top": "Information Technology Act, 2000",
+      "is_top1_correct": false,
+      "is_top3_correct": false,
+      "status": "\u274c WRONG",
+      "fixed_by_remediation": false
+    },
+    {
+      "case_id": "con_04",
+      "domain": "consumer",
+      "input": "E-commerce site delivered a stone instead of a laptop I ordered.",
+      "expected": "Consumer Protection Act, 2019",
+      "was_failing_before": true,
+      "previous_failure_reason": "product_defective not tagged; service_not_delivered missed; CPA not surfaced.",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "placed an order for a laptop",
+          "description": "P1 initiated a purchase of a laptop from P2's e-commerce site.",
+          "event_type": "action",
+          "semantic_tags": []
+        },
+        {
+          "seq": 2,
+          "action": "fulfilled the order with an incorrect item",
+          "description": "P2 shipped a stone instead of the ordered laptop to P1.",
+          "event_type": "action",
+          "semantic_tags": [
+            "product_defective"
+          ]
+        },
+        {
+          "seq": 3,
+          "action": "received the incorrect item",
+          "description": "P1 physically received the stone as the fulfillment of their order.",
+          "event_type": "action",
+          "semantic_tags": []
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "seller/opponent"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "product_defective"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "product_defective",
+          "confidence": 0.9
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Consumer Protection Act, 2019",
+          "section": "Sec 2(10)",
+          "score": 1.0,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "predicted_top": "Consumer Protection Act, 2019",
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "status": "\u2705 CORRECT",
+      "fixed_by_remediation": true
+    },
+    {
+      "case_id": "emp_01",
+      "domain": "employment",
+      "input": "Company hasn't paid my salary for 2 months.",
+      "expected": "Payment of Wages Act, 1936",
+      "was_failing_before": false,
+      "previous_failure_reason": "N/A",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "failed to disburse salary",
+          "description": "P2 did not pay P1's salary for the first month.",
+          "event_type": "action",
+          "semantic_tags": [
+            "money_not_paid"
+          ]
+        },
+        {
+          "seq": 2,
+          "action": "failed to disburse salary",
+          "description": "P2 did not pay P1's salary for the second consecutive month.",
+          "event_type": "action",
+          "semantic_tags": [
+            "money_not_paid"
+          ]
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "employer"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "money_not_paid"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "non_payment",
+          "confidence": 0.8
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Payment of Wages Act, 1936",
+          "section": "Sec 3",
+          "score": 0.95,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.99) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "rank": 2,
+          "law": "Industrial Disputes Act, 1947",
+          "section": "Sec 33C",
+          "score": 0.912,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.95) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        },
+        {
+          "rank": 3,
+          "law": "Indian Contract Act, 1872",
+          "section": "Sec 73",
+          "score": 0.576,
+          "confidence_level": "medium",
+          "reasoning": "Ranked based on: Full behavioral evidence. Formula trace: Base(0.9) x Interp(0.8) x Evidence(1.0) x Context(0.8) x Sanity(1.0)."
+        }
+      ],
+      "predicted_top": "Payment of Wages Act, 1936",
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "status": "\u2705 CORRECT",
+      "fixed_by_remediation": false
+    },
+    {
+      "case_id": "cyb_01",
+      "domain": "cyber",
+      "input": "Someone hacked my bank account and stole money using my OTP.",
+      "expected": "Information Technology Act, 2000",
+      "was_failing_before": false,
+      "previous_failure_reason": "N/A",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "Narrative summary",
+          "description": "Someone hacked my bank account and stole money using my OTP.",
+          "event_type": "action",
+          "semantic_tags": [
+            "account_compromised",
+            "money_not_paid",
+            "unauthorized_access"
+          ]
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "perpetrator"
+        },
+        {
+          "id": "P3",
+          "role": "third-party",
+          "relationship": "service provider"
+        },
+        {
+          "id": "P4",
+          "role": "authority",
+          "relationship": "regulatory/legal authority"
+        },
+        {
+          "id": "P5",
+          "role": "third-party",
+          "relationship": "service provider"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "account_compromised",
+        "money_not_paid",
+        "unauthorized_access"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "non_payment",
+          "confidence": 0.8
+        },
+        {
+          "label": "unauthorized_access",
+          "confidence": 0.9
+        },
+        {
+          "label": "cyber_crime",
+          "confidence": 0.9
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43A",
+          "score": 0.794,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.98) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "rank": 2,
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 0.77,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "rank": 3,
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 43",
+          "score": 0.77,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.95) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        },
+        {
+          "rank": 4,
+          "law": "Information Technology Act, 2000",
+          "section": "Sec 66",
+          "score": 0.729,
+          "confidence_level": "medium",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general), Score adjusted for evidence density. Formula trace: Base(0.9) x Interp(0.9) x Evidence(1.0) x Context(1.0) x Sanity(0.6)."
+        }
+      ],
+      "predicted_top": "Information Technology Act, 2000",
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "status": "\u2705 CORRECT",
+      "fixed_by_remediation": false
+    },
+    {
+      "case_id": "fin_02_new",
+      "domain": "financial",
+      "input": "I gave a post-dated cheque for rent and it bounced.",
+      "expected": "Negotiable Instruments Act, 1881",
+      "was_failing_before": false,
+      "previous_failure_reason": "N/A",
+      "phase1_events": [
+        {
+          "seq": 1,
+          "action": "issued a post-dated cheque",
+          "description": "P1 provided a post-dated cheque to P2 as payment for rent.",
+          "event_type": "action",
+          "semantic_tags": []
+        },
+        {
+          "seq": 2,
+          "action": "received the post-dated cheque",
+          "description": "P2 accepted the post-dated cheque from P1 as valid payment.",
+          "event_type": "action",
+          "semantic_tags": []
+        },
+        {
+          "seq": 3,
+          "action": "processed the cheque upon its due date",
+          "description": "P3 (bank) attempted to clear the cheque when the date arrived.",
+          "event_type": "action",
+          "semantic_tags": []
+        },
+        {
+          "seq": 4,
+          "action": "determined the cheque bounced",
+          "description": "P3 identified insufficient funds or another issue causing the cheque to bounce.",
+          "event_type": "action",
+          "semantic_tags": [
+            "cheque_bounce"
+          ]
+        },
+        {
+          "seq": 5,
+          "action": "notified P2 of the bounced cheque",
+          "description": "P3 informed P2 that the cheque was returned unpaid.",
+          "event_type": "action",
+          "semantic_tags": [
+            "cheque_bounce"
+          ]
+        },
+        {
+          "seq": 6,
+          "action": "received notification of the bounced cheque",
+          "description": "P2 was officially notified by P3 that the cheque did not clear.",
+          "event_type": "action",
+          "semantic_tags": [
+            "cheque_bounce"
+          ]
+        }
+      ],
+      "phase1_parties": [
+        {
+          "id": "P1",
+          "role": "client",
+          "relationship": "self"
+        },
+        {
+          "id": "P2",
+          "role": "opponent",
+          "relationship": "landlord/property owner"
+        },
+        {
+          "id": "P3",
+          "role": "authority",
+          "relationship": "financial institution"
+        }
+      ],
+      "inferred_domain": null,
+      "phase2_behaviors": [
+        "cheque_bounce"
+      ],
+      "phase2_interpretations": [
+        {
+          "label": "cheque_bounce",
+          "confidence": 0.95
+        }
+      ],
+      "phase3_ranked_laws": [
+        {
+          "rank": 1,
+          "law": "Negotiable Instruments Act, 1881",
+          "section": "Sec 138",
+          "score": 1.0,
+          "confidence_level": "high",
+          "reasoning": "Ranked based on: Full behavioral evidence, Strong context match (general). Formula trace: Base(0.99) x Interp(0.95) x Evidence(1.0) x Context(1.0) x Sanity(1.0)."
+        }
+      ],
+      "predicted_top": "Negotiable Instruments Act, 1881",
+      "is_top1_correct": true,
+      "is_top3_correct": true,
+      "status": "\u2705 CORRECT",
+      "fixed_by_remediation": false
+    }
+  ]
+}
