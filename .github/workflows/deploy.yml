@@ -24,12 +24,11 @@ jobs:
           git pull origin main
 
           # Backend
-          cd backend
           source .venv/bin/activate
           pip install -r requirements.txt
 
           # Frontend
-          cd ../ui
+          cd ui
           npm install
           npm run build
 
