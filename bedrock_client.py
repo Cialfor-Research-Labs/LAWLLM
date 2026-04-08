@@ -38,8 +38,7 @@ DEFAULT_BEDROCK_MODEL_ID = os.getenv(
     os.getenv(
         "BEDROCK_MODEL_ID",
         os.getenv(
-            "BEDROCK_MODEL",
-            os.getenv("QWEN_MODEL_NAME"),
+            "BEDROCK_MODEL"
         ),
     ),
 )
@@ -178,7 +177,9 @@ def call_bedrock_chat(
     if target_model.startswith("us.") and not os.getenv("BEDROCK_REGION"):
         region = "us-east-1"
 
-    print(f"[BEDROCK] Attempting call in {region}...")
+    profile = os.getenv("AWS_PROFILE", "")
+    # Phase 27: Diagnostic Visibility
+    print(f"[BEDROCK] Attempting call to {target_model} in {region} (profile={profile or 'default'})...")
 
     normalized_messages = _normalize_messages(messages)
     # Global hard cap requested for output size. Claude 3.5 Sonnet needs more than 1000.
