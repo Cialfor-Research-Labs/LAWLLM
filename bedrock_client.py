@@ -38,14 +38,13 @@ DEFAULT_BEDROCK_MODEL_ID = os.getenv(
     os.getenv(
         "BEDROCK_MODEL_ID",
         os.getenv(
-            "BEDROCK_MODEL",
-            os.getenv("QWEN_MODEL_NAME", "mistral.ministral-3-14b-instruct"),
+            "BEDROCK_MODEL"
         ),
     ),
 )
 DEFAULT_REGION = os.getenv(
     "BEDROCK_REGION",
-    os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "ap-south-1")),
+    os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION")),
 )
 
 
@@ -89,7 +88,7 @@ def _get_bedrock_client(region_name: str) -> Any:
 
     read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "300"))
     connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "10"))
-    retries = int(os.getenv("BEDROCK_MAX_RETRIES", "2"))
+    retries = int(os.getenv("BEDROCK_MAX_RETRIES", "100"))
     cfg = Config(
         read_timeout=read_timeout,
         connect_timeout=connect_timeout,
@@ -178,9 +177,9 @@ def call_bedrock_chat(
     if target_model.startswith("us.") and not os.getenv("BEDROCK_REGION"):
         region = "us-east-1"
 
-
-    print(f"[BEDROCK] Attempting call in {region}...")
-
+    profile = os.getenv("AWS_PROFILE", "")
+    # Phase 27: Diagnostic Visibility
+    print(f"[BEDROCK] Attempting call to {target_model} in {region} (profile={profile or 'default'})...")
 
     normalized_messages = _normalize_messages(messages)
     # Global hard cap requested for output size. Claude 3.5 Sonnet needs more than 1000.
