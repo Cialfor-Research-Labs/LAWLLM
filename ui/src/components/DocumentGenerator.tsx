@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
-import { getApiBase } from '../lib/api';
 import {
   FileText,
   Plus,
@@ -40,6 +39,14 @@ interface NoticeResponse {
 type Tone = 'firm' | 'aggressive' | 'polite';
 
 // ---- API ----
+
+function getApiBase(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  return '/api';
+}
 
 const markdownComponents: Components = {
   strong: ({ children }) => <strong className="font-extrabold text-primary">{children}</strong>,

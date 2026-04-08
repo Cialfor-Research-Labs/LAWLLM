@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
-import { getApiBase } from '../lib/api';
 import { 
   CheckCircle2, 
   Loader2, 
@@ -110,6 +109,14 @@ const markdownComponents: Components = {
   ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-2">{children}</ul>,
   li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
 };
+
+function getApiBase(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  return '/api';
+}
 
 function formatInterviewResponse(data: InterviewChatResponse) {
     const out = data.legal_output;
