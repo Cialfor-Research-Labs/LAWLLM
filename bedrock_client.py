@@ -79,21 +79,12 @@ def _normalize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 @lru_cache(maxsize=6)
-def _get_bedrock_client(region_name: str, profile_name: str) -> Any:
+def _get_bedrock_client(region_name: str) -> Any:
     session_kwargs: Dict[str, str] = {}
     if region_name:
         session_kwargs["region_name"] = region_name
-    access_key = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
-    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
-    session_token = os.getenv("AWS_SESSION_TOKEN", "").strip()
-
-    if access_key and secret_key:
-        session_kwargs["aws_access_key_id"] = access_key
-        session_kwargs["aws_secret_access_key"] = secret_key
-        if session_token:
-            session_kwargs["aws_session_token"] = session_token
-    elif profile_name:
-        session_kwargs["profile_name"] = profile_name
+    # Use AWS default credential provider chain (EC2 IAM role, ECS task role,
+    # web identity, shared config, etc.). No static secrets in code.
     session = boto3.session.Session(**session_kwargs)
 
     read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "300"))
@@ -154,9 +145,7 @@ def call_bedrock_chat(
     if target_model.startswith("us.") and not os.getenv("BEDROCK_REGION"):
         region = "us-east-1"
 
-    profile = os.getenv("AWS_PROFILE", "")
-    # Phase 27: Diagnostic Visibility
-    print(f"[BEDROCK] Attempting call to {target_model} in {region} (profile={profile or 'default'})...")
+    print(f"[BEDROCK] Attempting call to {target_model} in {region}...")
 
     normalized_messages = _normalize_messages(messages)
     # Global hard cap requested for output size. Claude 3.5 Sonnet needs more than 1000.
@@ -164,7 +153,7 @@ def call_bedrock_chat(
     if not normalized_messages:
         return "[ERROR] No valid message content provided."
     try:
-        client = _get_bedrock_client(region, profile)
+        client = _get_bedrock_client(region)
     except Exception as e:
         return f"[ERROR] Unable to initialize Bedrock client in {region}: {str(e)}"
 
