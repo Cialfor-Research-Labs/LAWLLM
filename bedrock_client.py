@@ -178,7 +178,9 @@ def call_bedrock_chat(
     if target_model.startswith("us.") and not os.getenv("BEDROCK_REGION"):
         region = "us-east-1"
 
+
     print(f"[BEDROCK] Attempting call in {region}...")
+
 
     normalized_messages = _normalize_messages(messages)
     # Global hard cap requested for output size. Claude 3.5 Sonnet needs more than 1000.
