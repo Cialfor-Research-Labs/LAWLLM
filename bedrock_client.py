@@ -108,8 +108,7 @@ def _extract_converse_text(response: Dict[str, Any]) -> str:
 
 
 def _extract_invoke_text(payload: Dict[str, Any]) -> str:
-    """Extracts text from various model-specific invoke_model payloads."""
-    # 1. Claude/Converse-style content list
+    """Extract text from common Bedrock invoke_model response shapes."""
     content = payload.get("content")
     if isinstance(content, list):
         parts: List[str] = []
@@ -118,14 +117,48 @@ def _extract_invoke_text(payload: Dict[str, Any]) -> str:
                 parts.append(str(item["text"]))
         if parts:
             return "\n".join(parts).strip()
-    
-    # 2. Mistral-style outputs list
+
     outputs = payload.get("outputs")
     if isinstance(outputs, list) and len(outputs) > 0:
         return str(outputs[0].get("text", "")).strip()
 
-    # 3. Claude Legacy 'completion'
     return str(payload.get("completion", "")).strip()
+
+
+def _to_plain_prompt(messages: List[Dict[str, Any]], system_prompt: Optional[str]) -> str:
+    parts: List[str] = []
+    if system_prompt and system_prompt.strip():
+        parts.append(f"System: {system_prompt.strip()}")
+    for m in messages or []:
+        text = _as_text(m.get("content", "")).strip()
+        if not text:
+            continue
+        role = str(m.get("role", "user")).strip().lower()
+        if role == "assistant":
+            parts.append(f"Assistant: {text}")
+        else:
+            parts.append(f"User: {text}")
+    # Keep the final assistant cue for generation.
+    parts.append("Assistant:")
+    return "\n\n".join(parts)
+
+
+def _build_invoke_payloads(
+    messages: List[Dict[str, Any]],
+    system_prompt: Optional[str],
+    temperature: float,
+    top_p: float,
+    max_tokens: int,
+) -> List[Dict[str, Any]]:
+    payloads: List[Dict[str, Any]] = [
+        {
+            "prompt": _to_plain_prompt(messages, system_prompt),
+            "max_tokens": max_tokens,
+            "temperature": float(temperature),
+            "top_p": float(top_p),
+        },
+    ]
+    return payloads
 
 
 def call_bedrock_chat(
@@ -145,7 +178,9 @@ def call_bedrock_chat(
     if target_model.startswith("us.") and not os.getenv("BEDROCK_REGION"):
         region = "us-east-1"
 
-    print(f"[BEDROCK] Attempting call to {target_model} in {region}...")
+
+    print(f"[BEDROCK] Attempting call in {region}...")
+
 
     normalized_messages = _normalize_messages(messages)
     # Global hard cap requested for output size. Claude 3.5 Sonnet needs more than 1000.
@@ -174,31 +209,37 @@ def call_bedrock_chat(
         return text or "[ERROR] Bedrock returned an empty response."
     except (ClientError, BotoCoreError):
         try:
-            # Fallback path for Anthropic models if Converse is unavailable.
-            invoke_body: Dict[str, Any] = {
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": effective_max_tokens,
-                "temperature": float(temperature),
-                "top_p": float(top_p),
-                "messages": [
-                    {"role": m["role"], "content": _as_text(m.get("content", ""))}
-                    for m in messages
-                    if _as_text(m.get("content", "")).strip()
-                ],
-            }
-            if system_prompt and system_prompt.strip():
-                invoke_body["system"] = system_prompt.strip()
-            response = client.invoke_model(
-                modelId=target_model,
-                contentType="application/json",
-                accept="application/json",
-                body=json.dumps(invoke_body).encode("utf-8"),
+            payloads = _build_invoke_payloads(
+                messages=messages,
+                system_prompt=system_prompt,
+                temperature=float(temperature),
+                top_p=float(top_p),
+                max_tokens=effective_max_tokens,
             )
-            body = response.get("body")
-            raw = body.read() if body is not None else b"{}"
-            payload = json.loads(raw.decode("utf-8"))
-            text = _extract_invoke_text(payload)
-            return text or "[ERROR] Bedrock returned an empty response."
+            last_error: Optional[Exception] = None
+            for invoke_body in payloads:
+                try:
+                    response = client.invoke_model(
+                        modelId=target_model,
+                        contentType="application/json",
+                        accept="application/json",
+                        body=json.dumps(invoke_body).encode("utf-8"),
+                    )
+                    body = response.get("body")
+                    raw = body.read() if body is not None else b"{}"
+                    payload = json.loads(raw.decode("utf-8"))
+                    text = _extract_invoke_text(payload)
+                    return text or "[ERROR] Bedrock returned an empty response."
+                except ClientError as ce:
+                    code = str(((ce.response or {}).get("Error") or {}).get("Code") or "")
+                    last_error = ce
+                    if code != "ValidationException":
+                        raise
+                except BotoCoreError as be:
+                    last_error = be
+                except Exception as e:
+                    last_error = e
+            return f"[ERROR] AWS Bedrock call failed: {str(last_error)}"
         except Exception as e:
             return f"[ERROR] AWS Bedrock call failed: {str(e)}"
     except Exception as e:
