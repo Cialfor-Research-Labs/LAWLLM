@@ -18,6 +18,15 @@ def _safe_lower(text: Any) -> str:
     return str(text or "").strip().lower()
 
 
+def _coerce_confidence(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def normalize_user_confidence(answer: str) -> Optional[float]:
     text = _safe_lower(answer)
     if not text:
@@ -129,8 +138,8 @@ def merge_signal_state(
             merged[signal_name] = incoming
             continue
 
-        incoming_conf = float(incoming.get("user_confidence", 0.0))
-        existing_conf = float(existing.get("user_confidence", 0.0))
+        incoming_conf = _coerce_confidence(incoming.get("user_confidence"), 0.0)
+        existing_conf = _coerce_confidence(existing.get("user_confidence"), 0.0)
         if incoming.get("value") != existing.get("value") or incoming_conf >= existing_conf:
             merged[signal_name] = {
                 **existing,
@@ -148,13 +157,13 @@ def derive_confirmed_tags(signal_state: Dict[str, Dict[str, Any]]) -> Tuple[List
     employment_end = ((signal_state or {}).get("employment_end") or {}).get("value")
 
     if payment_type == "monthly_salary":
-        conf = float((signal_state["payment_type"]).get("user_confidence", 0.6))
+        conf = _coerce_confidence((signal_state["payment_type"]).get("user_confidence"), 0.6)
         confirmed_tags.append("under_payment")
         tag_confidence["under_payment"] = conf
     elif payment_type == "gratuity":
         base_conf = min(
-            float((signal_state.get("payment_type") or {}).get("user_confidence", 0.6)),
-            float((signal_state.get("employment_end") or {}).get("user_confidence", 0.6)),
+            _coerce_confidence((signal_state.get("payment_type") or {}).get("user_confidence"), 0.6),
+            _coerce_confidence((signal_state.get("employment_end") or {}).get("user_confidence"), 0.6),
         )
         if employment_end is True:
             confirmed_tags.append("gratuity_dispute")
@@ -163,11 +172,11 @@ def derive_confirmed_tags(signal_state: Dict[str, Dict[str, Any]]) -> Tuple[List
             confirmed_tags.append("money_not_paid")
             tag_confidence["money_not_paid"] = base_conf
     elif payment_type == "retirement_benefit":
-        conf = float((signal_state["payment_type"]).get("user_confidence", 0.6))
+        conf = _coerce_confidence((signal_state["payment_type"]).get("user_confidence"), 0.6)
         confirmed_tags.append("pf_dispute")
         tag_confidence["pf_dispute"] = conf
     elif payment_type == "bonus":
-        conf = float((signal_state["payment_type"]).get("user_confidence", 0.6))
+        conf = _coerce_confidence((signal_state["payment_type"]).get("user_confidence"), 0.6)
         confirmed_tags.append("bonus_not_paid")
         tag_confidence["bonus_not_paid"] = conf
 
@@ -256,7 +265,7 @@ def summarize_signal_state(signal_state: Dict[str, Dict[str, Any]]) -> Dict[str,
     return {
         name: {
             "value": payload.get("value"),
-            "user_confidence": round(float(payload.get("user_confidence", 0.0)), 2),
+            "user_confidence": round(_coerce_confidence(payload.get("user_confidence"), 0.0), 2),
             "confirmed": bool(payload.get("confirmed")),
             "source": payload.get("source", "query"),
         }
@@ -410,7 +419,7 @@ def analyze_interaction_logs(log_path: str, days: int = 7) -> Dict[str, Any]:
             for contradiction in row.get("contradictions", []):
                 confusion_counter[contradiction.get("code", "unknown")] += 1
 
-            if row.get("user_confidence", 1.0) < 0.5:
+            if _coerce_confidence(row.get("user_confidence"), 1.0) < 0.5:
                 confusion_counter["low_user_confidence"] += 1
 
     improving_questions = []
