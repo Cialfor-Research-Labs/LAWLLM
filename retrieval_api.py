@@ -484,7 +484,67 @@ def merge_retrieval_results(result_sets: List[List[Dict[str, Any]]], top_k: int)
 
     ranked = list(merged.values())
     ranked.sort(key=lambda x: float(x.get("final_score", x.get("hybrid_score", 0.0)) or 0.0), reverse=True)
-    return ranked[:top_k]
+    if top_k <= 0:
+        return []
+
+    top = ranked[:top_k]
+    if not top:
+        return top
+
+    # Preserve corpus diversity: keep at least one judgement and one act when available.
+    available_corpora = {str(item.get("corpus") or "").lower() for item in ranked}
+    top_corpora = {str(item.get("corpus") or "").lower() for item in top}
+
+    def _inject_corpus(corpus_name: str) -> None:
+        if top_k < 2:
+            return
+        if corpus_name not in available_corpora or corpus_name in top_corpora:
+            return
+        candidate = next((item for item in ranked if str(item.get("corpus") or "").lower() == corpus_name), None)
+        if not candidate:
+            return
+        # Replace the last item from another corpus to preserve list size.
+        replace_idx = next(
+            (idx for idx in range(len(top) - 1, -1, -1) if str(top[idx].get("corpus") or "").lower() != corpus_name),
+            len(top) - 1,
+        )
+        top[replace_idx] = candidate
+        top_corpora.add(corpus_name)
+
+    _inject_corpus("acts")
+    _inject_corpus("judgements")
+
+    # Dedupe while preserving order, then refill from ranked if needed.
+    deduped: List[Dict[str, Any]] = []
+    seen = set()
+    for item in top:
+        key = (
+            str(item.get("corpus") or ""),
+            str(item.get("chunk_id") or ""),
+            str(item.get("title") or ""),
+            str(item.get("section_number") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+
+    if len(deduped) < top_k:
+        for item in ranked:
+            key = (
+                str(item.get("corpus") or ""),
+                str(item.get("chunk_id") or ""),
+                str(item.get("title") or ""),
+                str(item.get("section_number") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+            if len(deduped) >= top_k:
+                break
+
+    return deduped[:top_k]
 
 
 def _extract_json_object(raw: str) -> Dict[str, Any]:
