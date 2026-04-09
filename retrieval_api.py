@@ -260,6 +260,53 @@ def _update_session_facts_from_case_model(case_obj: CaseModel, session_facts: Di
             facts["months_unpaid"] = facts.get("months_unpaid", True)
     return facts
 
+
+def _fresh_interview_session_state() -> Dict[str, Any]:
+    return {
+        "issue": "unknown",
+        "active_issues": [],
+        "facts": {},
+        "asked_questions": [],
+        "case_model": None,
+        "signals": {},
+        "pending_confirmation": None,
+        "contradictions": [],
+        "last_top_law": None,
+        "interview_turns": 0,
+        "stagnant_turns": 0,
+        "pending_confirmation_retries": 0,
+        "asked_contradiction_codes": [],
+    }
+
+
+def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) -> bool:
+    """Reset stale interview state when a clearly new case narrative is submitted on an existing session."""
+    if not session:
+        return False
+    prior_turns = int(session.get("interview_turns", 0))
+    if prior_turns < 2:
+        return False
+
+    q = str(query or "")
+    low = q.lower()
+    words = re.findall(r"[a-z0-9]+", low)
+    if len(words) < 40:
+        return False
+
+    new_matter_markers = [
+        "my client", "purchased", "bought", "hospital", "medical", "seller", "manufacturer",
+        "injury", "burn", "accident", "seeking legal advice", "despite multiple complaints",
+    ]
+    looks_like_new_narrative = (q.count(".") >= 3 or "\n" in q) and any(tok in low for tok in new_matter_markers)
+    if not looks_like_new_narrative:
+        return False
+
+    hinted = str((detect_issues(q) or {}).get("primary") or "unknown")
+    current = str(session.get("issue") or "unknown")
+    issue_shift = hinted not in {"unknown", ""} and current not in {"unknown", ""} and hinted != current
+
+    return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 3
+
 # =========================
 # HELPERS
 # =========================
@@ -2160,22 +2207,13 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
         
         # 0. Initialize/Load Case Model from Session
         if s_id not in INTERVIEW_SESSIONS:
-            INTERVIEW_SESSIONS[s_id] = {
-                "issue": "unknown",
-                "active_issues": [],
-                "facts": {},
-                "asked_questions": [],
-                "case_model": None,
-                "signals": {},
-                "pending_confirmation": None,
-                "contradictions": [],
-                "last_top_law": None,
-                "interview_turns": 0,
-                "stagnant_turns": 0,
-                "pending_confirmation_retries": 0,
-                "asked_contradiction_codes": [],
-            }
+            INTERVIEW_SESSIONS[s_id] = _fresh_interview_session_state()
         session = INTERVIEW_SESSIONS[s_id]
+        auto_session_reset = False
+        if _should_auto_reset_interview_session(session, payload.query):
+            INTERVIEW_SESSIONS[s_id] = _fresh_interview_session_state()
+            session = INTERVIEW_SESSIONS[s_id]
+            auto_session_reset = True
         # Backfill guard fields for old sessions.
         session.setdefault("interview_turns", 0)
         session.setdefault("stagnant_turns", 0)
@@ -2369,7 +2407,8 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                     "strength": strength, 
                     "decision": "CLARIFY",
                     "top_confidence": top_confidence,
-                    "fact_progress": fact_progress
+                    "fact_progress": fact_progress,
+                    "auto_session_reset": auto_session_reset,
                 }
             )
 
@@ -2481,6 +2520,7 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                 "strength": strength,
                 "decision": decision,
                 "forced_assess": forced_assess,
+                "auto_session_reset": auto_session_reset,
                 "behavioral_count": len(brain_response.behavioral_primitives),
                 "interpretation_count": len(brain_response.interpretations),
                 "law_count": len(laws_response.applicable_laws),
