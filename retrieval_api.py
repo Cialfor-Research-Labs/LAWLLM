@@ -83,6 +83,9 @@ DEFAULT_ALLOWED_DOCS = {"acts", "judgements"}
 LAWYER_SESSIONS: Dict[str, Dict[str, Any]] = {}
 INTERVIEW_SESSIONS: Dict[str, Dict[str, Any]] = {}
 INTERACTION_LOG_PATH = os.path.join("test", "interaction_logs.jsonl")
+MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
+MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
+MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
 
 DOMAIN_FORBIDDEN_QUESTION_TERMS: Dict[str, List[str]] = {
     "labour": ["landlord", "rent", "property"],
@@ -118,7 +121,7 @@ GENERIC_STATE_RENT_HINTS = [
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=2)
-    mode: str = "understand_case"  # "understand_case" or "query_act"
+    mode: str = "lawyer_case"  # "lawyer_case" (default) or "query_act"; "understand_case" kept as alias
     llm_model: str = DEFAULT_BEDROCK_MODEL_ID
     llm_timeout_sec: int = 300
     session_id: Optional[str] = None
@@ -1592,6 +1595,8 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
 def query(payload: QueryRequest) -> QueryResponse:
     try:
         raw_query = payload.query
+        requested_mode = str(payload.mode or "").strip().lower()
+        effective_mode = "query_act" if requested_mode == "query_act" else "lawyer_case"
         reasoning = []
         debug_trace: Dict[str, Any] = {"query": raw_query}
         
@@ -1604,7 +1609,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                 ok=True, query=user_query, answer=static_answer, 
                 reasoning=["Greeting Optimization: Static response used."],
                 citations=[], context_blocks=[], 
-                meta={"mode": "greeting", "inference": False}
+                meta={"mode": "greeting", "effective_mode": effective_mode, "inference": False}
             )
 
         # 🛡️ 2. Input Validation Layer (CLEARED as per user request)
@@ -1676,7 +1681,7 @@ def query(payload: QueryRequest) -> QueryResponse:
             reasoning.append(f"Legal priors matched: {', '.join(m['heuristic_key'] for m in heuristic_matches)}")
 
         # Temporary bypass: direct LLM answer without embedding retrieval.
-        if DISABLE_EMBEDDING_RETRIEVAL and payload.mode != "query_act" and not precise_statute_query:
+        if DISABLE_EMBEDDING_RETRIEVAL and effective_mode != "query_act" and not precise_statute_query:
             reasoning.append("Embedding retrieval disabled; generating direct model answer with legal priors.")
             prompt = build_direct_legal_prompt(user_query, legal_priors=legal_priors_text)
             answer = call_llm(model_name=payload.llm_model, prompt=prompt, timeout_sec=payload.llm_timeout_sec)
@@ -1717,7 +1722,8 @@ def query(payload: QueryRequest) -> QueryResponse:
                 citations=[],
                 context_blocks=[],
                 meta={
-                    "mode": payload.mode,
+                    "mode": effective_mode,
+                    "requested_mode": requested_mode,
                     "session_id": s_id,
                     "structured_query": structured_query,
                     "retrieval_disabled": True,
@@ -1737,7 +1743,7 @@ def query(payload: QueryRequest) -> QueryResponse:
         # --- STEP 3: Deep Retrieval ---
         reasoning.append("Step 2: Performing deep retrieval...")
         
-        if payload.mode == "query_act" or precise_statute_query:
+        if effective_mode == "query_act" or precise_statute_query:
             load_act_data() 
             results = search_sections(legal_query)
             max_score = 1.0 if results else 0.0 # Deterministic is binary
@@ -1754,10 +1760,10 @@ def query(payload: QueryRequest) -> QueryResponse:
                     reasoning=reasoning,
                     citations=[],
                     context_blocks=[],
-                    meta={"mode": payload.mode, "reason": "no_match", "session_id": s_id},
+                    meta={"mode": effective_mode, "requested_mode": requested_mode, "reason": "no_match", "session_id": s_id},
                 )
             reasoning.append("Detected direct statute query; using deterministic section lookup.")
-            return _build_query_act_response(user_query, results, reasoning, s_id, payload.mode)
+            return _build_query_act_response(user_query, results, reasoning, s_id, effective_mode)
         else:
             retrieval_corpus = "acts" if precise_statute_query else ("all" if USE_JUDGEMENT_EMBEDDINGS else "acts")
             allowed_docs = DEFAULT_ALLOWED_DOCS if structured_query.get("intent") == "legal_query" else {"acts"}
@@ -1876,7 +1882,8 @@ def query(payload: QueryRequest) -> QueryResponse:
                 confidence=conf_score,
                 confidence_label=conf_level,
                 meta={
-                    "mode": payload.mode,
+                    "mode": effective_mode,
+                    "requested_mode": requested_mode,
                     "score": max_score,
                     "session_id": s_id,
                     "retrieval_mode": retrieval_mode,
@@ -1889,7 +1896,7 @@ def query(payload: QueryRequest) -> QueryResponse:
 
         # --- STEP 4: LLM Re-ranking ---
         if (
-            payload.mode == "understand_case"
+            effective_mode == "lawyer_case"
             and len(results) > 3
             and not precise_statute_query
             and not any(item.get("rerank_score") is not None for item in results)
@@ -2009,7 +2016,8 @@ def query(payload: QueryRequest) -> QueryResponse:
                 citations=pack.get("citations", []),
                 context_blocks=context_blocks,
                 meta={
-                    "mode": payload.mode,
+                    "mode": effective_mode,
+                    "requested_mode": requested_mode,
                     "score": max_score,
                     "session_id": s_id,
                     "validation": grounding,
@@ -2057,7 +2065,8 @@ def query(payload: QueryRequest) -> QueryResponse:
             confidence=conf_score,
             confidence_label=conf_level,
             meta={
-                "mode": payload.mode,
+                "mode": effective_mode,
+                "requested_mode": requested_mode,
                 "score": max_score,
                 "session_id": s_id,
                 "structured_query": structured_query,
@@ -2075,8 +2084,10 @@ def query(payload: QueryRequest) -> QueryResponse:
 
 @app.post("/query/user", response_model=UserModeResponse)
 def query_user(payload: QueryRequest) -> UserModeResponse:
-    base = query(payload)
-    return _build_user_mode_response(base)
+    raise HTTPException(
+        status_code=410,
+        detail="User/consumer endpoint is disabled. This deployment is configured for lawyers only. Use /query."
+    )
 
 
 # =====================================================
@@ -2099,11 +2110,22 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                 "pending_confirmation": None,
                 "contradictions": [],
                 "last_top_law": None,
+                "interview_turns": 0,
+                "stagnant_turns": 0,
+                "pending_confirmation_retries": 0,
+                "asked_contradiction_codes": [],
             }
         session = INTERVIEW_SESSIONS[s_id]
+        # Backfill guard fields for old sessions.
+        session.setdefault("interview_turns", 0)
+        session.setdefault("stagnant_turns", 0)
+        session.setdefault("pending_confirmation_retries", 0)
+        session.setdefault("asked_contradiction_codes", [])
+        session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
 
         status = "interviewing"
         fact_progress = False
+        forced_assess = False
         user_confidence = None
         previous_top_law = session.get("last_top_law")
 
@@ -2167,12 +2189,17 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
         subtype = "general"
 
         # 3. Persist heuristic facts from both the case model and raw user turn
+        prev_facts_snapshot = json.dumps(session.get("facts", {}), sort_keys=True, default=str)
         session["facts"] = _update_session_facts_from_case_model(case_obj, session["facts"])
         session["facts"] = extract_facts_heuristic(payload.query, issue, session["facts"])
+        curr_facts_snapshot = json.dumps(session.get("facts", {}), sort_keys=True, default=str)
+        if curr_facts_snapshot != prev_facts_snapshot:
+            fact_progress = True
 
         # 4. PHASE 6.5: Signal accumulation + confidence handling
         signal_updates = extract_signal_updates(payload.query)
         pending_confirmation = session.get("pending_confirmation")
+        confirmation_progress = False
         if pending_confirmation:
             user_confidence = normalize_user_confidence(payload.query)
             if user_confidence is not None:
@@ -2184,8 +2211,21 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                     existing_payload["source"] = "user_confirmation"
                     session["signals"][signal_name] = existing_payload
                 session["pending_confirmation"] = None
+                session["pending_confirmation_retries"] = 0
+                confirmation_progress = True
+            else:
+                session["pending_confirmation_retries"] = int(session.get("pending_confirmation_retries", 0)) + 1
+                if signal_updates or session["pending_confirmation_retries"] >= MAX_PENDING_CONFIRMATION_RETRIES:
+                    # Don't get stuck waiting for explicit yes/no phrasing forever.
+                    session["pending_confirmation"] = None
+                    session["pending_confirmation_retries"] = 0
 
         session["signals"] = merge_signal_state(session.get("signals", {}), signal_updates)
+        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress)
+        if progress_this_turn:
+            session["stagnant_turns"] = 0
+        else:
+            session["stagnant_turns"] = int(session.get("stagnant_turns", 0)) + 1
 
         contradictions = detect_contradictions(session["signals"], session["facts"], case_obj)
         session["contradictions"] = contradictions
@@ -2243,6 +2283,15 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
         # Progress Guard: If we got new facts, don't stall in CLARIFY
         if decision == "CLARIFY" and fact_progress:
             decision = "INTERVIEW"
+        # Loop guard: if we've stalled too long, move to assessment with assumptions.
+        if decision in {"CLARIFY", "INTERVIEW"} and (
+            int(session.get("interview_turns", 0)) >= MAX_INTERVIEW_TURNS
+            or int(session.get("stagnant_turns", 0)) >= MAX_STAGNANT_TURNS
+        ):
+            decision = "ASSESS"
+            forced_assess = True
+            session["pending_confirmation"] = None
+            session["pending_confirmation_retries"] = 0
 
         if decision == "CLARIFY":
             return InterviewChatResponse(
@@ -2270,7 +2319,12 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
         final_questions_text = []
         if not is_complete:
             if contradictions_present:
-                final_questions_text.append(contradictions[0]["clarification_question"])
+                asked_contradiction_codes = set(session.get("asked_contradiction_codes", []))
+                new_contradiction = next((c for c in contradictions if c.get("code") not in asked_contradiction_codes), None)
+                if new_contradiction:
+                    final_questions_text.append(new_contradiction["clarification_question"])
+                    asked_contradiction_codes.add(str(new_contradiction.get("code")))
+                    session["asked_contradiction_codes"] = list(asked_contradiction_codes)
 
             if not final_questions_text:
                 confirmation_question = choose_confirmation_question(session["signals"], session["asked_questions"])
@@ -2366,10 +2420,14 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
             state_debug={
                 "strength": strength,
                 "decision": decision,
+                "forced_assess": forced_assess,
                 "behavioral_count": len(brain_response.behavioral_primitives),
                 "interpretation_count": len(brain_response.interpretations),
                 "law_count": len(laws_response.applicable_laws),
                 "active_issues": active_issues,
+                "interview_turns": session.get("interview_turns", 0),
+                "stagnant_turns": session.get("stagnant_turns", 0),
+                "pending_confirmation_retries": session.get("pending_confirmation_retries", 0),
                 "signals": summarize_signal_state(session["signals"]),
                 "confirmed_tags": confirmed_tags,
                 "confirmed_tag_confidence": confirmed_tag_confidence,
