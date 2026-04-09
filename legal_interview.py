@@ -414,6 +414,19 @@ def detect_issues(query: str) -> Dict[str, Any]:
     if any(w in q for w in ["cyber stalking", "online abuse", "morphing"]):
         detected_issues.append("harassment_cyber")
 
+    explicit_online_fraud_markers = ["upi", "gpay", "phishing", "money stolen online", "bank fraud"]
+    has_explicit_online_fraud = any(w in q for w in explicit_online_fraud_markers)
+    is_consumer_safety_incident = (
+        any(w in q for w in ["bought", "purchased", "ordered", "product", "item", "appliance", "pressure cooker"])
+        and any(w in q for w in ["defective", "exploded", "blast", "burst", "unsafe", "injury", "burn", "hospital", "medical"])
+        and any(w in q for w in ["seller", "manufacturer", "refund", "replace", "compensate", "liability"])
+    )
+    if is_consumer_safety_incident:
+        if "consumer_dispute" not in detected_issues:
+            detected_issues.append("consumer_dispute")
+        if not has_explicit_online_fraud:
+            detected_issues = [i for i in detected_issues if i != "online_fraud"]
+
     # 1. PRIORITY SORTING
     priority_ladder = [
         "account_hacking", "online_fraud", "identity_theft", 
@@ -423,7 +436,11 @@ def detect_issues(query: str) -> Dict[str, Any]:
         "wage_dispute", "consumer_dispute", "contract_dispute", "defamation"
     ]
 
-    detected_issues = sorted(list(set(detected_issues)), key=lambda x: priority_ladder.index(x) if x in priority_ladder else 99)
+    deduped = list(dict.fromkeys(detected_issues))
+    if is_consumer_safety_incident and "consumer_dispute" in deduped:
+        detected_issues = ["consumer_dispute"] + [i for i in deduped if i != "consumer_dispute"]
+    else:
+        detected_issues = sorted(deduped, key=lambda x: priority_ladder.index(x) if x in priority_ladder else 99)
 
     if not detected_issues:
         return {"primary": "unknown", "secondary": [], "confidence": 0.0, "subtype": "none"}
