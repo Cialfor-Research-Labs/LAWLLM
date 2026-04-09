@@ -314,12 +314,12 @@ def build_direct_legal_prompt(user_query: str, legal_priors: str = "", citation_
         f"User question:\n{user_query}\n"
         f"{priors_block}"
         f"{citations_block}\n"
-        "Return in this FIRAC structure:\n"
-        "Part 1 - Facts and Legal Issue:\n"
-        "Part 2 - Applicable Law:\n"
-        "Part 3 - Analysis:\n"
-        "Part 4 - Remedies and Next Steps:\n"
-        "Part 5 - Limits:\n"
+        "Return in strict FIRAC structure:\n"
+        "Part 1 - Facts:\n"
+        "Part 2 - Issue:\n"
+        "Part 3 - Rule:\n"
+        "Part 4 - Application:\n"
+        "Part 5 - Conclusion:\n"
         "Part 6 - Disclaimer:\n"
     )
 
@@ -355,19 +355,18 @@ def _build_fallback_prompt(user_query: str, legal_priors: str, citation_text: st
         f"User Facts:\n{user_query}\n\n"
         f"{priors_section}"
         f"{citations_section}"
-        "Structure your answer in FIRAC format:\n"
-        "Part 1 - Facts and Legal Issue:\n"
-        "- Restate key facts and identify the legal issue\n\n"
-        "Part 2 - Applicable Law:\n"
+        "Structure your answer in strict FIRAC format:\n"
+        "Part 1 - Facts:\n"
+        "- Restate only the material facts\n\n"
+        "Part 2 - Issue:\n"
+        "- Frame the core legal issue(s) as questions\n\n"
+        "Part 3 - Rule:\n"
         "- List every applicable Act, section, and judgement\n\n"
-        "Part 3 - Analysis:\n"
-        "- Apply the law to the facts\n\n"
-        "Part 4 - Remedies and Next Steps:\n"
-        "1. <specific immediate action>\n"
-        "2. <specific procedural step>\n"
-        "3. <specific authority to approach>\n\n"
-        "Part 5 - Limits:\n"
-        "<limitations, jurisdictional notes>\n\n"
+        "Part 4 - Application:\n"
+        "- Apply each rule to the facts step-by-step\n"
+        "- Include procedural next steps and forum/authority\n\n"
+        "Part 5 - Conclusion:\n"
+        "- Give a clear legal conclusion and immediate action plan\n\n"
         "Part 6 - Disclaimer:\n"
         "For information only. Consult a professional.\n"
     )
@@ -399,10 +398,12 @@ def _retry_prompt_for_general_info(user_query: str) -> str:
         "You are an Indian legal information assistant.\n"
         "Do not refuse with 'I can't give legal advice'.\n"
         "Instead provide:\n"
-        "Part 1 - Acts, Sections and Judgements,\n"
-        "Part 2 - Exact Steps to Follow,\n"
-        "Part 3 - Limits,\n"
-        "Part 4 - Disclaimer.\n"
+        "Part 1 - Facts,\n"
+        "Part 2 - Issue,\n"
+        "Part 3 - Rule,\n"
+        "Part 4 - Application,\n"
+        "Part 5 - Conclusion,\n"
+        "Part 6 - Disclaimer.\n"
         "Give general legal information and practical procedural guidance. Do not assist wrongdoing.\n\n"
         f"User question:\n{user_query}\n"
     )
@@ -510,15 +511,26 @@ def _coerce_string_list(values: Any) -> List[str]:
 def _parse_answer_sections(answer: str) -> Dict[str, str]:
     normalized = (answer or "").replace("\r\n", "\n").strip()
     sections: Dict[str, str] = {}
-    patterns = {
-        "part1": r"(?is)(?:\*\*)?Part 1 - Acts, Sections and Judgements(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part 2 - Exact Steps to Follow(?:\*\*)?\s*\n|\Z)",
-        "part2": r"(?is)(?:\*\*)?Part 2 - Exact Steps to Follow(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part 3 - Limits(?:\*\*)?\s*\n|\Z)",
-        "part3": r"(?is)(?:\*\*)?Part 3 - Limits(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part 4 - Disclaimer(?:\*\*)?\s*\n|\Z)",
-        "part4": r"(?is)(?:\*\*)?Part 4 - Disclaimer(?:\*\*)?\s*\n(.*)$",
-    }
-    for key, pattern in patterns.items():
-        match = re.search(pattern, normalized)
-        sections[key] = match.group(1).strip() if match else ""
+    def _extract_any(headings: List[str]) -> str:
+        for heading in headings:
+            pattern = rf"(?is)(?:\*\*)?{re.escape(heading)}(?:\*\*)?\s*\n(.*?)(?=\n(?:\*\*)?Part\s*\d+\s*-\s*[A-Za-z][^\n]*(?:\*\*)?\s*\n|\Z)"
+            match = re.search(pattern, normalized)
+            if match:
+                return match.group(1).strip()
+        return ""
+
+    sections["facts"] = _extract_any(["Part 1 - Facts", "Part 1 - Facts and Legal Issue"])
+    sections["issue"] = _extract_any(["Part 2 - Issue"])
+    sections["rule"] = _extract_any(["Part 3 - Rule", "Part 2 - Applicable Law", "Part 1 - Acts, Sections and Judgements"])
+    sections["application"] = _extract_any(["Part 4 - Application", "Part 3 - Analysis", "Part 2 - Exact Steps to Follow"])
+    sections["conclusion"] = _extract_any(["Part 5 - Conclusion", "Part 5 - Limits", "Part 3 - Limits"])
+    sections["disclaimer"] = _extract_any(["Part 6 - Disclaimer", "Part 4 - Disclaimer", "Disclaimer"])
+
+    # Backward-compatible aliases used by older response shaping logic.
+    sections["part1"] = sections["rule"]
+    sections["part2"] = sections["application"]
+    sections["part3"] = sections["conclusion"]
+    sections["part4"] = sections["disclaimer"]
     return sections
 
 
@@ -878,23 +890,23 @@ def _build_user_mode_response(base: QueryResponse) -> UserModeResponse:
         )
 
     sections = _parse_answer_sections(base.answer)
-    legal_options = _extract_numbered_items(sections.get("part1", ""))
+    legal_options = _extract_numbered_items(sections.get("rule", ""))
     if not legal_options:
-        legal_options = [line for line in sections.get("part1", "").splitlines() if line.strip()]
-    steps = _extract_numbered_items(sections.get("part2", ""))
+        legal_options = [line for line in sections.get("rule", "").splitlines() if line.strip()]
+    steps = _extract_numbered_items(sections.get("application", ""))
     summary_parts = []
     if legal_options:
         summary_parts.append("Possible legal basis: " + "; ".join(legal_options[:3]))
     if steps:
         summary_parts.append("Best next move: " + steps[0])
-    summary = " ".join(summary_parts).strip() or sections.get("part2") or base.answer
+    summary = " ".join(summary_parts).strip() or sections.get("application") or base.answer
     return UserModeResponse(
         ok=base.ok,
         query=base.query,
         summary=summary,
         what_you_can_do=steps[:5],
         legal_options=legal_options[:5],
-        notes=sections.get("part3") or sections.get("part4") or "",
+        notes=sections.get("conclusion") or sections.get("disclaimer") or "",
         meta=base.meta,
     )
 
@@ -1164,39 +1176,44 @@ def _build_context_grounded_fallback(user_query: str, context_blocks: List[Dict[
         if txt:
             snippets.append(txt[:280].strip())
 
-    part_1_lines = []
+    rule_lines = []
     if act_authorities:
-        part_1_lines.append("Relevant Acts and Sections:")
-        part_1_lines.extend(act_authorities)
+        rule_lines.append("Relevant Acts and Sections:")
+        rule_lines.extend(act_authorities)
     if judgement_authorities:
-        if part_1_lines:
-            part_1_lines.append("")
-        part_1_lines.append("Relevant Judgements:")
-        part_1_lines.extend(judgement_authorities)
-    if not part_1_lines:
-        part_1_lines.append("No specific statute or judgement was identified with high confidence from the retrieved context.")
+        if rule_lines:
+            rule_lines.append("")
+        rule_lines.append("Relevant Judgements:")
+        rule_lines.extend(judgement_authorities)
+    if not rule_lines:
+        rule_lines.append("No specific statute or judgement was identified with high confidence from the retrieved context.")
 
     if snippets:
-        part_1_lines.append("")
-        part_1_lines.append("Context Notes:")
-        part_1_lines.extend(f"- {s}" for s in snippets)
+        rule_lines.append("")
+        rule_lines.append("Context Notes:")
+        rule_lines.extend(f"- {s}" for s in snippets)
 
-    next_steps = (
+    application = (
         "1. File a written complaint with the local Cyber Crime Police Station or portal with all digital evidence.\n"
         "2. Preserve logs, emails, screenshots, and account access history to support investigation.\n"
         "3. Consult an Indian legal professional for case-specific drafting and forum strategy."
     )
-    limits = (
-        "This answer is constrained to the retrieved context and avoids citing any Act, section number, or judgement outside that context. Forum, jurisdiction, and remedy may change based on missing facts."
+    conclusion = (
+        "Based on the available context, there appears to be a legally actionable grievance under the cited authorities. "
+        "Immediate preservation of evidence and filing before the correct forum are critical to protect limitation periods."
     )
     return (
-        "**Part 1 - Acts, Sections and Judgements**\n"
-        f"{chr(10).join(part_1_lines)}\n\n"
-        "**Part 2 - Exact Steps to Follow**\n"
-        f"{next_steps}\n\n"
-        "**Part 3 - Limits**\n"
-        f"{limits}\n\n"
-        "**Part 4 - Disclaimer**\n"
+        "**Part 1 - Facts**\n"
+        f"- User query summary: {user_query.strip()}\n\n"
+        "**Part 2 - Issue**\n"
+        "- Which Indian legal rights/remedies are triggered on these facts?\n\n"
+        "**Part 3 - Rule**\n"
+        f"{chr(10).join(rule_lines)}\n\n"
+        "**Part 4 - Application**\n"
+        f"{application}\n\n"
+        "**Part 5 - Conclusion**\n"
+        f"{conclusion}\n\n"
+        "**Part 6 - Disclaimer**\n"
         "For information only. Consult a professional."
     )
 
@@ -1245,15 +1262,18 @@ def _sanitize_section_artifacts(answer: str) -> str:
 
 def _normalize_heading_breaks(answer: str) -> str:
     headings = [
-        "Applicable Law",
-        "How It Applies",
-        "Next Steps",
-        "Limits",
+        "Facts",
+        "Issue",
+        "Rule",
+        "Application",
+        "Conclusion",
         "Disclaimer",
-        "Part 1 - Acts, Sections and Judgements",
-        "Part 2 - Exact Steps to Follow",
-        "Part 3 - Limits",
-        "Part 4 - Disclaimer",
+        "Part 1 - Facts",
+        "Part 2 - Issue",
+        "Part 3 - Rule",
+        "Part 4 - Application",
+        "Part 5 - Conclusion",
+        "Part 6 - Disclaimer",
     ]
     for heading in headings:
         answer = re.sub(
@@ -1272,11 +1292,11 @@ def _normalize_heading_breaks(answer: str) -> str:
 
 def _remove_existing_disclaimer_sections(answer: str) -> str:
     patterns = [
-        r"(?ms)\n*\*\*Part 4 - Disclaimer\*\*\s*\n.*$",
+        r"(?ms)\n*\*\*Part 6 - Disclaimer\*\*\s*\n.*$",
         r"(?ms)\n*\*\*Disclaimer\*\*\s*\n.*$",
-        r"(?ms)\n*Part 4 - Disclaimer\s*:?\s*\n.*$",
+        r"(?ms)\n*Part 6 - Disclaimer\s*:?\s*\n.*$",
         r"(?ms)\n*Disclaimer\s*:?\s*\n.*$",
-        r"(?ms)\n*---\s*\n\*\*Part 4 - Disclaimer\*\*\s*\n.*$",
+        r"(?ms)\n*---\s*\n\*\*Part 6 - Disclaimer\*\*\s*\n.*$",
         r"(?ms)\n*---\s*\n\*\*Disclaimer\*\*\s*\n.*$",
     ]
     trimmed = answer
@@ -1287,15 +1307,32 @@ def _remove_existing_disclaimer_sections(answer: str) -> str:
 
 def _bold_headings(answer: str) -> str:
     heading_map = {
-        "Applicable Law": "Part 1 - Acts, Sections and Judgements",
-        "How It Applies": "Part 2 - Exact Steps to Follow",
-        "Next Steps": "Part 2 - Exact Steps to Follow",
-        "Limits": "Part 3 - Limits",
-        "Disclaimer": "Part 4 - Disclaimer",
-        "Part 1 - Acts, Sections and Judgements": "Part 1 - Acts, Sections and Judgements",
-        "Part 2 - Exact Steps to Follow": "Part 2 - Exact Steps to Follow",
-        "Part 3 - Limits": "Part 3 - Limits",
-        "Part 4 - Disclaimer": "Part 4 - Disclaimer",
+        "Facts": "Part 1 - Facts",
+        "Issue": "Part 2 - Issue",
+        "Applicable Law": "Part 3 - Rule",
+        "Rule": "Part 3 - Rule",
+        "How It Applies": "Part 4 - Application",
+        "Analysis": "Part 4 - Application",
+        "Next Steps": "Part 4 - Application",
+        "Application": "Part 4 - Application",
+        "Limits": "Part 5 - Conclusion",
+        "Conclusion": "Part 5 - Conclusion",
+        "Disclaimer": "Part 6 - Disclaimer",
+        "Part 1 - Facts and Legal Issue": "Part 1 - Facts",
+        "Part 1 - Acts, Sections and Judgements": "Part 3 - Rule",
+        "Part 2 - Applicable Law": "Part 3 - Rule",
+        "Part 2 - Exact Steps to Follow": "Part 4 - Application",
+        "Part 3 - Analysis": "Part 4 - Application",
+        "Part 3 - Limits": "Part 5 - Conclusion",
+        "Part 4 - Remedies and Next Steps": "Part 4 - Application",
+        "Part 4 - Disclaimer": "Part 6 - Disclaimer",
+        "Part 5 - Limits": "Part 5 - Conclusion",
+        "Part 6 - Disclaimer": "Part 6 - Disclaimer",
+        "Part 1 - Facts": "Part 1 - Facts",
+        "Part 2 - Issue": "Part 2 - Issue",
+        "Part 3 - Rule": "Part 3 - Rule",
+        "Part 4 - Application": "Part 4 - Application",
+        "Part 5 - Conclusion": "Part 5 - Conclusion",
     }
     for heading, canonical in heading_map.items():
         answer = re.sub(
@@ -1346,13 +1383,13 @@ def _rebuild_applicable_law(answer: str, context_blocks: List[Dict[str, Any]]) -
     applicable_body = "\n".join(lines)
 
     pattern = re.compile(
-        r"(?ms)(^\*\*Part 1 - Acts, Sections and Judgements\*\*\s*\n)(.*?)(?=^\*\*[A-Za-z0-9][A-Za-z0-9\s/\-]+\*\*\s*$|\Z)"
+        r"(?ms)(^\*\*Part 3 - Rule\*\*\s*\n)(.*?)(?=^\*\*[A-Za-z0-9][A-Za-z0-9\s/\-]+\*\*\s*$|\Z)"
     )
     match = pattern.search(answer)
     if match:
         return answer[:match.start()] + match.group(1) + applicable_body + "\n\n" + answer[match.end():]
 
-    return f"**Part 1 - Acts, Sections and Judgements**\n{applicable_body}\n\n{answer}".strip()
+    return f"**Part 3 - Rule**\n{applicable_body}\n\n{answer}".strip()
 
 
 def _align_section_references(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
@@ -1374,11 +1411,11 @@ def _align_section_references(answer: str, context_blocks: List[Dict[str, Any]])
 
 
 def _dedupe_disclaimer(answer: str) -> str:
-    answer = re.sub(r"(?ms)\n*---\n\*\*Part 4 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*---\n\*\*Part 6 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
     answer = re.sub(r"(?ms)\n*---\n\*\*Disclaimer\*\*:\s*For information only\. Consult a professional\.\s*$", "", answer)
-    answer = re.sub(r"(?ms)\n*\*\*Part 4 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*\*\*Part 6 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
     answer = re.sub(r"(?ms)\n*\*\*Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
-    answer = re.sub(r"(?ms)\n*Part 4 - Disclaimer:\s*For information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*Part 6 - Disclaimer:\s*For information only\. Consult a professional\.\s*$", "", answer)
     answer = re.sub(r"(?ms)\n*Disclaimer:\s*For information only\. Consult a professional\.\s*$", "", answer)
     return answer.strip()
 
@@ -1420,7 +1457,7 @@ def _normalize_markdown_layout(answer: str) -> str:
     formatted = re.sub(r"(?<!\n)(---)", r"\n\n\1", formatted)
     formatted = re.sub(r"(---)(?!\n)", r"\1\n", formatted)
     formatted = re.sub(
-        r"\s+(?=(\*\*(?:Section|Official Statutory Text|Legal Answer|Quick Pillars|Limits|Applicable Law|How It Applies|Next Steps|Disclaimer)\*\*))",
+        r"\s+(?=(\*\*(?:Section|Official Statutory Text|Legal Answer|Quick Pillars|Facts|Issue|Rule|Application|Conclusion|Disclaimer|Applicable Law|How It Applies|Next Steps|Limits)\*\*))",
         "\n\n",
         formatted,
     )
@@ -1440,7 +1477,7 @@ def _normalize_markdown_layout(answer: str) -> str:
 
 def _format_next_steps_section(answer: str) -> str:
     pattern = re.compile(
-        r"(?ms)(^\*\*Part 2 - Exact Steps to Follow\*\*\s*\n)(.*?)(?=^\*\*[A-Za-z0-9][A-Za-z0-9\s/\-]+\*\*\s*$|\Z)"
+        r"(?ms)(^\*\*Part 4 - Application\*\*\s*\n)(.*?)(?=^\*\*[A-Za-z0-9][A-Za-z0-9\s/\-]+\*\*\s*$|\Z)"
     )
     match = pattern.search(answer)
     if not match:
@@ -1477,8 +1514,8 @@ def format_final_answer(answer: str, context_blocks: List[Dict[str, Any]]) -> st
     formatted = _rebuild_applicable_law(formatted, context_blocks)
     formatted = _normalize_heading_breaks(formatted)
     formatted = _format_next_steps_section(formatted)
-    formatted = re.sub(r"(?m)^Disclaimer\s+(?=For information only\.)", "**Part 4 - Disclaimer**\n", formatted)
-    formatted = re.sub(r"(?m)^Part 4 - Disclaimer\s*:\s*$", "**Part 4 - Disclaimer**", formatted)
+    formatted = re.sub(r"(?m)^Disclaimer\s+(?=For information only\.)", "**Part 6 - Disclaimer**\n", formatted)
+    formatted = re.sub(r"(?m)^Part 6 - Disclaimer\s*:\s*$", "**Part 6 - Disclaimer**", formatted)
     formatted = _dedupe_disclaimer(formatted)
     formatted = re.sub(r"\n{3,}", "\n\n", formatted).strip()
     return formatted
@@ -1526,7 +1563,7 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
         },
     }
 
-    final_answer = format_final_answer(answer, [context_block]) + "\n\n---\n**Part 4 - Disclaimer**\nFor information only. Consult a professional."
+    final_answer = format_final_answer(answer, [context_block]) + "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
 
     return QueryResponse(
         ok=True,
@@ -1650,7 +1687,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                     prompt=_retry_prompt_for_general_info(user_query),
                     timeout_sec=payload.llm_timeout_sec,
                 )
-            disclaimer = "\n\n---\n**Part 4 - Disclaimer**\nFor information only. Consult a professional."
+            disclaimer = "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
             final_answer = answer.strip() + disclaimer
 
             SESSIONS[s_id].append({"role": "user", "content": user_query})
