@@ -121,6 +121,93 @@ def _extract_json(text: str) -> Any:
         return json.loads(match.group())
     return json.loads(cleaned)
 
+
+def _coerce_amount(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    raw = str(value).strip().lower()
+    if not raw or raw in {"none", "null", "na", "n/a", "unknown", "not specified"}:
+        return None
+
+    multiplier = 1.0
+    if "crore" in raw:
+        multiplier = 10_000_000.0
+    elif "lakh" in raw or "lac" in raw:
+        multiplier = 100_000.0
+
+    normalized = (
+        raw.replace(",", "")
+        .replace("inr", "")
+        .replace("rs.", "")
+        .replace("rs", "")
+        .replace("₹", "")
+    )
+    match = re.search(r"-?\d+(?:\.\d+)?", normalized)
+    if not match:
+        return None
+    try:
+        return float(match.group()) * multiplier
+    except (TypeError, ValueError):
+        return None
+
+
+def _sanitize_financials(raw_financials: Any) -> List[Financial]:
+    if not isinstance(raw_financials, list):
+        return []
+
+    clean_items: List[Financial] = []
+    for item in raw_financials:
+        if not isinstance(item, dict):
+            continue
+        amount = _coerce_amount(item.get("amount"))
+        if amount is None:
+            # Skip incomplete financial rows instead of crashing validation.
+            continue
+        context = str(item.get("context") or "unspecified financial claim").strip()
+        status = str(item.get("status") or "disputed").strip() or "disputed"
+        currency = str(item.get("currency") or "INR").strip() or "INR"
+        try:
+            clean_items.append(
+                Financial(
+                    amount=amount,
+                    currency=currency,
+                    context=context,
+                    status=status,
+                )
+            )
+        except Exception:
+            continue
+    return clean_items
+
+
+def _sanitize_documents(raw_documents: Any) -> List[Document]:
+    if not isinstance(raw_documents, list):
+        return []
+
+    clean_items: List[Document] = []
+    for item in raw_documents:
+        if not isinstance(item, dict):
+            continue
+        doc_type = str(item.get("type") or "document").strip() or "document"
+        description = str(item.get("description") or "Document referenced in user narrative").strip()
+        status = str(item.get("status") or "mentioned").strip() or "mentioned"
+        try:
+            clean_items.append(
+                Document(
+                    type=doc_type,
+                    description=description,
+                    status=status,
+                )
+            )
+        except Exception:
+            continue
+    return clean_items
+
 def validate_case_model(case: CaseModel) -> List[str]:
     vitals = []
     # CHECK 1: Legal terminology leakage
@@ -159,8 +246,10 @@ def run_case_extractor_pipeline(text: str, model_name: str) -> CaseModel:
     
     # 3. Extract Assets
     assets = run_asset_extraction(text, model_name)
-    financials = [Financial(**f) for f in assets.get("financials", [])]
-    documents = [Document(**d) for d in assets.get("documents", [])]
+    if not isinstance(assets, dict):
+        assets = {"financials": [], "documents": []}
+    financials = _sanitize_financials(assets.get("financials", []))
+    documents = _sanitize_documents(assets.get("documents", []))
     
     # 4. Meta Layer
     meta = run_meta_extraction(text, model_name)
