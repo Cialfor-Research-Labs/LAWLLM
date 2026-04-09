@@ -45,6 +45,12 @@ def normalize_user_confidence(answer: str) -> Optional[float]:
 def extract_signal_updates(text: str) -> Dict[str, Dict[str, Any]]:
     low = _safe_lower(text)
     updates: Dict[str, Dict[str, Any]] = {}
+    employment_tokens = [
+        "employee", "employer", "employment", "company", "office", "workplace", "job",
+        "hr", "payroll", "salary", "wages", "terminated", "resigned", "notice period",
+        "offer letter", "appointment letter", "labour", "service years",
+    ]
+    has_employment_context = any(token in low for token in employment_tokens)
 
     payment_keywords = [
         ("monthly_salary", ["salary", "monthly salary", "wages", "pay slip", "salary slip"]),
@@ -71,7 +77,10 @@ def extract_signal_updates(text: str) -> Dict[str, Dict[str, Any]]:
             "confirmed": False,
             "raw_text": text,
         }
-    elif any(token in low for token in ["employee", "employer", "company terminated me", "my salary", "my wages", "hr", "payroll"]):
+    elif has_employment_context and any(
+        token in low
+        for token in ["employee", "employer", "employment", "company", "office", "hr", "payroll", "my salary", "my wages"]
+    ):
         updates["work_relationship"] = {
             "value": "employee",
             "source": "query",
@@ -81,7 +90,7 @@ def extract_signal_updates(text: str) -> Dict[str, Dict[str, Any]]:
         }
 
     years_match = re.search(r"(\d+)\s*\+?\s*years?", low)
-    if years_match:
+    if years_match and has_employment_context:
         years = int(years_match.group(1))
         updates["service_years"] = {
             "value": years,
@@ -98,7 +107,10 @@ def extract_signal_updates(text: str) -> Dict[str, Dict[str, Any]]:
             "raw_text": text,
         }
 
-    if any(token in low for token in ["terminated", "fired", "left job", "resigned", "after leaving", "after i left", "former employee"]):
+    if has_employment_context and any(
+        token in low
+        for token in ["terminated", "fired", "left job", "resigned", "after leaving", "after i left", "former employee"]
+    ):
         updates["employment_end"] = {
             "value": True,
             "source": "query",
@@ -106,7 +118,10 @@ def extract_signal_updates(text: str) -> Dict[str, Dict[str, Any]]:
             "confirmed": False,
             "raw_text": text,
         }
-    elif any(token in low for token in ["still employed", "still working", "currently employed", "i am still working"]):
+    elif has_employment_context and any(
+        token in low
+        for token in ["still employed", "still working", "currently employed", "i am still working"]
+    ):
         updates["employment_end"] = {
             "value": False,
             "source": "query",
