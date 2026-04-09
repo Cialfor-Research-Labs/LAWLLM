@@ -2285,6 +2285,7 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
         issue = session["issue"]
         active_issues = session.get("active_issues", [issue])
         subtype = "general"
+        employment_issues = {"wage_dispute", "termination_dispute"}
 
         # 3. Persist heuristic facts from both the case model and raw user turn
         prev_facts_snapshot = json.dumps(session.get("facts", {}), sort_keys=True, default=str)
@@ -2296,6 +2297,11 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
 
         # 4. PHASE 6.5: Signal accumulation + confidence handling
         signal_updates = extract_signal_updates(payload.query)
+        if issue not in employment_issues:
+            # Ignore stale employment-specific signal prompts for non-employment matters.
+            for signal_name in ["work_relationship", "service_years", "employment_end", "payment_type"]:
+                session["signals"].pop(signal_name, None)
+
         pending_confirmation = session.get("pending_confirmation")
         confirmation_progress = False
         if pending_confirmation:
@@ -2426,7 +2432,11 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                     session["asked_contradiction_codes"] = list(asked_contradiction_codes)
 
             if not final_questions_text:
-                confirmation_question = choose_confirmation_question(session["signals"], session["asked_questions"])
+                confirmation_signal_state = dict(session["signals"])
+                if issue not in employment_issues:
+                    for signal_name in ["work_relationship", "service_years", "employment_end", "payment_type"]:
+                        confirmation_signal_state.pop(signal_name, None)
+                confirmation_question = choose_confirmation_question(confirmation_signal_state, session["asked_questions"])
                 if confirmation_question:
                     session["pending_confirmation"] = confirmation_question
                     if confirmation_question["id"] not in session["asked_questions"]:
@@ -2468,9 +2478,21 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                     
             # If the Case Model has missing info, prioritize its questions
             if case_obj.missing_information and len(final_questions_text) < 2:
+                asked_gap_questions = set(session.get("asked_gap_questions", []))
+                lawyer_rep_markers = [
+                    "i am a lawyer", "i am the lawyer", "my client", "she is my client", "he is my client", "represent",
+                ]
+                has_lawyer_rep_context = any(marker in payload.query.lower() for marker in lawyer_rep_markers)
                 for gap in case_obj.missing_information[:2]:
-                    if gap["question"] not in final_questions_text:
-                        final_questions_text.append(gap["question"])
+                    gap_question = str(gap.get("question") or "").strip()
+                    if not gap_question or gap_question in asked_gap_questions:
+                        continue
+                    if has_lawyer_rep_context and "relationship" in gap_question.lower():
+                        continue
+                    if gap_question not in final_questions_text:
+                        final_questions_text.append(gap_question)
+                        asked_gap_questions.add(gap_question)
+                session["asked_gap_questions"] = list(asked_gap_questions)
         
         # 7. Generate Output
         output_data = generate_legal_output(issue, subtype, session["facts"], is_complete, payload.llm_model)

@@ -76,12 +76,34 @@ class SemanticNormalizer:
                     event.event_type = data.get("type", "action")
                     # Filter tags to ensure only canonical ones are used
                     tags = data.get("tags", [])
-                    event.semantic_tags = [t for t in tags if t in CANONICAL_TAGS]
+                    event.semantic_tags = [
+                        t for t in tags
+                        if t in CANONICAL_TAGS and self._is_tag_valid_for_event(event, t)
+                    ]
                     
             return events
         except Exception as e:
             logger.error(f"Semantic Normalization failed: {e}")
             return events
+
+    def _is_tag_valid_for_event(self, event: Event, tag: str) -> bool:
+        if tag != "injury_at_work":
+            return True
+
+        hay = f"{event.action or ''} {event.description or ''}".lower()
+        positive_workplace_markers = [
+            "at work", "while working", "on duty", "during duty", "office", "factory",
+            "worksite", "work site", "employer", "company premises", "during employment", "shift",
+        ]
+        negative_non_work_markers = [
+            "working professional", "at home", "home", "kitchen", "cooking", "domestic",
+        ]
+
+        has_positive = any(tok in hay for tok in positive_workplace_markers)
+        has_negative = any(tok in hay for tok in negative_non_work_markers)
+        if has_negative and not has_positive:
+            return False
+        return has_positive
 
     def _extract_json(self, text: str) -> Dict[str, Any]:
         cleaned = (text or "").strip()
