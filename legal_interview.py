@@ -925,6 +925,58 @@ def select_questions(issue: str, facts: dict, asked_questions: list, llm_model: 
         priority = round(impact_on_ranking * uncertainty * issue_bias, 3)
         return {**question, "dynamic_priority": priority}
 
+    def _build_cyber_triage_questions() -> List[Dict[str, Any]]:
+        return [
+            {
+                "id": "cy_triage_platform",
+                "question": "Which platform was used to threaten the leak (WhatsApp, Instagram, Telegram, email, etc.)?",
+                "issue_type": issue,
+                "category": "entities",
+                "priority": 1,
+                "required": True,
+                "fact_key": "platform",
+            },
+            {
+                "id": "cy_triage_proof",
+                "question": "Do you have screenshots/URLs/chat logs of the threat and the AI-generated video or preview?",
+                "issue_type": issue,
+                "category": "evidence",
+                "priority": 1,
+                "required": True,
+                "fact_key": "proof",
+            },
+            {
+                "id": "cy_triage_amount",
+                "question": "What exact amount/payment demand was made, and by which payment method/account?",
+                "issue_type": issue,
+                "category": "issue",
+                "priority": 1,
+                "required": True,
+                "fact_key": "amount",
+            },
+            {
+                "id": "cy_triage_accused",
+                "question": "Do you know the identity/contact of the accused (phone, handle, email, bank/UPI details)?",
+                "issue_type": issue,
+                "category": "transaction",
+                "priority": 1,
+                "required": True,
+                "fact_key": "person",
+            },
+            {
+                "id": "cy_triage_reported",
+                "question": "Have you already filed a complaint on cybercrime.gov.in, called 1930, or filed an FIR?",
+                "issue_type": issue,
+                "category": "timeline",
+                "priority": 1,
+                "required": True,
+                "fact_key": "reported",
+            },
+        ]
+
+    cyber_urgent_issues = {"harassment_cyber", "identity_theft", "online_fraud", "account_hacking", "criminal_complaint"}
+    is_cyber_urgent = issue in cyber_urgent_issues or any(s in cyber_urgent_issues for s in (secondary or []))
+
     # 1. Primary Candidates
     candidates = [
         score_question(q, issue_bias=1.0)
@@ -956,5 +1008,24 @@ def select_questions(issue: str, facts: dict, asked_questions: list, llm_model: 
     for sq in secondary_questions:
         if sq not in final_list:
             final_list.insert(0, sq)
+
+    # Cyber blackmail/deepfake-style matters need immediate triage facts first.
+    if is_cyber_urgent:
+        urgent_candidates = [
+            score_question(q, issue_bias=1.2)
+            for q in _build_cyber_triage_questions()
+            if q["id"] not in asked_questions and (facts.get(q["fact_key"]) is None or facts.get(q["fact_key"]) == "")
+        ]
+        urgent_candidates = sorted(urgent_candidates, key=lambda x: (-x["dynamic_priority"], x["priority"]))
+
+        merged: List[Dict[str, Any]] = []
+        seen_ids = set()
+        for item in urgent_candidates + final_list:
+            item_id = item.get("id")
+            if item_id in seen_ids:
+                continue
+            seen_ids.add(item_id)
+            merged.append(item)
+        final_list = merged
 
     return final_list[:3]
