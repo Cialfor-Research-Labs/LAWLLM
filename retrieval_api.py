@@ -276,7 +276,6 @@ def _fresh_interview_session_state() -> Dict[str, Any]:
         "stagnant_turns": 0,
         "pending_confirmation_retries": 0,
         "asked_contradiction_codes": [],
-        "asked_gap_questions": [],
     }
 
 
@@ -285,7 +284,7 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
     if not session:
         return False
     prior_turns = int(session.get("interview_turns", 0))
-    if prior_turns < 1 and not session.get("signals") and not session.get("asked_questions"):
+    if prior_turns < 2:
         return False
 
     q = str(query or "")
@@ -306,7 +305,7 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
     current = str(session.get("issue") or "unknown")
     issue_shift = hinted not in {"unknown", ""} and current not in {"unknown", ""} and hinted != current
 
-    return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 1
+    return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 3
 
 # =========================
 # HELPERS
@@ -2220,7 +2219,6 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
         session.setdefault("stagnant_turns", 0)
         session.setdefault("pending_confirmation_retries", 0)
         session.setdefault("asked_contradiction_codes", [])
-        session.setdefault("asked_gap_questions", [])
         session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
 
         status = "interviewing"
@@ -2305,14 +2303,6 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
                 session["signals"].pop(signal_name, None)
 
         pending_confirmation = session.get("pending_confirmation")
-        if (
-            pending_confirmation
-            and issue not in employment_issues
-            and pending_confirmation.get("signal_name") in {"work_relationship", "service_years", "employment_end", "payment_type"}
-        ):
-            session["pending_confirmation"] = None
-            session["pending_confirmation_retries"] = 0
-            pending_confirmation = None
         confirmation_progress = False
         if pending_confirmation:
             user_confidence = normalize_user_confidence(payload.query)
