@@ -455,21 +455,29 @@ export const LegalChat = () => {
                                 onClick={async () => {
                                     setIsLoading(true);
                                     try {
-                                        const response = await fetch(`${apiBase}/query/interview/chat`, {
+                                        const response = await fetch(`${apiBase}/query`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({
                                                 query: "Confirmed",
                                                 session_id: sessionId,
-                                                case_model_update: caseModel
+                                                mode: 'lawyer_case',
                                             }),
                                         });
-                                        const data = await response.json();
-                                        setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
-                                        setStatus(data.status);
-                                        setConfidence(data.confidence);
-                                        setLegalOutput(data.legal_output);
-                                        setIsComplete(data.is_complete);
+                                        const data: RagQueryResponse | InterviewChatResponse = await response.json();
+                                        if ('answer' in data) {
+                                            setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+                                            setStatus("complete");
+                                            setConfidence(data.confidence || 0);
+                                            setLegalOutput(null);
+                                            setIsComplete(true);
+                                        } else {
+                                            setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
+                                            setStatus(data.status);
+                                            setConfidence(data.confidence);
+                                            setLegalOutput(data.legal_output);
+                                            setIsComplete(data.is_complete);
+                                        }
                                     } catch (e) {
                                         console.error(e);
                                     } finally {
