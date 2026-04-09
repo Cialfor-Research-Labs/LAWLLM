@@ -195,38 +195,24 @@ def llm_rerank(user_query: str, results: List[Dict], model_name: str, timeout_se
     selected = [results[i] for i in selected_indices[:3]]
 
     available_corpora = {r.get("corpus") for r in results if r.get("corpus")}
-    selected_corpora = {r.get("corpus") for r in selected if r.get("corpus")}
 
-    if "judgements" in available_corpora and "judgements" not in selected_corpora:
-        query_terms = _query_terms(user_query)
-        best_judgement = None
-        for candidate in results:
-            if candidate.get("corpus") != "judgements":
-                continue
-            candidate_terms = _query_terms(
-                " ".join(
-                    [
-                        str(candidate.get("title") or ""),
-                        str(candidate.get("chunk_text") or ""),
-                    ]
-                )
-            )
-            if len(query_terms & candidate_terms) >= 2:
-                best_judgement = candidate
-                break
-        if best_judgement is not None:
-            if len(selected) >= 3:
-                selected[-1] = best_judgement
-            else:
-                selected.append(best_judgement)
+    def _ensure_corpus(corpus_name: str, replace_from_end: bool = True) -> None:
+        selected_corpora = {r.get("corpus") for r in selected if r.get("corpus")}
+        if corpus_name not in available_corpora or corpus_name in selected_corpora:
+            return
+        candidate = next((r for r in results if r.get("corpus") == corpus_name), None)
+        if candidate is None:
+            return
+        if len(selected) >= 3:
+            idx_range = range(len(selected) - 1, -1, -1) if replace_from_end else range(len(selected))
+            replace_idx = next((idx for idx in idx_range if selected[idx].get("corpus") != corpus_name), len(selected) - 1)
+            selected[replace_idx] = candidate
+        else:
+            selected.append(candidate)
 
-    if "acts" in available_corpora and "acts" not in {r.get("corpus") for r in selected}:
-        best_act = next((r for r in results if r.get("corpus") == "acts"), None)
-        if best_act is not None:
-            if len(selected) >= 3:
-                selected[0] = best_act
-            else:
-                selected.append(best_act)
+    # Keep one judgement and one act whenever available in retrieved results.
+    _ensure_corpus("judgements", replace_from_end=True)
+    _ensure_corpus("acts", replace_from_end=False)
 
     deduped = []
     seen_keys = set()
