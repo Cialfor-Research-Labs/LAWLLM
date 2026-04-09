@@ -101,6 +101,17 @@ interface InterviewChatResponse {
     state_debug?: Record<string, unknown>;
 }
 
+interface RagQueryResponse {
+    ok: boolean;
+    query: string;
+    answer: string;
+    confidence?: number;
+    meta?: {
+        session_id?: string;
+        [key: string]: unknown;
+    };
+}
+
 const markdownComponents: Components = {
   strong: ({ children }) => <strong className="font-extrabold text-primary">{children}</strong>,
   b: ({ children }) => <b className="font-extrabold text-primary">{children}</b>,
@@ -226,11 +237,12 @@ export const LegalChat = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${apiBase}/query/interview/chat`, {
+            const response = await fetch(`${apiBase}/query`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     query: userMessage,
+                    mode: 'lawyer_case',
                     session_id: sessionId,
                 }),
             });
@@ -240,28 +252,44 @@ export const LegalChat = () => {
                 throw new Error(errData.detail?.error || `Request failed: ${response.status}`);
             }
             
-            const data: InterviewChatResponse = await response.json();
-            setSessionId(data.session_id);
-            setIsComplete(data.is_complete);
-            setStatus(data.status);
-            setSecondaryIssues(data.secondary_issues || []);
-            
-            if (data.legal_output) {
-                setLegalOutput(data.legal_output);
-                setConfidence(data.confidence);
-            } else {
+            const data: RagQueryResponse | InterviewChatResponse = await response.json();
+
+            // Primary path: /query RAG response
+            if ('answer' in data) {
+                setSessionId(data.meta?.session_id || sessionId);
+                setIsComplete(true);
+                setStatus("complete");
+                setSecondaryIssues([]);
+                setLegalOutput(null);
+                setCaseModel(null);
+                setBehavioralPrimitives([]);
+                setInterpretations([]);
+                setApplicableLaws([]);
                 setConfidence(data.confidence || 0);
+                setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+            } else {
+                // Backward compatible fallback if interview response is returned
+                setSessionId(data.session_id);
+                setIsComplete(data.is_complete);
+                setStatus(data.status);
+                setSecondaryIssues(data.secondary_issues || []);
+                
+                if (data.legal_output) {
+                    setLegalOutput(data.legal_output);
+                    setConfidence(data.confidence);
+                } else {
+                    setConfidence(data.confidence || 0);
+                }
+                
+                if (data.case_model) {
+                    setCaseModel(data.case_model);
+                }
+                
+                setBehavioralPrimitives(data.behavioral_primitives || []);
+                setInterpretations(data.interpretations || []);
+                setApplicableLaws(data.applicable_laws || []);
+                setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
             }
-            
-            if (data.case_model) {
-                setCaseModel(data.case_model);
-            }
-            
-            setBehavioralPrimitives(data.behavioral_primitives || []);
-            setInterpretations(data.interpretations || []);
-            setApplicableLaws(data.applicable_laws || []);
-            
-            setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
             
         } catch (error: any) {
             console.error('Chat Error:', error);
