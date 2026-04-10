@@ -135,6 +135,7 @@ class QueryResponse(BaseModel):
     reasoning: List[str] = [] 
     citations: List[Dict[str, Any]]
     context_blocks: List[Dict[str, Any]]
+    applicable_laws: List[str] = Field(default_factory=list)
     confidence: Optional[float] = None
     confidence_label: Optional[str] = None
     meta: Dict[str, Any]
@@ -724,6 +725,74 @@ def _clean_law_name(value: str) -> str:
 
 def _canonical_law_key(value: str) -> str:
     return re.sub(r"[^a-z]+", " ", _clean_law_name(value).lower()).strip()
+
+
+def _display_law_name(value: str) -> str:
+    cleaned = _clean_law_name(value)
+    if not cleaned:
+        return ""
+    if cleaned == cleaned.lower():
+        acronym_tokens = {"ipc", "crpc", "cpc", "it", "bns", "bnss", "bsa", "gst"}
+        words = [token.upper() if token in acronym_tokens else token.capitalize() for token in cleaned.split()]
+        return " ".join(words)
+    return cleaned
+
+
+def _law_focus_candidates(law_focus: Dict[str, List[str]], limit: int = 6) -> List[str]:
+    ordered: List[str] = []
+    seen = set()
+    for key in ("preferred_laws", "relevant_laws"):
+        for raw in law_focus.get(key, []) or []:
+            display = _display_law_name(raw)
+            canonical = _canonical_law_key(display)
+            if not display or not canonical or canonical in seen:
+                continue
+            seen.add(canonical)
+            ordered.append(display)
+            if len(ordered) >= limit:
+                return ordered
+    return ordered
+
+
+def _extract_applicable_law_lines(
+    context_blocks: List[Dict[str, Any]],
+    fallback_laws: Optional[List[str]] = None,
+    limit: int = 8,
+) -> List[str]:
+    law_sections: Dict[str, set[str]] = {}
+    for block in context_blocks:
+        corpus = str(block.get("corpus") or "").strip().lower()
+        if corpus == "judgements":
+            continue
+        title = _display_law_name(str(block.get("title") or ""))
+        section = str(block.get("section_number") or "").strip()
+        if not title:
+            continue
+        law_sections.setdefault(title, set())
+        if section:
+            law_sections[title].add(section)
+
+    lines: List[str] = []
+    for title, sections in law_sections.items():
+        if sections:
+            section_list = ", ".join(sorted(sections, key=lambda x: (len(x), x)))
+            lines.append(f"{title} - Section {section_list}")
+        else:
+            lines.append(title)
+        if len(lines) >= limit:
+            return lines[:limit]
+
+    if lines:
+        return lines[:limit]
+
+    fallback = fallback_laws or []
+    for law in fallback:
+        display = _display_law_name(law)
+        if display:
+            lines.append(display)
+        if len(lines) >= limit:
+            break
+    return lines[:limit]
 
 
 def _is_security_deposit_tenancy_query(user_query: str, structured_query: Dict[str, Any]) -> bool:
@@ -1458,11 +1527,15 @@ def _bold_headings(answer: str) -> str:
     return answer
 
 
-def _rebuild_applicable_law(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
+def _rebuild_applicable_law(
+    answer: str,
+    context_blocks: List[Dict[str, Any]],
+    suggested_laws: Optional[List[str]] = None,
+) -> str:
     authorities: Dict[str, set[str]] = {}
     judgements: List[str] = []
     for block in context_blocks:
-        title = str(block.get("title") or "").strip()
+        title = _display_law_name(str(block.get("title") or ""))
         section = str(block.get("section_number") or "").strip()
         corpus = str(block.get("corpus") or "").strip().lower()
         if not title:
@@ -1475,16 +1548,26 @@ def _rebuild_applicable_law(answer: str, context_blocks: List[Dict[str, Any]]) -
         if section:
             authorities[title].add(section)
 
-    if not authorities and not judgements:
+    fallback_laws = [law for law in (suggested_laws or []) if str(law).strip()]
+    if not authorities and not judgements and not fallback_laws:
         return answer
 
     lines = []
-    for title, sections in authorities.items():
-        if sections:
-            for section in sorted(sections, key=lambda x: (len(x), x)):
-                lines.append(f"- **{title}**, Section {section}")
-        else:
-            lines.append(f"- **{title}**")
+    if authorities:
+        lines.append("Applicable Acts and Sections:")
+        for title, sections in authorities.items():
+            if sections:
+                for section in sorted(sections, key=lambda x: (len(x), x)):
+                    lines.append(f"- **{title}**, Section {section}")
+            else:
+                lines.append(f"- **{title}**")
+    elif fallback_laws:
+        lines.append("Likely Applicable Laws:")
+        for law in fallback_laws:
+            display = _display_law_name(law)
+            if display:
+                lines.append(f"- **{display}**")
+
     if judgements:
         if lines:
             lines.append("")
@@ -1681,7 +1764,11 @@ def _enforce_firac_layout(answer: str) -> str:
     return "\n\n".join(parts).strip()
 
 
-def format_final_answer(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
+def format_final_answer(
+    answer: str,
+    context_blocks: List[Dict[str, Any]],
+    suggested_laws: Optional[List[str]] = None,
+) -> str:
     formatted = _remove_existing_disclaimer_sections(answer)
     formatted = _normalize_markdown_layout(formatted)
     formatted = _strip_context_markers(formatted)
@@ -1689,7 +1776,7 @@ def format_final_answer(answer: str, context_blocks: List[Dict[str, Any]]) -> st
     formatted = _align_section_references(formatted, context_blocks)
     formatted = _bold_headings(formatted)
     formatted = _bold_authorities(formatted, context_blocks)
-    formatted = _rebuild_applicable_law(formatted, context_blocks)
+    formatted = _rebuild_applicable_law(formatted, context_blocks, suggested_laws=suggested_laws)
     formatted = _normalize_heading_breaks(formatted)
     formatted = _format_next_steps_section(formatted)
     formatted = _enforce_firac_layout(formatted)
@@ -1742,7 +1829,8 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
         },
     }
 
-    final_answer = format_final_answer(answer, [context_block]) + "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
+    applicable_laws = _extract_applicable_law_lines([context_block])
+    final_answer = format_final_answer(answer, [context_block], suggested_laws=applicable_laws) + "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
 
     return QueryResponse(
         ok=True,
@@ -1760,6 +1848,7 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
             }
         ],
         context_blocks=[context_block],
+        applicable_laws=applicable_laws,
         meta={"mode": mode, "score": float(top_score), "session_id": session_id},
     )
 
@@ -1785,6 +1874,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                 ok=True, query=user_query, answer=static_answer, 
                 reasoning=["Greeting Optimization: Static response used."],
                 citations=[], context_blocks=[], 
+                applicable_laws=[],
                 meta={"mode": "greeting", "effective_mode": effective_mode, "inference": False}
             )
 
@@ -1821,6 +1911,7 @@ def query(payload: QueryRequest) -> QueryResponse:
         debug_trace["law_focus"] = law_focus
         if law_focus.get("preferred_laws"):
             reasoning.append("Preferred laws: " + ", ".join(law_focus["preferred_laws"]))
+        law_candidates = _law_focus_candidates(law_focus)
         precise_statute_query = bool(expanded_obj.filters.get("section_number") and expanded_obj.filters.get("act"))
 
         # --- STEP 1: Query Rewriter ---
@@ -1869,7 +1960,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                     timeout_sec=payload.llm_timeout_sec,
                 )
             disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
-            final_answer = answer.strip() + disclaimer
+            final_answer = format_final_answer(answer.strip(), [], suggested_laws=law_candidates) + disclaimer
 
             SESSIONS[s_id].append({"role": "user", "content": user_query})
             SESSIONS[s_id].append({"role": "assistant", "content": answer})
@@ -1897,6 +1988,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                 reasoning=reasoning,
                 citations=[],
                 context_blocks=[],
+                applicable_laws=law_candidates,
                 meta={
                     "mode": effective_mode,
                     "requested_mode": requested_mode,
@@ -1936,6 +2028,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                     reasoning=reasoning,
                     citations=[],
                     context_blocks=[],
+                    applicable_laws=law_candidates,
                     meta={"mode": effective_mode, "requested_mode": requested_mode, "reason": "no_match", "session_id": s_id},
                 )
             reasoning.append("Detected direct statute query; using deterministic section lookup.")
@@ -2032,7 +2125,7 @@ def query(payload: QueryRequest) -> QueryResponse:
             # PHASE 3: Mode-aware styling
             answer = apply_confidence_styling(answer.strip(), conf_score, retrieval_mode)
             disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
-            final_answer = answer + disclaimer
+            final_answer = format_final_answer(answer, [], suggested_laws=law_candidates) + disclaimer
 
             append_query_log(
                 {
@@ -2055,6 +2148,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                 answer=final_answer,
                 reasoning=reasoning,
                 citations=[], context_blocks=[],
+                applicable_laws=law_candidates,
                 confidence=conf_score,
                 confidence_label=conf_level,
                 meta={
@@ -2168,6 +2262,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                 reasoning.append("Grounding repaired successfully after one retry.")
 
         if not grounding.get("valid", False):
+            applicable_laws = _extract_applicable_law_lines(context_blocks, fallback_laws=law_candidates)
             conservative_answer = _build_context_grounded_fallback(user_query, context_blocks)
             append_query_log(
                 {
@@ -2191,6 +2286,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                 reasoning=reasoning + ["Post-generation validation failed; returned context-grounded conservative fallback."],
                 citations=pack.get("citations", []),
                 context_blocks=context_blocks,
+                applicable_laws=applicable_laws,
                 meta={
                     "mode": effective_mode,
                     "requested_mode": requested_mode,
@@ -2208,10 +2304,11 @@ def query(payload: QueryRequest) -> QueryResponse:
 
         # PHASE 3: Mode-aware styling
         answer = apply_confidence_styling(answer, conf_score, retrieval_mode)
+        applicable_laws = _extract_applicable_law_lines(context_blocks, fallback_laws=law_candidates)
 
         # 🤝 Safe Return
         disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
-        final_answer = format_final_answer(answer, context_blocks) + disclaimer
+        final_answer = format_final_answer(answer, context_blocks, suggested_laws=law_candidates) + disclaimer
         append_query_log(
             {
                 "time": datetime.utcnow().isoformat() + "Z",
@@ -2238,6 +2335,7 @@ def query(payload: QueryRequest) -> QueryResponse:
             ok=True, query=user_query, answer=final_answer, reasoning=reasoning,
             citations=pack.get("citations", []),
             context_blocks=context_blocks,
+            applicable_laws=applicable_laws,
             confidence=conf_score,
             confidence_label=conf_level,
             meta={
