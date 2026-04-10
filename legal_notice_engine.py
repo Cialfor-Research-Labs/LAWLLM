@@ -148,6 +148,126 @@ NOTICE_TYPES = {
         "deadline_days": 30,
         "keywords": ["eviction", "vacate", "tenant", "premises"],
     },
+    "rent_arrears": {
+        "label": "Rent Arrears Recovery Notice",
+        "laws": [
+            "Transfer of Property Act, 1882 - Section 108",
+            "State Rent Control Act (state-specific)",
+            "Code of Civil Procedure, 1908",
+        ],
+        "relief": [
+            "Payment of all outstanding rent arrears",
+            "Interest on delayed rent as per agreement/law",
+            "Compliance with tenancy obligations within the notice period",
+        ],
+        "deadline_days": 15,
+        "keywords": ["rent", "arrears", "unpaid rent", "rent due", "defaulted rent"],
+    },
+    "maintenance_nonpayment": {
+        "label": "Maintenance / Alimony Non-Payment Notice",
+        "laws": [
+            "Bharatiya Nagarik Suraksha Sanhita, 2023 - Section 144",
+            "Hindu Marriage Act, 1955 - Sections 24, 25",
+            "Protection of Women from Domestic Violence Act, 2005 - Section 20",
+        ],
+        "relief": [
+            "Immediate payment of pending maintenance/alimony dues",
+            "Clear schedule for future monthly payments",
+            "Interest/compensation for delayed compliance",
+        ],
+        "deadline_days": 15,
+        "keywords": ["maintenance", "alimony", "monthly support", "maintenance due", "spousal support"],
+    },
+    "ip_infringement": {
+        "label": "Intellectual Property Infringement Notice",
+        "laws": [
+            "Trade Marks Act, 1999",
+            "Copyright Act, 1957",
+            "Patents Act, 1970 (where applicable)",
+        ],
+        "relief": [
+            "Immediate cease-and-desist from infringing use",
+            "Removal of infringing content/products from all channels",
+            "Disclosure of profits earned and compensation for losses",
+        ],
+        "deadline_days": 7,
+        "keywords": ["trademark", "copyright", "infringement", "piracy", "counterfeit", "brand misuse"],
+    },
+    "cyber_fraud": {
+        "label": "Cyber Fraud / Online Scam Notice",
+        "laws": [
+            "Information Technology Act, 2000",
+            "Bharatiya Nyaya Sanhita, 2023 - cheating and cyber-related offences",
+            "RBI digital payment and grievance directions (where applicable)",
+        ],
+        "relief": [
+            "Immediate reversal/refund of fraudulently transferred amount",
+            "Preservation of logs, transaction records, and device metadata",
+            "Formal confirmation of fraud investigation and action taken",
+        ],
+        "deadline_days": 7,
+        "keywords": ["cyber fraud", "online scam", "phishing", "upi fraud", "otp fraud", "unauthorized transaction"],
+    },
+    "data_privacy_breach": {
+        "label": "Data Privacy Breach Notice",
+        "laws": [
+            "Digital Personal Data Protection Act, 2023",
+            "Information Technology Act, 2000",
+            "Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011",
+        ],
+        "relief": [
+            "Disclosure of the nature and scope of personal data breach",
+            "Immediate remedial security controls and user protection measures",
+            "Compensation for losses and distress caused by data misuse",
+        ],
+        "deadline_days": 10,
+        "keywords": ["data breach", "privacy", "personal data leak", "data leak", "unauthorized access"],
+    },
+    "workplace_harassment": {
+        "label": "Workplace Harassment Notice",
+        "laws": [
+            "Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013",
+            "Industrial Employment and service rules (where applicable)",
+            "Bharatiya Nyaya Sanhita, 2023 (where criminal intimidation/assault is involved)",
+        ],
+        "relief": [
+            "Immediate cessation of harassment and retaliatory actions",
+            "Initiation of lawful internal inquiry/ICC process",
+            "Protection of complainant and compensation as per law",
+        ],
+        "deadline_days": 7,
+        "keywords": ["harassment", "workplace harassment", "sexual harassment", "hostile workplace", "intimidation at work"],
+    },
+    "builder_delay": {
+        "label": "Builder Delay / Possession Notice",
+        "laws": [
+            "Real Estate (Regulation and Development) Act, 2016",
+            "Consumer Protection Act, 2019",
+            "Indian Contract Act, 1872",
+        ],
+        "relief": [
+            "Immediate handover of possession with occupancy formalities",
+            "Interest/compensation for delayed possession period",
+            "Refund with interest if possession is not delivered",
+        ],
+        "deadline_days": 15,
+        "keywords": ["builder delay", "delayed possession", "rera", "flat possession", "real estate project delay"],
+    },
+    "title_ownership_dispute": {
+        "label": "Property Title / Ownership Dispute Notice",
+        "laws": [
+            "Transfer of Property Act, 1882",
+            "Specific Relief Act, 1963",
+            "Registration Act, 1908",
+        ],
+        "relief": [
+            "Immediate cessation of interference with lawful ownership/possession",
+            "Rectification of records and title-related defects",
+            "Compensation for loss arising from unlawful claims or obstruction",
+        ],
+        "deadline_days": 15,
+        "keywords": ["title dispute", "ownership dispute", "property title", "mutation dispute", "encumbrance issue"],
+    },
     "general": {
         "label": "General Legal Notice",
         "laws": [],
