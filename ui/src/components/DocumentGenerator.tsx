@@ -75,8 +75,15 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 
 // ---- Component ----
 
-export const DocumentGenerator = () => {
+export const DocumentGenerator = ({ authToken }: { authToken: string }) => {
   const apiBase = useMemo(() => getApiBase(), []);
+  const authHeaders = useMemo(
+    () => ({
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
+    }),
+    [authToken],
+  );
 
   // Form state
   const [senderName, setSenderName] = useState('');
@@ -99,13 +106,20 @@ export const DocumentGenerator = () => {
 
   // Fetch notice types on mount
   useEffect(() => {
-    fetch(`${apiBase}/generate/notice-types`)
-      .then((res) => res.json())
+    fetch(`${apiBase}/generate/notice-types`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Unable to load notice types (${res.status})`);
+        return res.json();
+      })
       .then((data) => {
         if (data.ok) setNoticeTypes(data.types || []);
       })
-      .catch(() => {});
-  }, [apiBase]);
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load notice types');
+      });
+  }, [apiBase, authToken]);
 
   // Sync with AI Legal Chat
   useEffect(() => {
@@ -167,7 +181,7 @@ export const DocumentGenerator = () => {
 
       const response = await fetch(`${apiBase}/generate/notice`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(body),
       });
 

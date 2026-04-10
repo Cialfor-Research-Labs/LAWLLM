@@ -181,8 +181,15 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 }
 
 
-export const LegalChat = () => {
+export const LegalChat = ({ authToken }: { authToken: string }) => {
     const apiBase = useMemo(() => getApiBase(), []);
+    const authHeaders = useMemo(
+        () => ({
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+        }),
+        [authToken],
+    );
     const scrollRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -239,7 +246,7 @@ export const LegalChat = () => {
         try {
             const response = await fetch(`${apiBase}/query`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders,
                 body: JSON.stringify({
                     query: userMessage,
                     mode: 'lawyer_case',
@@ -457,7 +464,7 @@ export const LegalChat = () => {
                                     try {
                                         const response = await fetch(`${apiBase}/query`, {
                                             method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
+                                            headers: authHeaders,
                                             body: JSON.stringify({
                                                 query: "Confirmed",
                                                 session_id: sessionId,

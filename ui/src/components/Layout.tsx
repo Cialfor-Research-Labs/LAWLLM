@@ -4,10 +4,12 @@ import {
   FileText, 
   BarChart3, 
   TrendingUp, 
+  ShieldCheck,
   Plus, 
   Library, 
   Settings, 
-  Bell 
+  Bell,
+  LogOut,
 } from 'lucide-react';
 
 interface NavItem {
@@ -16,13 +18,27 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-export const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (id: string) => void }) => {
+interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (id: string) => void;
+  isAdmin: boolean;
+}
+
+interface HeaderProps {
+  currentUserName: string;
+  onLogout: () => void;
+}
+
+export const Sidebar = ({ activeTab, setActiveTab, isAdmin }: SidebarProps) => {
   const navItems: NavItem[] = [
     { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
     { id: 'generator', label: 'Document Generator', icon: FileText },
     { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
     { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
   ];
+  if (isAdmin) {
+    navItems.push({ id: 'admin', label: 'Admin Access', icon: ShieldCheck });
+  }
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-slate-100 dark:bg-slate-900 flex flex-col p-4 z-50">
@@ -69,7 +85,7 @@ export const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setAct
   );
 };
 
-export const Header = () => (
+export const Header = ({ currentUserName, onLogout }: HeaderProps) => (
   <header className="sticky top-0 w-full px-8 py-4 glass-panel z-40 flex justify-between items-center">
     <div className="flex items-center">
       <span className="text-2xl font-headline italic text-primary">Vidhi AI</span>
@@ -85,6 +101,16 @@ export const Header = () => (
         <button className="p-2 hover:bg-surface-container rounded-full transition-colors text-on-surface-variant">
           <Bell size={20} />
         </button>
+        <button
+          onClick={onLogout}
+          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary hover:border-primary/30"
+        >
+          <LogOut size={14} />
+          Logout
+        </button>
+        <span className="text-xs font-semibold text-on-surface-variant hidden md:block">
+          {currentUserName}
+        </span>
         <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/30">
           <img 
             src="https://picsum.photos/seed/lawyer/100/100" 

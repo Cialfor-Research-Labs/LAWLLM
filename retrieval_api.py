@@ -1,13 +1,17 @@
 import json
+import hashlib
+import hmac
 import os
 import re
+import secrets
+import sqlite3
 import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -86,6 +90,43 @@ INTERACTION_LOG_PATH = os.path.join("test", "interaction_logs.jsonl")
 MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
 MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
 MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
+
+# Auth / Access control settings
+AUTH_DB_PATH = os.getenv("AUTH_DB_PATH", "auth_access.db")
+SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
+PASSWORD_SETUP_TOKEN_TTL_HOURS = int(os.getenv("PASSWORD_SETUP_TOKEN_TTL_HOURS", "48"))
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
+PASSWORD_HASH_ITERATIONS = 120_000
+_DOTENV_CACHE: Optional[Dict[str, str]] = None
+
+
+def _load_dotenv_cache() -> Dict[str, str]:
+    global _DOTENV_CACHE
+    if _DOTENV_CACHE is not None:
+        return _DOTENV_CACHE
+
+    parsed: Dict[str, str] = {}
+    env_path = ".env"
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as fh:
+                for raw_line in fh:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, val = line.split("=", 1)
+                    parsed[key.strip()] = val.strip()
+        except Exception:
+            parsed = {}
+    _DOTENV_CACHE = parsed
+    return parsed
+
+
+def _get_env_with_dotenv_fallback(key: str, default: Optional[str] = None) -> Optional[str]:
+    value = os.getenv(key)
+    if value is not None:
+        return value
+    return _load_dotenv_cache().get(key, default)
 
 DOMAIN_FORBIDDEN_QUESTION_TERMS: Dict[str, List[str]] = {
     "labour": ["landlord", "rent", "property"],
@@ -179,6 +220,83 @@ class LawyerModeResponse(BaseModel):
     meta: Dict[str, Any] = {}
 
 
+class RequestAccessRequest(BaseModel):
+    name: str = Field(..., min_length=2)
+    email: str = Field(..., min_length=5)
+    organization: str = ""
+    use_case: str = Field(..., min_length=5)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., min_length=5)
+    password: str = Field("", min_length=0)
+
+
+class SetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=8)
+
+
+class AccessUpdateRequest(BaseModel):
+    status: str = Field(..., regex="^(pending|granted|denied)$")
+    access_granted: bool
+    review_notes: str = ""
+
+
+class AuthUserView(BaseModel):
+    id: int
+    name: str
+    email: str
+    organization: str = ""
+    use_case: str = ""
+    role: str
+    status: str
+    access_granted: bool
+    created_at: str
+    updated_at: str
+
+
+class RequestAccessResponse(BaseModel):
+    ok: bool
+    message: str
+
+
+class LoginResponse(BaseModel):
+    ok: bool
+    state: str
+    message: str
+    token: Optional[str] = None
+    user: Optional[AuthUserView] = None
+
+
+class MeResponse(BaseModel):
+    ok: bool
+    user: AuthUserView
+
+
+class LogoutResponse(BaseModel):
+    ok: bool
+    message: str
+
+
+class AdminAccessListResponse(BaseModel):
+    ok: bool
+    users: List[Dict[str, Any]]
+    requests: List[Dict[str, Any]]
+
+
+class AdminAccessUpdateResponse(BaseModel):
+    ok: bool
+    message: str
+    user: Dict[str, Any]
+
+
+class PasswordSetupLinkResponse(BaseModel):
+    ok: bool
+    setup_url: str
+    expires_at: str
+
+
 # =====================================================
 # PHASE 2/3 INTERVIEW MODELS
 # =====================================================
@@ -219,6 +337,296 @@ class InterviewChatResponse(BaseModel):
     interpretations: List[LegalInterpretation] = []
     applicable_laws: List[ApplicableLaw] = []
     state_debug: Dict[str, Any]
+
+
+def _utc_now_iso() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def _utc_iso_after_hours(hours: int) -> str:
+    return (datetime.utcnow() + timedelta(hours=hours)).replace(microsecond=0).isoformat() + "Z"
+
+
+def _db_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(AUTH_DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_HASH_ITERATIONS)
+    return (
+        f"pbkdf2_sha256${PASSWORD_HASH_ITERATIONS}$"
+        f"{salt.hex()}${digest.hex()}"
+    )
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        algo, iter_str, salt_hex, digest_hex = stored_hash.split("$", 3)
+        if algo != "pbkdf2_sha256":
+            return False
+        iterations = int(iter_str)
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(digest_hex)
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+        return hmac.compare_digest(actual, expected)
+    except Exception:
+        return False
+
+
+def _hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _row_to_user_view(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "name": row["name"],
+        "email": row["email"],
+        "organization": row["organization"] or "",
+        "use_case": row["use_case"] or "",
+        "role": row["role"],
+        "status": row["status"],
+        "access_granted": bool(row["access_granted"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _ensure_auth_schema() -> None:
+    with _db_conn() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                organization TEXT NOT NULL DEFAULT '',
+                use_case TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
+                access_granted INTEGER NOT NULL DEFAULT 0 CHECK (access_granted IN (0, 1)),
+                password_hash TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_single_admin_role
+            ON users(role) WHERE role = 'admin';
+
+            CREATE TABLE IF NOT EXISTS access_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                organization TEXT NOT NULL DEFAULT '',
+                use_case TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
+                reviewed_by INTEGER,
+                review_notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS password_setup_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0 CHECK (used IN (0, 1)),
+                created_by_admin_id INTEGER,
+                created_at TEXT NOT NULL,
+                used_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                revoked INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0, 1)),
+                created_at TEXT NOT NULL,
+                revoked_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            """
+        )
+        conn.commit()
+
+
+def _bootstrap_single_admin() -> None:
+    admin_email = (_get_env_with_dotenv_fallback("ADMIN_EMAIL", "") or "").strip().lower()
+    admin_name = (_get_env_with_dotenv_fallback("ADMIN_NAME", "System Admin") or "System Admin").strip() or "System Admin"
+    admin_password = _get_env_with_dotenv_fallback("ADMIN_PASSWORD")
+    admin_setup_token = (_get_env_with_dotenv_fallback("ADMIN_SETUP_TOKEN", "") or "").strip()
+
+    if not admin_email:
+        raise RuntimeError("Missing ADMIN_EMAIL. Cannot start without seeded single admin.")
+    if not admin_password and not admin_setup_token:
+        raise RuntimeError(
+            "Missing admin credentials. Set ADMIN_PASSWORD or ADMIN_SETUP_TOKEN to seed the single admin."
+        )
+
+    with _db_conn() as conn:
+        admins = conn.execute("SELECT * FROM users WHERE role = 'admin'").fetchall()
+        if len(admins) > 1:
+            raise RuntimeError("Single-admin invariant violated: more than one admin exists in database.")
+
+        now = _utc_now_iso()
+        if not admins:
+            password_hash = _hash_password(admin_password) if admin_password else None
+            cur = conn.execute(
+                """
+                INSERT INTO users
+                (name, email, organization, use_case, role, status, access_granted, password_hash, created_at, updated_at)
+                VALUES (?, ?, '', 'Seeded admin account', 'admin', 'granted', 1, ?, ?, ?)
+                """,
+                (admin_name, admin_email, password_hash, now, now),
+            )
+            admin_id = int(cur.lastrowid)
+            if admin_setup_token and not admin_password:
+                conn.execute(
+                    """
+                    INSERT INTO password_setup_tokens
+                    (user_id, token_hash, expires_at, used, created_by_admin_id, created_at)
+                    VALUES (?, ?, ?, 0, NULL, ?)
+                    """,
+                    (
+                        admin_id,
+                        _hash_token(admin_setup_token),
+                        _utc_iso_after_hours(PASSWORD_SETUP_TOKEN_TTL_HOURS),
+                        now,
+                    ),
+                )
+            conn.commit()
+            return
+
+        admin_row = admins[0]
+        existing_email = str(admin_row["email"]).strip().lower()
+        if existing_email != admin_email:
+            raise RuntimeError(
+                f"Seeded admin mismatch. DB admin={existing_email}, env ADMIN_EMAIL={admin_email}."
+            )
+
+        if admin_row["status"] != "granted" or int(admin_row["access_granted"]) != 1:
+            raise RuntimeError("Admin account is corrupt. Admin must always be status='granted' and access_granted=1.")
+
+        if not admin_row["password_hash"]:
+            if admin_password:
+                conn.execute(
+                    "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+                    (_hash_password(admin_password), now, int(admin_row["id"])),
+                )
+                conn.commit()
+            elif admin_setup_token:
+                token_hash = _hash_token(admin_setup_token)
+                existing = conn.execute(
+                    """
+                    SELECT id FROM password_setup_tokens
+                    WHERE user_id = ? AND token_hash = ? AND used = 0 AND expires_at > ?
+                    """,
+                    (int(admin_row["id"]), token_hash, now),
+                ).fetchone()
+                if not existing:
+                    conn.execute(
+                        """
+                        INSERT INTO password_setup_tokens
+                        (user_id, token_hash, expires_at, used, created_by_admin_id, created_at)
+                        VALUES (?, ?, ?, 0, NULL, ?)
+                        """,
+                        (
+                            int(admin_row["id"]),
+                            token_hash,
+                            _utc_iso_after_hours(PASSWORD_SETUP_TOKEN_TTL_HOURS),
+                            now,
+                        ),
+                    )
+                    conn.commit()
+            else:
+                raise RuntimeError("Admin password is missing. Set ADMIN_PASSWORD or ADMIN_SETUP_TOKEN.")
+
+
+def _initialize_auth_system() -> None:
+    _ensure_auth_schema()
+    _bootstrap_single_admin()
+
+
+def _extract_bearer_token(authorization: Optional[str]) -> str:
+    raw = (authorization or "").strip()
+    if not raw.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid bearer token.")
+    token = raw[7:].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing bearer token.")
+    return token
+
+
+def _get_user_by_valid_session_token(raw_token: str) -> sqlite3.Row:
+    token_hash = _hash_token(raw_token)
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        session_row = conn.execute(
+            """
+            SELECT s.id AS session_id, s.user_id, s.revoked, s.expires_at
+            FROM sessions s
+            WHERE s.token_hash = ?
+            """,
+            (token_hash,),
+        ).fetchone()
+        if not session_row or int(session_row["revoked"]) == 1 or str(session_row["expires_at"]) <= now:
+            raise HTTPException(status_code=401, detail="Session expired or invalid.")
+
+        user_row = conn.execute("SELECT * FROM users WHERE id = ?", (int(session_row["user_id"]),)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=401, detail="User not found for active session.")
+        return user_row
+
+
+def _require_authenticated_user(authorization: Optional[str]) -> sqlite3.Row:
+    token = _extract_bearer_token(authorization)
+    return _get_user_by_valid_session_token(token)
+
+
+def _require_admin_user(authorization: Optional[str]) -> sqlite3.Row:
+    user = _require_authenticated_user(authorization)
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return user
+
+
+def _require_product_access_user(authorization: Optional[str]) -> sqlite3.Row:
+    user = _require_authenticated_user(authorization)
+    if user["role"] == "admin":
+        return user
+    if user["status"] != "granted" or int(user["access_granted"]) != 1:
+        raise HTTPException(status_code=403, detail="Product access not granted.")
+    return user
+
+
+def _create_session_for_user(user_id: int) -> str:
+    raw_token = secrets.token_urlsafe(48)
+    now = _utc_now_iso()
+    expires_at = _utc_iso_after_hours(SESSION_TTL_HOURS)
+    with _db_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO sessions (user_id, token_hash, expires_at, revoked, created_at)
+            VALUES (?, ?, ?, 0, ?)
+            """,
+            (user_id, _hash_token(raw_token), expires_at, now),
+        )
+        conn.commit()
+    return raw_token
+
+
+_initialize_auth_system()
 
 
 def _domain_forbidden_terms(domain: str) -> List[str]:
@@ -1853,11 +2261,330 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
     )
 
 # =========================
+# AUTH / ACCESS ENDPOINTS
+# =========================
+
+@app.post("/auth/request-access", response_model=RequestAccessResponse)
+def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
+    email = payload.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        existing = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if existing and existing["role"] == "admin":
+            raise HTTPException(status_code=400, detail="This email is reserved for seeded admin access.")
+
+        if existing:
+            user_id = int(existing["id"])
+            target_status = existing["status"]
+            target_access = int(existing["access_granted"])
+            if existing["status"] != "granted" or int(existing["access_granted"]) != 1:
+                target_status = "pending"
+                target_access = 0
+            conn.execute(
+                """
+                UPDATE users
+                SET name = ?, organization = ?, use_case = ?, status = ?, access_granted = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    payload.name.strip(),
+                    payload.organization.strip(),
+                    payload.use_case.strip(),
+                    target_status,
+                    target_access,
+                    now,
+                    user_id,
+                ),
+            )
+            final_status = target_status
+            has_access = bool(target_access)
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO users
+                (name, email, organization, use_case, role, status, access_granted, password_hash, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'user', 'pending', 0, NULL, ?, ?)
+                """,
+                (
+                    payload.name.strip(),
+                    email,
+                    payload.organization.strip(),
+                    payload.use_case.strip(),
+                    now,
+                    now,
+                ),
+            )
+            user_id = int(cur.lastrowid)
+            final_status = "pending"
+            has_access = False
+
+        conn.execute(
+            """
+            INSERT INTO access_requests
+            (user_id, name, email, organization, use_case, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                payload.name.strip(),
+                email,
+                payload.organization.strip(),
+                payload.use_case.strip(),
+                final_status,
+                now,
+            ),
+        )
+        conn.commit()
+
+    if final_status == "granted" and has_access:
+        return RequestAccessResponse(ok=True, message="Account already has product access. Please log in.")
+    return RequestAccessResponse(ok=True, message="Access request submitted successfully. Please wait for admin approval.")
+
+
+@app.post("/auth/login", response_model=LoginResponse)
+def auth_login(payload: LoginRequest) -> LoginResponse:
+    email = payload.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    with _db_conn() as conn:
+        row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    user_view = AuthUserView(**_row_to_user_view(row))
+    role = row["role"]
+    status = row["status"]
+    access_granted = bool(row["access_granted"])
+
+    if role == "user" and status == "pending":
+        return LoginResponse(ok=True, state="pending_access", message="Your access request is pending admin approval.", user=user_view)
+
+    if role == "user" and (status == "denied" or not access_granted):
+        return LoginResponse(ok=True, state="access_denied", message="Access not granted. Please contact admin.", user=user_view)
+
+    if not row["password_hash"]:
+        return LoginResponse(
+            ok=True,
+            state="password_setup_required",
+            message="Password setup is required before login.",
+            user=user_view,
+        )
+
+    if not _verify_password(payload.password, str(row["password_hash"])):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    token = _create_session_for_user(int(row["id"]))
+    return LoginResponse(ok=True, state="success", message="Login successful.", token=token, user=user_view)
+
+
+@app.post("/auth/logout", response_model=LogoutResponse)
+def auth_logout(authorization: Optional[str] = Header(default=None)) -> LogoutResponse:
+    raw_token = _extract_bearer_token(authorization)
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        cur = conn.execute(
+            """
+            UPDATE sessions
+            SET revoked = 1, revoked_at = ?
+            WHERE token_hash = ? AND revoked = 0
+            """,
+            (now, _hash_token(raw_token)),
+        )
+        conn.commit()
+    if cur.rowcount <= 0:
+        raise HTTPException(status_code=401, detail="Session already invalid.")
+    return LogoutResponse(ok=True, message="Logged out successfully.")
+
+
+@app.get("/auth/me", response_model=MeResponse)
+def auth_me(authorization: Optional[str] = Header(default=None)) -> MeResponse:
+    user_row = _require_authenticated_user(authorization)
+    return MeResponse(ok=True, user=AuthUserView(**_row_to_user_view(user_row)))
+
+
+@app.post("/auth/set-password", response_model=RequestAccessResponse)
+def auth_set_password(payload: SetPasswordRequest) -> RequestAccessResponse:
+    token_hash = _hash_token(payload.token.strip())
+    now = _utc_now_iso()
+
+    with _db_conn() as conn:
+        token_row = conn.execute(
+            """
+            SELECT * FROM password_setup_tokens
+            WHERE token_hash = ? AND used = 0 AND expires_at > ?
+            """,
+            (token_hash, now),
+        ).fetchone()
+        if not token_row:
+            raise HTTPException(status_code=400, detail="Password setup token is invalid or expired.")
+
+        user_row = conn.execute("SELECT * FROM users WHERE id = ?", (int(token_row["user_id"]),)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found for setup token.")
+
+        if user_row["role"] == "user" and (user_row["status"] != "granted" or int(user_row["access_granted"]) != 1):
+            raise HTTPException(status_code=400, detail="User is not currently granted product access.")
+
+        conn.execute(
+            "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+            (_hash_password(payload.new_password), now, int(user_row["id"])),
+        )
+        conn.execute(
+            "UPDATE password_setup_tokens SET used = 1, used_at = ? WHERE id = ?",
+            (now, int(token_row["id"])),
+        )
+        conn.commit()
+
+    return RequestAccessResponse(ok=True, message="Password set successfully. You can now log in.")
+
+
+@app.get("/admin/access-requests", response_model=AdminAccessListResponse)
+def admin_access_requests(authorization: Optional[str] = Header(default=None)) -> AdminAccessListResponse:
+    _require_admin_user(authorization)
+
+    with _db_conn() as conn:
+        user_rows = conn.execute(
+            """
+            SELECT id, name, email, organization, use_case, role, status, access_granted, created_at, updated_at,
+                   CASE WHEN password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password
+            FROM users
+            WHERE role = 'user'
+            ORDER BY updated_at DESC
+            """
+        ).fetchall()
+        request_rows = conn.execute(
+            """
+            SELECT id, user_id, name, email, organization, use_case, status, reviewed_by, review_notes, created_at, reviewed_at
+            FROM access_requests
+            ORDER BY created_at DESC
+            LIMIT 500
+            """
+        ).fetchall()
+
+    users_payload = []
+    for row in user_rows:
+        item = dict(row)
+        item["access_granted"] = bool(item.get("access_granted"))
+        item["has_password"] = bool(item.get("has_password"))
+        users_payload.append(item)
+
+    requests_payload = [dict(row) for row in request_rows]
+    return AdminAccessListResponse(ok=True, users=users_payload, requests=requests_payload)
+
+
+@app.patch("/admin/users/{user_id}/access", response_model=AdminAccessUpdateResponse)
+def admin_update_user_access(
+    user_id: int,
+    payload: AccessUpdateRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> AdminAccessUpdateResponse:
+    admin_row = _require_admin_user(authorization)
+    now = _utc_now_iso()
+
+    target_status = payload.status
+    target_access = bool(payload.access_granted)
+    if target_status in {"pending", "denied"}:
+        target_access = False
+
+    with _db_conn() as conn:
+        user_row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if user_row["role"] != "user":
+            raise HTTPException(status_code=400, detail="Admin user cannot be modified by this endpoint.")
+
+        conn.execute(
+            """
+            UPDATE users
+            SET status = ?, access_granted = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (target_status, int(target_access), now, user_id),
+        )
+
+        conn.execute(
+            """
+            INSERT INTO access_requests
+            (user_id, name, email, organization, use_case, status, reviewed_by, review_notes, created_at, reviewed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                user_row["name"],
+                user_row["email"],
+                user_row["organization"] or "",
+                user_row["use_case"] or "",
+                target_status,
+                int(admin_row["id"]),
+                payload.review_notes.strip(),
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+
+        updated = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+
+    return AdminAccessUpdateResponse(
+        ok=True,
+        message="User access updated successfully.",
+        user=_row_to_user_view(updated),
+    )
+
+
+@app.post("/admin/users/{user_id}/password-setup-link", response_model=PasswordSetupLinkResponse)
+def admin_generate_password_setup_link(
+    user_id: int,
+    authorization: Optional[str] = Header(default=None),
+) -> PasswordSetupLinkResponse:
+    admin_row = _require_admin_user(authorization)
+    now = _utc_now_iso()
+
+    with _db_conn() as conn:
+        user_row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if user_row["role"] != "user":
+            raise HTTPException(status_code=400, detail="Cannot generate setup link for admin account.")
+        if user_row["status"] != "granted" or int(user_row["access_granted"]) != 1:
+            raise HTTPException(status_code=400, detail="Grant product access before generating a setup link.")
+
+        conn.execute(
+            """
+            UPDATE password_setup_tokens
+            SET used = 1, used_at = ?
+            WHERE user_id = ? AND used = 0
+            """,
+            (now, user_id),
+        )
+
+        raw_token = secrets.token_urlsafe(48)
+        expires_at = _utc_iso_after_hours(PASSWORD_SETUP_TOKEN_TTL_HOURS)
+        conn.execute(
+            """
+            INSERT INTO password_setup_tokens
+            (user_id, token_hash, expires_at, used, created_by_admin_id, created_at)
+            VALUES (?, ?, ?, 0, ?, ?)
+            """,
+            (user_id, _hash_token(raw_token), expires_at, int(admin_row["id"]), now),
+        )
+        conn.commit()
+
+    setup_url = f"{FRONTEND_BASE_URL}/?setup_token={raw_token}"
+    return PasswordSetupLinkResponse(ok=True, setup_url=setup_url, expires_at=expires_at)
+
+
+# =========================
 # MAIN STRUCTURED RAG FLOW
 # =========================
 
 @app.post("/query", response_model=QueryResponse)
-def query(payload: QueryRequest) -> QueryResponse:
+def query(payload: QueryRequest, authorization: Optional[str] = Header(default=None)) -> QueryResponse:
+    _require_product_access_user(authorization)
     try:
         raw_query = payload.query
         requested_mode = str(payload.mode or "").strip().lower()
@@ -2357,7 +3084,8 @@ def query(payload: QueryRequest) -> QueryResponse:
 
 
 @app.post("/query/user", response_model=UserModeResponse)
-def query_user(payload: QueryRequest) -> UserModeResponse:
+def query_user(payload: QueryRequest, authorization: Optional[str] = Header(default=None)) -> UserModeResponse:
+    _require_product_access_user(authorization)
     raise HTTPException(
         status_code=410,
         detail="User/consumer endpoint is disabled. This deployment is configured for lawyers only. Use /query."
@@ -2368,7 +3096,11 @@ def query_user(payload: QueryRequest) -> UserModeResponse:
 # PHASE 2: INTELLIGENT LEGAL INTERVIEW
 # =====================================================
 @app.post("/query/interview/chat", response_model=InterviewChatResponse)
-def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatResponse:
+def interview_chat(
+    payload: InterviewChatRequest = Body(...),
+    authorization: Optional[str] = Header(default=None),
+) -> InterviewChatResponse:
+    _require_product_access_user(authorization)
     try:
         s_id = payload.session_id or str(uuid.uuid4())
         
@@ -2735,7 +3467,8 @@ def interview_chat(payload: InterviewChatRequest = Body(...)) -> InterviewChatRe
 # PHASE 3: LAWYER MODE (LLM DRIVEN)
 # =====================================================
 @app.post("/query/lawyer/init", response_model=LawyerModeResponse)
-def query_lawyer_init(payload: LawyerInitRequest) -> LawyerModeResponse:
+def query_lawyer_init(payload: LawyerInitRequest, authorization: Optional[str] = Header(default=None)) -> LawyerModeResponse:
+    _require_product_access_user(authorization)
     user_query = sanitize_user_input(payload.query)
     session_id = payload.session_id or str(uuid.uuid4())
     LAWYER_SESSIONS[session_id] = {}
@@ -2780,7 +3513,8 @@ def query_lawyer_init(payload: LawyerInitRequest) -> LawyerModeResponse:
 
 
 @app.post("/query/lawyer/refine", response_model=LawyerModeResponse)
-def query_lawyer_refine(payload: LawyerRefineRequest) -> LawyerModeResponse:
+def query_lawyer_refine(payload: LawyerRefineRequest, authorization: Optional[str] = Header(default=None)) -> LawyerModeResponse:
+    _require_product_access_user(authorization)
     session = LAWYER_SESSIONS.get(payload.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Lawyer session not found. Start with /query/lawyer/init.")
@@ -2884,13 +3618,15 @@ class NoticeResponse(BaseModel):
 
 
 @app.get("/generate/notice-types")
-def get_notice_types():
+def get_notice_types(authorization: Optional[str] = Header(default=None)):
+    _require_product_access_user(authorization)
     """Return available notice types for the frontend dropdown."""
     return {"ok": True, "types": get_available_notice_types()}
 
 
 @app.post("/generate/notice", response_model=NoticeResponse)
-def generate_notice(payload: NoticeRequest) -> NoticeResponse:
+def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Header(default=None)) -> NoticeResponse:
+    _require_product_access_user(authorization)
     """Generate a professional legal notice from structured input."""
     try:
         # STEP 1: Determine notice type

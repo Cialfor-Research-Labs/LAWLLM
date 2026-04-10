@@ -3,24 +3,149 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sidebar, Header } from './components/Layout';
 import { DocumentAnalyzer } from './components/DocumentAnalyzer';
 import { LegalChat } from './components/LegalChat';
 import { DocumentGenerator } from './components/DocumentGenerator';
 import { WinPredictor } from './components/WinPredictor';
+import { LoginPage } from './components/auth/LoginPage';
+import { RequestAccessPage } from './components/auth/RequestAccessPage';
+import { SetPasswordPage } from './components/auth/SetPasswordPage';
+import { AdminAccessPage } from './components/AdminAccessPage';
+
+interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  organization: string;
+  use_case: string;
+  role: 'admin' | 'user';
+  status: 'pending' | 'granted' | 'denied';
+  access_granted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+function getApiBase(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  return '/api';
+}
 
 export default function App() {
+  const apiBase = useMemo(() => getApiBase(), []);
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('vidhi_auth_token'));
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(Boolean(localStorage.getItem('vidhi_auth_token')));
+  const [authView, setAuthView] = useState<'login' | 'request' | 'set_password'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('setup_token') ? 'set_password' : 'login';
+  });
   const [activeTab, setActiveTab] = useState('chat');
+  const [setupToken, setSetupToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get('setup_token'));
+
+  useEffect(() => {
+    if (!authToken) {
+      setCurrentUser(null);
+      setAuthLoading(false);
+      return;
+    }
+    setAuthLoading(true);
+    fetch(`${apiBase}/auth/me`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Session invalid (${res.status})`);
+        return res.json();
+      })
+      .then((data) => {
+        setCurrentUser(data.user as AuthUser);
+      })
+      .catch(() => {
+        localStorage.removeItem('vidhi_auth_token');
+        setAuthToken(null);
+        setCurrentUser(null);
+      })
+      .finally(() => setAuthLoading(false));
+  }, [authToken, apiBase]);
+
+  useEffect(() => {
+    if (currentUser?.role !== 'admin' && activeTab === 'admin') {
+      setActiveTab('chat');
+    }
+  }, [currentUser, activeTab]);
+
+  const onLoginSuccess = (token: string, user: AuthUser) => {
+    localStorage.setItem('vidhi_auth_token', token);
+    setAuthToken(token);
+    setCurrentUser(user);
+    setAuthView('login');
+  };
+
+  const onLogout = async () => {
+    try {
+      if (authToken) {
+        await fetch(`${apiBase}/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      }
+    } catch {
+      // ignore logout request failures and clear local session anyway
+    }
+    localStorage.removeItem('vidhi_auth_token');
+    setAuthToken(null);
+    setCurrentUser(null);
+    setActiveTab('chat');
+    setAuthView('login');
+  };
+
+  const goToLogin = () => {
+    setAuthView('login');
+    setSetupToken(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('setup_token');
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-container-low">
+        <div className="flex items-center gap-3 text-on-surface-variant">
+          <Loader2 size={20} className="animate-spin" />
+          Checking session...
+        </div>
+      </div>
+    );
+  }
+
+  if (!authToken || !currentUser) {
+    if (authView === 'request') {
+      return <RequestAccessPage apiBase={apiBase} onBackToLogin={goToLogin} />;
+    }
+    if (authView === 'set_password' && setupToken) {
+      return <SetPasswordPage apiBase={apiBase} token={setupToken} onBackToLogin={goToLogin} />;
+    }
+    return (
+      <LoginPage
+        apiBase={apiBase}
+        onLoginSuccess={onLoginSuccess}
+        onShowRequestAccess={() => setAuthView('request')}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-surface font-body overflow-hidden">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={currentUser.role === 'admin'} />
       
       <main className="flex-1 ml-64 flex flex-col h-screen relative">
-        <Header />
+        <Header currentUserName={currentUser.name} onLogout={onLogout} />
         
         <AnimatePresence mode="wait">
           {activeTab === 'analyzer' ? (
@@ -41,7 +166,7 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col overflow-hidden"
             >
-              <LegalChat />
+              <LegalChat authToken={authToken} />
             </motion.div>
           ) : activeTab === 'generator' ? (
             <motion.div 
@@ -51,7 +176,17 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col overflow-hidden"
             >
-              <DocumentGenerator />
+              <DocumentGenerator authToken={authToken} />
+            </motion.div>
+          ) : activeTab === 'admin' && currentUser.role === 'admin' ? (
+            <motion.div
+              key="admin"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col overflow-hidden"
+            >
+              <AdminAccessPage apiBase={apiBase} authToken={authToken} />
             </motion.div>
           ) : activeTab === 'predictor' ? (
             <motion.div 
