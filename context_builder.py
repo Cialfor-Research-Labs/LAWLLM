@@ -54,6 +54,11 @@ def trim(text: str, n: int) -> str:
     return text[: n - 3].rstrip() + "..."
 
 
+def _looks_like_hash(value: str) -> bool:
+    token = str(value or "").strip().lower()
+    return bool(re.fullmatch(r"[a-f0-9]{24,64}", token))
+
+
 def _normalize_hint_list(values: List[str]) -> List[str]:
     return [str(v).strip().lower() for v in values if str(v).strip()]
 
@@ -294,15 +299,27 @@ def build_context_pack(query: str, results: List[Dict], acts_lookup: Dict[str, D
         parent_text = extra.get("parent_text") or ""
         section_text = extra.get("full_section_text") or ""
 
-        # Clean up titles: prefer document_id if the title is too long or messy
+        # Clean up titles with corpus-aware rules.
         raw_title = extra.get("title") or item.get("title")
         doc_id = item.get("document_id")
-        
-        # If title is suspiciously long (intro sentence) or missing, use doc_id
-        if doc_id and (not raw_title or len(raw_title) > 60 or "The following provisions" in raw_title):
-            display_title = doc_id
+
+        corpus = str(item.get("corpus") or "").strip().lower()
+
+        # For judgements, always prefer the retrieved case name.
+        # Avoid showing hash-like document IDs as authority names.
+        if corpus == "judgements":
+            if raw_title:
+                display_title = raw_title
+            elif doc_id and not _looks_like_hash(doc_id):
+                display_title = doc_id
+            else:
+                display_title = "Judgement (title unavailable)"
         else:
-            display_title = raw_title or "Legal Document"
+            # For acts, keep existing cleanup behavior.
+            if doc_id and (not raw_title or len(raw_title) > 60 or "The following provisions" in raw_title):
+                display_title = doc_id
+            else:
+                display_title = raw_title or "Legal Document"
 
         block = {
             "citation_id": cite_id,
