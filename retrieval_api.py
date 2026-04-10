@@ -9,7 +9,7 @@ import traceback
 import uuid
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Body, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -238,7 +238,7 @@ class SetPasswordRequest(BaseModel):
 
 
 class AccessUpdateRequest(BaseModel):
-    status: str = Field(..., regex="^(pending|granted|denied)$")
+    status: Literal["pending", "granted", "denied"]
     access_granted: bool
     review_notes: str = ""
 
