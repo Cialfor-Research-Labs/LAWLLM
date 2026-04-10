@@ -370,7 +370,7 @@ def build_direct_legal_prompt(user_query: str, legal_priors: str = "", citation_
         "Part 3 - Rule:\n"
         "Part 4 - Application:\n"
         "Part 5 - Conclusion:\n"
-        "Part 6 - Disclaimer:\n"
+        "Disclaimer:\n"
     )
 
 
@@ -417,7 +417,7 @@ def _build_fallback_prompt(user_query: str, legal_priors: str, citation_text: st
         "- Include procedural next steps and forum/authority\n\n"
         "Part 5 - Conclusion:\n"
         "- Give a clear legal conclusion and immediate action plan\n\n"
-        "Part 6 - Disclaimer:\n"
+        "Disclaimer:\n"
         "For information only. Consult a professional.\n"
     )
 
@@ -453,7 +453,7 @@ def _retry_prompt_for_general_info(user_query: str) -> str:
         "Part 3 - Rule,\n"
         "Part 4 - Application,\n"
         "Part 5 - Conclusion,\n"
-        "Part 6 - Disclaimer.\n"
+        "Disclaimer.\n"
         "Give general legal information and practical procedural guidance. Do not assist wrongdoing.\n\n"
         f"User question:\n{user_query}\n"
     )
@@ -1323,7 +1323,7 @@ def _build_context_grounded_fallback(user_query: str, context_blocks: List[Dict[
         f"{application}\n\n"
         "**Part 5 - Conclusion**\n"
         f"{conclusion}\n\n"
-        "**Part 6 - Disclaimer**\n"
+        "**Disclaimer**\n"
         "For information only. Consult a professional."
     )
 
@@ -1427,7 +1427,7 @@ def _bold_headings(answer: str) -> str:
         "Application": "Part 4 - Application",
         "Limits": "Part 5 - Conclusion",
         "Conclusion": "Part 5 - Conclusion",
-        "Disclaimer": "Part 6 - Disclaimer",
+        "Disclaimer": "Disclaimer",
         "Part 1 - Facts and Legal Issue": "Part 1 - Facts",
         "Part 1 - Acts, Sections and Judgements": "Part 3 - Rule",
         "Part 2 - Applicable Law": "Part 3 - Rule",
@@ -1435,9 +1435,9 @@ def _bold_headings(answer: str) -> str:
         "Part 3 - Analysis": "Part 4 - Application",
         "Part 3 - Limits": "Part 5 - Conclusion",
         "Part 4 - Remedies and Next Steps": "Part 4 - Application",
-        "Part 4 - Disclaimer": "Part 6 - Disclaimer",
+        "Part 4 - Disclaimer": "Disclaimer",
         "Part 5 - Limits": "Part 5 - Conclusion",
-        "Part 6 - Disclaimer": "Part 6 - Disclaimer",
+        "Part 6 - Disclaimer": "Disclaimer",
         "Part 1 - Facts": "Part 1 - Facts",
         "Part 2 - Issue": "Part 2 - Issue",
         "Part 3 - Rule": "Part 3 - Rule",
@@ -1522,7 +1522,7 @@ def _align_section_references(answer: str, context_blocks: List[Dict[str, Any]])
 
 def _dedupe_disclaimer(answer: str) -> str:
     answer = re.sub(r"(?ms)\n*---\n\*\*Part 6 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
-    answer = re.sub(r"(?ms)\n*---\n\*\*Disclaimer\*\*:\s*For information only\. Consult a professional\.\s*$", "", answer)
+    answer = re.sub(r"(?ms)\n*---\n\*\*Disclaimer\*\*\s*:?\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
     answer = re.sub(r"(?ms)\n*\*\*Part 6 - Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
     answer = re.sub(r"(?ms)\n*\*\*Disclaimer\*\*\s*\nFor information only\. Consult a professional\.\s*$", "", answer)
     answer = re.sub(r"(?ms)\n*Part 6 - Disclaimer:\s*For information only\. Consult a professional\.\s*$", "", answer)
@@ -1613,6 +1613,74 @@ def _format_next_steps_section(answer: str) -> str:
     return answer[:match.start()] + match.group(1) + numbered + "\n\n" + answer[match.end():]
 
 
+def _enforce_firac_layout(answer: str) -> str:
+    normalized = (answer or "").replace("\r\n", "\n").strip()
+    if not normalized:
+        return normalized
+
+    # Ensure Part headings start on their own line even if the model emits inline prose.
+    heading_token = r"(?:\*\*)?Part\s*[1-6]\s*-\s*(?:Facts|Issue|Rule|Application|Conclusion|Disclaimer)(?:\*\*)?"
+    normalized = re.sub(rf"(?<!\n)(?={heading_token})", "\n\n", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()
+
+    part_pattern = re.compile(
+        r"(?ims)(?:\*\*)?Part\s*([1-6])\s*-\s*(Facts|Issue|Rule|Application|Conclusion|Disclaimer)(?:\*\*)?\s*:?\s*"
+        r"(.*?)(?=(?:\n|\A)\s*(?:\*\*)?Part\s*[1-6]\s*-\s*(?:Facts|Issue|Rule|Application|Conclusion|Disclaimer)"
+        r"(?:\*\*)?\s*:?\s*|\Z)"
+    )
+
+    extracted: Dict[int, str] = {}
+    for match in part_pattern.finditer(normalized):
+        idx = int(match.group(1))
+        body = match.group(3).strip()
+        if idx not in extracted:
+            extracted[idx] = body
+        elif body:
+            extracted[idx] = (extracted[idx] + "\n" + body).strip()
+
+    if not extracted:
+        return normalized
+
+    # Backfill from legacy parser if any part was not captured by the strict regex.
+    parsed = _parse_answer_sections(normalized)
+    fallback = {
+        1: parsed.get("facts", ""),
+        2: parsed.get("issue", ""),
+        3: parsed.get("rule", ""),
+        4: parsed.get("application", ""),
+        5: parsed.get("conclusion", ""),
+        6: parsed.get("disclaimer", ""),
+    }
+    for idx in range(1, 7):
+        if idx not in extracted and fallback.get(idx):
+            extracted[idx] = fallback[idx].strip()
+
+    if not any(extracted.get(i, "").strip() for i in range(1, 7)):
+        return normalized
+
+    ordered_headings = {
+        1: "Part 1 - Facts",
+        2: "Part 2 - Issue",
+        3: "Part 3 - Rule",
+        4: "Part 4 - Application",
+        5: "Part 5 - Conclusion",
+        6: "Disclaimer",
+    }
+
+    parts: List[str] = []
+    for idx in range(1, 7):
+        body = (extracted.get(idx) or "").strip()
+        if not body and idx == 6:
+            body = "For information only. Consult a professional."
+        if not body:
+            continue
+        parts.append(f"**{ordered_headings[idx]}**\n{body}")
+
+    if not parts:
+        return normalized
+    return "\n\n".join(parts).strip()
+
+
 def format_final_answer(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
     formatted = _remove_existing_disclaimer_sections(answer)
     formatted = _normalize_markdown_layout(formatted)
@@ -1624,8 +1692,9 @@ def format_final_answer(answer: str, context_blocks: List[Dict[str, Any]]) -> st
     formatted = _rebuild_applicable_law(formatted, context_blocks)
     formatted = _normalize_heading_breaks(formatted)
     formatted = _format_next_steps_section(formatted)
-    formatted = re.sub(r"(?m)^Disclaimer\s+(?=For information only\.)", "**Part 6 - Disclaimer**\n", formatted)
-    formatted = re.sub(r"(?m)^Part 6 - Disclaimer\s*:\s*$", "**Part 6 - Disclaimer**", formatted)
+    formatted = _enforce_firac_layout(formatted)
+    formatted = re.sub(r"(?m)^Disclaimer\s+(?=For information only\.)", "**Disclaimer**\n", formatted)
+    formatted = re.sub(r"(?m)^Part 6 - Disclaimer\s*:?\s*$", "**Disclaimer**", formatted)
     formatted = _dedupe_disclaimer(formatted)
     formatted = re.sub(r"\n{3,}", "\n\n", formatted).strip()
     return formatted
@@ -1673,7 +1742,7 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
         },
     }
 
-    final_answer = format_final_answer(answer, [context_block]) + "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
+    final_answer = format_final_answer(answer, [context_block]) + "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
 
     return QueryResponse(
         ok=True,
@@ -1799,7 +1868,7 @@ def query(payload: QueryRequest) -> QueryResponse:
                     prompt=_retry_prompt_for_general_info(user_query),
                     timeout_sec=payload.llm_timeout_sec,
                 )
-            disclaimer = "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
+            disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
             final_answer = answer.strip() + disclaimer
 
             SESSIONS[s_id].append({"role": "user", "content": user_query})
@@ -1962,7 +2031,7 @@ def query(payload: QueryRequest) -> QueryResponse:
 
             # PHASE 3: Mode-aware styling
             answer = apply_confidence_styling(answer.strip(), conf_score, retrieval_mode)
-            disclaimer = "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
+            disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
             final_answer = answer + disclaimer
 
             append_query_log(
@@ -2141,7 +2210,7 @@ def query(payload: QueryRequest) -> QueryResponse:
         answer = apply_confidence_styling(answer, conf_score, retrieval_mode)
 
         # 🤝 Safe Return
-        disclaimer = "\n\n---\n**Part 6 - Disclaimer**\nFor information only. Consult a professional."
+        disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
         final_answer = format_final_answer(answer, context_blocks) + disclaimer
         append_query_log(
             {
