@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import sqlite3
+import subprocess
 import traceback
 import uuid
 from datetime import datetime, timedelta
@@ -97,6 +98,8 @@ SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
 PASSWORD_SETUP_TOKEN_TTL_HOURS = int(os.getenv("PASSWORD_SETUP_TOKEN_TTL_HOURS", "48"))
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
 PASSWORD_HASH_ITERATIONS = 120_000
+MAILER_NODE_BIN = os.getenv("MAILER_NODE_BIN", "node")
+MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join("ui", "scripts", "send_setup_email.cjs"))
 _DOTENV_CACHE: Optional[Dict[str, str]] = None
 
 
@@ -127,6 +130,61 @@ def _get_env_with_dotenv_fallback(key: str, default: Optional[str] = None) -> Op
     if value is not None:
         return value
     return _load_dotenv_cache().get(key, default)
+
+
+def _send_setup_link_email(recipient_email: str, recipient_name: str, setup_url: str) -> None:
+    smtp_host = (_get_env_with_dotenv_fallback("SMTP_HOST", "") or "").strip()
+    smtp_port = (_get_env_with_dotenv_fallback("SMTP_PORT", "587") or "587").strip()
+    smtp_user = (_get_env_with_dotenv_fallback("SMTP_USER", "") or "").strip()
+    smtp_pass = (_get_env_with_dotenv_fallback("SMTP_PASS", "") or "").strip()
+    smtp_from = (_get_env_with_dotenv_fallback("SMTP_FROM", smtp_user) or "").strip()
+    smtp_secure = (_get_env_with_dotenv_fallback("SMTP_SECURE", "false") or "false").strip().lower()
+
+    missing = []
+    if not smtp_host:
+        missing.append("SMTP_HOST")
+    if not smtp_user:
+        missing.append("SMTP_USER")
+    if not smtp_pass:
+        missing.append("SMTP_PASS")
+    if not smtp_from:
+        missing.append("SMTP_FROM")
+    if missing:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Email configuration missing: {', '.join(missing)}",
+        )
+
+    script_abs = os.path.abspath(MAILER_SCRIPT_PATH)
+    script_dir = os.path.dirname(script_abs)
+    script_file = os.path.basename(script_abs)
+    if not os.path.exists(script_abs):
+        raise HTTPException(status_code=500, detail=f"Mailer script not found: {script_abs}")
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "SMTP_HOST": smtp_host,
+            "SMTP_PORT": smtp_port,
+            "SMTP_USER": smtp_user,
+            "SMTP_PASS": smtp_pass,
+            "SMTP_FROM": smtp_from,
+            "SMTP_SECURE": smtp_secure,
+        }
+    )
+
+    proc = subprocess.run(
+        [MAILER_NODE_BIN, script_file, recipient_email, recipient_name or "User", setup_url],
+        cwd=script_dir,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    if proc.returncode != 0:
+        stderr = (proc.stderr or proc.stdout or "").strip()
+        raise HTTPException(status_code=500, detail=f"Failed to send setup email: {stderr or 'unknown error'}")
 
 DOMAIN_FORBIDDEN_QUESTION_TERMS: Dict[str, List[str]] = {
     "labour": ["landlord", "rent", "property"],
@@ -2574,6 +2632,8 @@ def admin_generate_password_setup_link(
 
         raw_token = secrets.token_urlsafe(48)
         expires_at = _utc_iso_after_hours(PASSWORD_SETUP_TOKEN_TTL_HOURS)
+        setup_url = f"{FRONTEND_BASE_URL}/?setup_token={raw_token}"
+        _send_setup_link_email(str(user_row["email"]), str(user_row["name"]), setup_url)
         conn.execute(
             """
             INSERT INTO password_setup_tokens
@@ -2584,7 +2644,6 @@ def admin_generate_password_setup_link(
         )
         conn.commit()
 
-    setup_url = f"{FRONTEND_BASE_URL}/?setup_token={raw_token}"
     return PasswordSetupLinkResponse(ok=True, setup_url=setup_url, expires_at=expires_at)
 
 

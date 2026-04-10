@@ -132,7 +132,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
       }
       const data = await res.json();
       setSetupLinks((prev) => ({ ...prev, [user.id]: data.setup_url }));
-      setMessage(`Password setup link generated for ${user.email}`);
+      setMessage(`Password setup link generated and email sent to ${user.email}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     }
@@ -306,4 +306,3 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
     </div>
   );
 };
-
