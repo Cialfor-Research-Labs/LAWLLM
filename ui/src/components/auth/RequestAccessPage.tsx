@@ -6,7 +6,8 @@ interface RequestAccessPageProps {
 }
 
 export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageProps) => {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [organization, setOrganization] = useState('');
   const [useCase, setUseCase] = useState('');
@@ -24,7 +25,8 @@ export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
           email: email.trim(),
           organization: organization.trim(),
           use_case: useCase.trim(),
@@ -35,7 +37,8 @@ export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageP
         throw new Error(data.detail || `Request failed (${res.status})`);
       }
       setMessage(data.message || 'Access request submitted.');
-      setName('');
+      setFirstName('');
+      setLastName('');
       setEmail('');
       setOrganization('');
       setUseCase('');
@@ -56,14 +59,25 @@ export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageP
         {message && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div>}
 
         <form onSubmit={submit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-1">Name</label>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-1">First Name</label>
+              <input
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-1">Last Name</label>
+              <input
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -79,6 +93,7 @@ export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageP
             <div>
               <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-1">Organization</label>
               <input
+                required
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
                 className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
@@ -112,4 +127,3 @@ export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageP
     </div>
   );
 };
-

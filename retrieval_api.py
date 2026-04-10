@@ -221,9 +221,10 @@ class LawyerModeResponse(BaseModel):
 
 
 class RequestAccessRequest(BaseModel):
-    name: str = Field(..., min_length=2)
+    first_name: str = Field(..., min_length=1)
+    last_name: str = Field(..., min_length=1)
     email: str = Field(..., min_length=5)
-    organization: str = ""
+    organization: str = Field(..., min_length=1)
     use_case: str = Field(..., min_length=5)
 
 
@@ -2266,9 +2267,18 @@ def _build_query_act_response(user_query: str, results: List[Any], reasoning: Li
 
 @app.post("/auth/request-access", response_model=RequestAccessResponse)
 def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
+    first_name = payload.first_name.strip()
+    last_name = payload.last_name.strip()
+    organization = payload.organization.strip()
+    use_case = payload.use_case.strip()
     email = payload.email.strip().lower()
+
+    if not first_name or not last_name or not organization or not use_case:
+        raise HTTPException(status_code=400, detail="All request access fields are required.")
     if "@" not in email:
         raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    full_name = f"{first_name} {last_name}".strip()
 
     now = _utc_now_iso()
     with _db_conn() as conn:
@@ -2290,9 +2300,9 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
                 WHERE id = ?
                 """,
                 (
-                    payload.name.strip(),
-                    payload.organization.strip(),
-                    payload.use_case.strip(),
+                    full_name,
+                    organization,
+                    use_case,
                     target_status,
                     target_access,
                     now,
@@ -2309,10 +2319,10 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
                 VALUES (?, ?, ?, ?, 'user', 'pending', 0, NULL, ?, ?)
                 """,
                 (
-                    payload.name.strip(),
+                    full_name,
                     email,
-                    payload.organization.strip(),
-                    payload.use_case.strip(),
+                    organization,
+                    use_case,
                     now,
                     now,
                 ),
@@ -2329,10 +2339,10 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
             """,
             (
                 user_id,
-                payload.name.strip(),
+                full_name,
                 email,
-                payload.organization.strip(),
-                payload.use_case.strip(),
+                organization,
+                use_case,
                 final_status,
                 now,
             ),
