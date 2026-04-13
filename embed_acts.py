@@ -4,14 +4,14 @@ embed_acts.py — Production-grade embedding, indexing & retrieval pipeline for 
 
 Pipeline (build mode):
   1. Reads structured JSON acts from a directory
-  2. Generates embeddings using BAAI/bge-base-en-v1.5
+  2. Generates embeddings using BAAI/bge-m3
   3. Stores vectors in FAISS (IndexIVFFlat for scalability)
   4. Stores metadata in SQLite with multi-field FTS5 for BM25 retrieval
   5. Maintains PERFECT alignment: FAISS vector position == SQLite row id
 
 Retrieval (search mode):
   6. Hybrid search (FAISS + BM25) with score fusion
-  7. Cross-encoder reranking (BAAI/bge-reranker-base)
+  7. Cross-encoder reranking (BAAI/bge-reranker-large)
   8. Section-level context reconstruction
   9. Hard validation with accuracy metrics
 """
@@ -39,12 +39,15 @@ from query_expansion import build_query as expand_query_full
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-MODEL_NAME = "BAAI/bge-large-en-v1.5"
+MODEL_NAME = "BAAI/bge-m3"
 RERANKER_MODEL = "BAAI/bge-reranker-large"
 EMBEDDING_DIM = 1024
 BATCH_SIZE = 16
-DOC_PREFIX = "Represent this legal passage for retrieval: "
-QUERY_PREFIX = "Represent this legal query for retrieving relevant passages: "
+# bge-m3 generally performs better on long, structured retrieval corpora and
+# mixed legal/citation style queries. Unlike the older bge v1.5 setup, it
+# does not benefit from custom "Represent this..." prefixes here.
+DOC_PREFIX = ""
+QUERY_PREFIX = ""
 
 # RRF constant (higher k = smoother blending)
 RRF_K = 60
@@ -159,11 +162,15 @@ def load_data(json_dir: str) -> List[Dict]:
         doc = data.get("document", {})
         document_id = doc.get("document_id", jf.stem)
         title = doc.get("title", document_id)
+        aliases = doc.get("aliases") or []
+        alias_text = " | ".join(str(alias).strip() for alias in aliases if str(alias).strip())
 
         sections = data.get("sections", [])
         for section in sections:
             sec_number = str(section.get("section_number", ""))
             sec_title = section.get("section_title", "")
+            chapter_number = str(section.get("chapter_number", "") or "").strip()
+            chapter_title = str(section.get("chapter_title", "") or "").strip()
             units = section.get("units", [])
 
             if not units:
@@ -178,9 +185,14 @@ def load_data(json_dir: str) -> List[Dict]:
                         {
                             "document_id": document_id,
                             "title": title,
+                            "aliases": alias_text,
+                            "chapter_number": chapter_number,
+                            "chapter_title": chapter_title,
                             "section_number": sec_number,
                             "section_title": sec_title,
                             "context_path": f"Section {sec_number}" if sec_number else "",
+                            "unit_type": "section",
+                            "unit_label": sec_number,
                             "chunk_id": f"{document_id}_S{sec_number}_FULL",
                             "chunk_index": chunk_index,
                             "chunk_text": " ".join(section_text.split()),
@@ -207,9 +219,14 @@ def load_data(json_dir: str) -> List[Dict]:
                     {
                         "document_id": document_id,
                         "title": title,
+                        "aliases": alias_text,
+                        "chapter_number": chapter_number,
+                        "chapter_title": chapter_title,
                         "section_number": sec_number,
                         "section_title": sec_title,
                         "context_path": unit.get("context_path", ""),
+                        "unit_type": unit.get("unit_type", ""),
+                        "unit_label": unit.get("label", ""),
                         "chunk_id": unit.get("unit_id", ""),
                         "chunk_index": chunk_index,
                         "chunk_text": text,
@@ -255,11 +272,25 @@ def build_embeddings(
 
     texts: List[str] = []
     for ch in chunks:
-        # PRIORITY 5: Include context_path for richer embeddings
+        chapter_line = ""
+        if ch.get("chapter_number") or ch.get("chapter_title"):
+            chapter_line = (
+                f"Chapter {ch.get('chapter_number', '')}: {ch.get('chapter_title', '')}".strip(": ")
+                + "\n"
+            )
+        alias_line = f"Aliases: {ch.get('aliases')}\n" if ch.get("aliases") else ""
+        unit_line = ""
+        if ch.get("unit_type") or ch.get("unit_label"):
+            unit_line = f"Unit {ch.get('unit_type', '')}: {ch.get('unit_label', '')}\n"
+
+        # PRIORITY 5: Include legal hierarchy for richer embeddings
         enriched = (
             f"{ch['title']}\n"
+            f"{alias_line}"
+            f"{chapter_line}"
             f"{ch['context_path']}\n"
             f"Section {ch['section_number']}: {ch['section_title']}\n"
+            f"{unit_line}"
             f"{ch['chunk_text']}"
         )
         doc_text = DOC_PREFIX + enriched
@@ -389,9 +420,14 @@ def build_sqlite(chunks: List[Dict], output_path: str) -> None:
             id            INTEGER PRIMARY KEY,
             document_id   TEXT,
             title         TEXT,
+            aliases       TEXT,
+            chapter_number TEXT,
+            chapter_title TEXT,
             section_number TEXT,
             section_title TEXT,
             context_path  TEXT,
+            unit_type     TEXT,
+            unit_label    TEXT,
             chunk_id      TEXT,
             chunk_index   INTEGER,
             chunk_text    TEXT
@@ -404,10 +440,13 @@ def build_sqlite(chunks: List[Dict], output_path: str) -> None:
         """
         CREATE VIRTUAL TABLE docs_fts USING fts5(
             chunk_text,
+            aliases,
+            chapter_title,
             section_title,
             section_number,
             title,
             context_path,
+            unit_type,
             content='docs',
             content_rowid='id',
             tokenize='unicode61'
@@ -427,9 +466,14 @@ def build_sqlite(chunks: List[Dict], output_path: str) -> None:
                 idx,  # id == FAISS vector position
                 ch["document_id"],
                 ch["title"],
+                ch.get("aliases"),
+                ch.get("chapter_number"),
+                ch.get("chapter_title"),
                 ch["section_number"],
                 ch["section_title"],
                 ch["context_path"],
+                ch.get("unit_type"),
+                ch.get("unit_label"),
                 ch["chunk_id"],
                 ch["chunk_index"],
                 ch["chunk_text"],
@@ -438,10 +482,11 @@ def build_sqlite(chunks: List[Dict], output_path: str) -> None:
         if len(rows) >= batch_size:
             cur.executemany(
                 """
-                INSERT INTO docs(id, document_id, title, section_number,
-                                 section_title, context_path, chunk_id,
+                INSERT INTO docs(id, document_id, title, aliases, chapter_number,
+                                 chapter_title, section_number, section_title,
+                                 context_path, unit_type, unit_label, chunk_id,
                                  chunk_index, chunk_text)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows,
             )
@@ -451,10 +496,11 @@ def build_sqlite(chunks: List[Dict], output_path: str) -> None:
     if rows:
         cur.executemany(
             """
-            INSERT INTO docs(id, document_id, title, section_number,
-                             section_title, context_path, chunk_id,
+            INSERT INTO docs(id, document_id, title, aliases, chapter_number,
+                             chapter_title, section_number, section_title,
+                             context_path, unit_type, unit_label, chunk_id,
                              chunk_index, chunk_text)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -463,8 +509,14 @@ def build_sqlite(chunks: List[Dict], output_path: str) -> None:
     # --- PRIORITY 1: Populate multi-field FTS5 index ---
     cur.execute(
         """
-        INSERT INTO docs_fts(rowid, chunk_text, section_title, section_number, title, context_path)
-        SELECT id, chunk_text, section_title, section_number, title, context_path FROM docs
+        INSERT INTO docs_fts(
+            rowid, chunk_text, aliases, chapter_title, section_title,
+            section_number, title, context_path, unit_type
+        )
+        SELECT
+            id, chunk_text, aliases, chapter_title, section_title,
+            section_number, title, context_path, unit_type
+        FROM docs
         """
     )
 
@@ -547,8 +599,9 @@ def fetch_docs(conn: sqlite3.Connection, ids: List[int]) -> Dict[int, Dict]:
     cur = conn.cursor()
     cur.execute(
         f"""
-        SELECT id, document_id, title, section_number, section_title,
-               context_path, chunk_id, chunk_index, chunk_text
+        SELECT id, document_id, title, aliases, chapter_number, chapter_title,
+               section_number, section_title, context_path, unit_type,
+               unit_label, chunk_id, chunk_index, chunk_text
         FROM docs
         WHERE id IN ({placeholders})
         """,
@@ -560,12 +613,17 @@ def fetch_docs(conn: sqlite3.Connection, ids: List[int]) -> Dict[int, Dict]:
             "id": int(row[0]),
             "document_id": row[1],
             "title": row[2],
-            "section_number": row[3],
-            "section_title": row[4],
-            "context_path": row[5],
-            "chunk_id": row[6],
-            "chunk_index": row[7],
-            "chunk_text": row[8],
+            "aliases": row[3],
+            "chapter_number": row[4],
+            "chapter_title": row[5],
+            "section_number": row[6],
+            "section_title": row[7],
+            "context_path": row[8],
+            "unit_type": row[9],
+            "unit_label": row[10],
+            "chunk_id": row[11],
+            "chunk_index": row[12],
+            "chunk_text": row[13],
         }
     return results
 
@@ -729,9 +787,20 @@ def rerank(
     t0 = time.time()
     pairs = []
     for ch in candidate_chunks:
+        chapter_line = ""
+        if ch.get("chapter_number") or ch.get("chapter_title"):
+            chapter_line = (
+                f"Chapter {ch.get('chapter_number', '')}: {ch.get('chapter_title', '')}".strip(": ")
+                + "\n"
+            )
+        unit_line = ""
+        if ch.get("unit_type") or ch.get("unit_label"):
+            unit_line = f"Unit {ch.get('unit_type', '')}: {ch.get('unit_label', '')}\n"
         enriched = (
             f"{ch.get('title', '')}\n"
+            f"{chapter_line}"
             f"Section {ch.get('section_number', '')}: {ch.get('section_title', '')}\n"
+            f"{unit_line}"
             f"{ch.get('chunk_text', '')}"
         )
         pairs.append([query, enriched])
