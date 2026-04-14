@@ -13,7 +13,7 @@ import numpy as np
 from sentence_transformers import CrossEncoder, SentenceTransformer
 
 
-MODEL_NAME = "BAAI/bge-large-en-v1.5"
+MODEL_NAME = "BAAI/bge-m3"
 EMBEDDING_DIM = 1024
 BGE_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-2-v2"
 
@@ -42,14 +42,14 @@ CORPORA: Dict[str, CorpusConfig] = {
     "acts": CorpusConfig(
         name="acts",
         embeddings_dir="embedding_acts",
-        model_name="BAAI/bge-large-en-v1.5",
-        dim=1024
+        model_name=MODEL_NAME,
+        dim=EMBEDDING_DIM
     ),
     "judgements": CorpusConfig(
         name="judgements",
         embeddings_dir="embedding_judgements",
-        model_name="BAAI/bge-large-en-v1.5",
-        dim=1024
+        model_name=MODEL_NAME,
+        dim=EMBEDDING_DIM
     ),
 }
 
