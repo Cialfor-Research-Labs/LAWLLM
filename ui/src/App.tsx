@@ -44,6 +44,14 @@ interface GeneratorHistoryItem {
   preview?: string;
 }
 
+const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
+const ALLOWED_TABS = new Set(['chat', 'generator', 'analyzer', 'predictor', 'admin']);
+
+function getInitialActiveTab(): string {
+  const stored = (localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || '').trim().toLowerCase();
+  return ALLOWED_TABS.has(stored) ? stored : 'generator';
+}
+
 function getApiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -61,7 +69,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('setup_token') ? 'set_password' : 'login';
   });
-  const [activeTab, setActiveTab] = useState('generator');
+  const [activeTab, setActiveTab] = useState<string>(() => getInitialActiveTab());
   const [setupToken, setSetupToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get('setup_token'));
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const [generatorHistory, setGeneratorHistory] = useState<GeneratorHistoryItem[]>([]);
@@ -102,6 +110,12 @@ export default function App() {
       setActiveTab('generator');
     }
   }, [currentUser, activeTab]);
+
+  useEffect(() => {
+    if (ALLOWED_TABS.has(activeTab)) {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+    }
+  }, [activeTab]);
 
   const onLoginSuccess = (token: string, user: AuthUser) => {
     localStorage.setItem('vidhi_auth_token', token);
