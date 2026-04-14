@@ -46,7 +46,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('setup_token') ? 'set_password' : 'login';
   });
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState('generator');
   const [setupToken, setSetupToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get('setup_token'));
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser?.role !== 'admin' && activeTab === 'admin') {
-      setActiveTab('chat');
+      setActiveTab('generator');
     }
   }, [currentUser, activeTab]);
 
@@ -84,6 +84,7 @@ export default function App() {
     localStorage.setItem('vidhi_auth_token', token);
     setAuthToken(token);
     setCurrentUser(user);
+    setActiveTab('generator');
     setAuthView('login');
   };
 
@@ -101,7 +102,7 @@ export default function App() {
     localStorage.removeItem('vidhi_auth_token');
     setAuthToken(null);
     setCurrentUser(null);
-    setActiveTab('chat');
+    setActiveTab('generator');
     setAuthView('login');
   };
 
