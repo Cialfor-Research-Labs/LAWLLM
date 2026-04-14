@@ -1273,6 +1273,17 @@ def _is_security_deposit_tenancy_query(user_query: str, structured_query: Dict[s
     return all(required_groups)
 
 
+def _is_cyber_it_act_query(user_query: str, structured_query: Dict[str, Any]) -> bool:
+    q = (user_query or "").lower()
+    cyber_terms = [
+        "cyber", "online fraud", "otp", "phishing", "hacking", "hacked",
+        "data breach", "identity theft", "fake profile", "ransomware",
+        "upi fraud", "bank otp", "sim swap", "whatsapp fraud",
+    ]
+    it_markers = ["it act", "information technology act", "ita 2000", "section 66", "section 67", "section 43"]
+    return any(term in q for term in cyber_terms) or any(marker in q for marker in it_markers)
+
+
 def _deterministic_retrieval_queries(user_query: str, structured_query: Dict[str, Any]) -> List[str]:
     q = " ".join((user_query or "").split())
     if _is_security_deposit_tenancy_query(user_query, structured_query):
@@ -1281,6 +1292,14 @@ def _deterministic_retrieval_queries(user_query: str, structured_query: Dict[str
             "landlord refusing return of security deposit tenant remedy india",
             "lease security deposit refund breach of contract india",
             "tenant legal notice for security deposit recovery india",
+            q,
+        ][:MAX_RETRIEVAL_QUERIES]
+    if _is_cyber_it_act_query(user_query, structured_query):
+        return [
+            "Information Technology Act cyber offence india",
+            "IT Act phishing otp fraud online cheating india",
+            "cyber crime unauthorized access data breach Information Technology Act",
+            "identity theft fake profile online fraud IT Act india",
             q,
         ][:MAX_RETRIEVAL_QUERIES]
     return []
@@ -1417,6 +1436,28 @@ def generate_relevant_laws(
             for hint in GENERIC_STATE_RENT_HINTS:
                 if hint not in [x.lower() for x in disallowed_law_hints]:
                     disallowed_law_hints.append(hint)
+
+    if _is_cyber_it_act_query(user_query, structured_query):
+        relevant_keys = [_canonical_law_key(x) for x in relevant_laws]
+        preferred_keys = [_canonical_law_key(x) for x in preferred_laws]
+
+        cyber_laws = [
+            "information technology act",
+            "bharatiya nyaya sanhita",
+            "bharatiya nagrik suraksha sanhita",
+        ]
+        for law in cyber_laws:
+            if law not in relevant_keys:
+                relevant_laws.append(law)
+                relevant_keys.append(law)
+        if "information technology act" not in preferred_keys:
+            preferred_laws.insert(0, "information technology act")
+            preferred_keys.insert(0, "information technology act")
+
+        # Cyber queries should not drift into unrelated civil statutes.
+        for hint in ["transfer of property act", "specific relief act", "consumer protection act"]:
+            if hint not in [x.lower() for x in disallowed_law_hints]:
+                disallowed_law_hints.append(hint)
 
     return {
         "relevant_laws": relevant_laws[:8],
@@ -2851,7 +2892,11 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
 
         # --- STEP 2: Rule-Based Metadata Filtering ---
         domain_filter = None
-        filter_keywords = {"theft", "stole", "murder", "kill", "rape", "assault", "robbery", "police", "fir", "arrest", "bail", "cheating"}
+        filter_keywords = {
+            "theft", "stole", "murder", "kill", "rape", "assault", "robbery", "police", "fir", "arrest", "bail", "cheating",
+            "cyber", "online fraud", "otp", "phishing", "hacking", "hacked", "data breach", "identity theft", "upi fraud",
+            "sim swap", "fake profile", "ransomware", "whatsapp fraud",
+        }
         if any(w in user_query.lower() for w in filter_keywords):
             domain_filter = "criminal"
             reasoning.append("Metadata Filter applied: Domain = Criminal")

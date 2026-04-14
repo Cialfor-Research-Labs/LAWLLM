@@ -27,6 +27,8 @@ DOMAIN_KEYWORDS: Dict[str, List[str]] = {
     "criminal": [
         "fir", "police", "arrest", "bail", "murder", "assault", "cheating",
         "theft", "forgery", "criminal", "offence", "offense",
+        "cyber", "online fraud", "phishing", "otp", "hacking", "hacked",
+        "data breach", "identity theft", "ransomware", "fake profile",
     ],
     "labour": [
         "salary", "wages", "termination", "dismissal", "employee", "employer",
@@ -53,6 +55,8 @@ DOMAIN_SOURCE_HINTS: Dict[str, List[str]] = {
         "bhartiya nyay sanhita",
         "bhartiya nagrik suraksha sanhita",
         "bhartiya sakshya adhiniyam",
+        "information technology act",
+        "it act",
         "indian penal code",
         "criminal procedure code",
         "indian evidence act",
@@ -141,7 +145,10 @@ SUBDOMAIN_PRIORS: Dict[str, str] = {
 DOMAIN_MUST_HAVE_TERMS: Dict[str, List[str]] = {
     "consumer": ["consumer", "refund", "defect", "deficiency", "unfair trade practice", "seller", "service"],
     "property": ["property", "tenant", "landlord", "eviction", "possession", "lease"],
-    "criminal": ["fir", "police", "offence", "offense", "arrest", "bail", "cheating", "theft", "stole", "robbery"],
+    "criminal": [
+        "fir", "police", "offence", "offense", "arrest", "bail", "cheating", "theft", "stole", "robbery",
+        "cyber", "phishing", "otp", "hacking", "online fraud", "identity theft",
+    ],
     "labour": ["employee", "employer", "wages", "termination", "industrial dispute"],
     "contract": ["contract", "agreement", "breach", "damages", "specific performance"],
 }
@@ -168,6 +175,8 @@ DOMAIN_ALLOWED_SOURCE_HINTS: Dict[str, List[str]] = {
         "bhartiya nyay sanhita",
         "bhartiya nagrik suraksha sanhita",
         "bhartiya sakshya adhiniyam",
+        "information technology act",
+        "it act",
         "indian penal code",
         "criminal procedure code",
         "indian evidence act",
