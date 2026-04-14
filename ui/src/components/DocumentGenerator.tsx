@@ -38,6 +38,34 @@ interface NoticeResponse {
 
 type Tone = 'firm' | 'aggressive' | 'polite';
 
+interface GeneratorFormSnapshot {
+  senderName: string;
+  receiverName: string;
+  relationship: string;
+  facts: string[];
+  claim: string;
+  noticeType: string;
+  tone: Tone;
+  deadline: number | '';
+  customRelief: string;
+}
+
+interface GeneratorHistoryItem {
+  id: string;
+  title: string;
+  created_at: string;
+  preview: string;
+  form: GeneratorFormSnapshot;
+  result: NoticeResponse;
+}
+
+interface DocumentGeneratorProps {
+  authToken: string;
+  openHistoryRequest?: { id: string; nonce: number } | null;
+  onHistoryChange?: (items: Array<{ id: string; title: string; created_at: string; preview?: string }>) => void;
+  onActiveHistoryChange?: (id: string | null) => void;
+}
+
 // ---- API ----
 
 function getApiBase(): string {
@@ -73,9 +101,17 @@ const CONFIDENCE_COLORS: Record<string, string> = {
   very_low: 'text-rose-700 bg-rose-50 border-rose-200',
 };
 
+const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
+const GENERATOR_HISTORY_LIMIT = 40;
+
 // ---- Component ----
 
-export const DocumentGenerator = ({ authToken }: { authToken: string }) => {
+export const DocumentGenerator = ({
+  authToken,
+  openHistoryRequest,
+  onHistoryChange,
+  onActiveHistoryChange,
+}: DocumentGeneratorProps) => {
   const apiBase = useMemo(() => getApiBase(), []);
   const authHeaders = useMemo(
     () => ({
@@ -103,6 +139,8 @@ export const DocumentGenerator = ({ authToken }: { authToken: string }) => {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>([]);
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
 
   // Fetch notice types on mount
   useEffect(() => {
@@ -148,6 +186,89 @@ export const DocumentGenerator = ({ authToken }: { authToken: string }) => {
     return () => clearInterval(interval);
   }, []);
 
+  const toHistorySummary = (items: GeneratorHistoryItem[]) =>
+    items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      created_at: item.created_at,
+      preview: item.preview,
+    }));
+
+  const applyHistoryItem = (item: GeneratorHistoryItem) => {
+    setSenderName(item.form.senderName);
+    setReceiverName(item.form.receiverName);
+    setRelationship(item.form.relationship);
+    setFacts(item.form.facts?.length ? item.form.facts : ['']);
+    setClaim(item.form.claim);
+    setNoticeType(item.form.noticeType || 'auto');
+    setTone(item.form.tone || 'firm');
+    setDeadline(item.form.deadline ?? '');
+    setCustomRelief(item.form.customRelief || '');
+    setResult(item.result);
+    setError('');
+    setActiveHistoryId(item.id);
+  };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(GENERATOR_HISTORY_KEY);
+      if (!raw) {
+        setHistoryItems([]);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const normalized = parsed.filter(Boolean) as GeneratorHistoryItem[];
+        setHistoryItems(normalized);
+      }
+    } catch {
+      setHistoryItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(GENERATOR_HISTORY_KEY, JSON.stringify(historyItems));
+    onHistoryChange?.(toHistorySummary(historyItems));
+  }, [historyItems, onHistoryChange]);
+
+  useEffect(() => {
+    onActiveHistoryChange?.(activeHistoryId);
+  }, [activeHistoryId, onActiveHistoryChange]);
+
+  useEffect(() => {
+    if (!openHistoryRequest?.id) return;
+    const target = historyItems.find((item) => item.id === openHistoryRequest.id);
+    if (!target) return;
+    applyHistoryItem(target);
+  }, [openHistoryRequest, historyItems]);
+
+  const pushHistoryItem = (generated: NoticeResponse) => {
+    const snapshot: GeneratorFormSnapshot = {
+      senderName,
+      receiverName,
+      relationship,
+      facts,
+      claim,
+      noticeType,
+      tone,
+      deadline,
+      customRelief,
+    };
+    const createdAt = new Date().toISOString();
+    const titleBase = claim.trim() || generated.notice_type_label || 'Generated Legal Notice';
+    const item: GeneratorHistoryItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: titleBase.length > 72 ? `${titleBase.slice(0, 69)}...` : titleBase,
+      created_at: createdAt,
+      preview: generated.notice.slice(0, 120).replace(/\s+/g, ' ').trim(),
+      form: snapshot,
+      result: generated,
+    };
+    const next = [item, ...historyItems].slice(0, GENERATOR_HISTORY_LIMIT);
+    setHistoryItems(next);
+    setActiveHistoryId(item.id);
+  };
+
   const addFact = () => setFacts((prev) => [...prev, '']);
   const removeFact = (index: number) => setFacts((prev) => prev.filter((_, i) => i !== index));
   const updateFact = (index: number, value: string) =>
@@ -188,6 +309,7 @@ export const DocumentGenerator = ({ authToken }: { authToken: string }) => {
       if (!response.ok) throw new Error(`Server responded with ${response.status}`);
       const data: NoticeResponse = await response.json();
       setResult(data);
+      pushHistoryItem(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to generate notice');
     } finally {
@@ -225,6 +347,7 @@ export const DocumentGenerator = ({ authToken }: { authToken: string }) => {
     setCustomRelief('');
     setResult(null);
     setError('');
+    setActiveHistoryId(null);
   };
 
   const selectedTypeLabel = noticeType === 'auto'

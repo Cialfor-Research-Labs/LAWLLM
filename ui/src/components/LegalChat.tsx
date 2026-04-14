@@ -4,13 +4,11 @@ import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import { 
   CheckCircle2, 
-  History,
   Loader2, 
   RotateCcw, 
   Scale, 
   Send, 
   Sparkles, 
-  Trash2,
   User, 
   FileText, 
   TrendingUp 
@@ -153,6 +151,13 @@ const DEFAULT_GREETING =
 
 const RESET_GREETING = 'Legal Interview reset. Describe your situation to begin a new case assessment.';
 
+interface LegalChatProps {
+    authToken: string;
+    openSessionRequest?: { sessionId: string; nonce: number } | null;
+    onChatSessionsChange?: (sessions: ChatSessionSummary[]) => void;
+    onActiveSessionChange?: (sessionId: string | null) => void;
+}
+
 function getApiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -213,7 +218,12 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 }
 
 
-export const LegalChat = ({ authToken }: { authToken: string }) => {
+export const LegalChat = ({
+    authToken,
+    openSessionRequest,
+    onChatSessionsChange,
+    onActiveSessionChange,
+}: LegalChatProps) => {
     const apiBase = useMemo(() => getApiBase(), []);
     const authHeaders = useMemo(
         () => ({
@@ -231,8 +241,6 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-    const [isSessionSwitching, setIsSessionSwitching] = useState(false);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [chatSessions, setChatSessions] = useState<ChatSessionSummary[]>([]);
     const [legalOutput, setLegalOutput] = useState<LegalOutput | null>(null);
@@ -252,7 +260,6 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
     }, [messages, isLoading]);
 
     const loadChatSessions = async () => {
-        setIsHistoryLoading(true);
         try {
             const response = await fetch(`${apiBase}/chat/sessions?limit=50`, {
                 method: 'GET',
@@ -266,14 +273,20 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
         } catch (error) {
             console.error('History load error:', error);
             setChatSessions([]);
-        } finally {
-            setIsHistoryLoading(false);
         }
     };
 
     useEffect(() => {
         void loadChatSessions();
     }, [authToken]);
+
+    useEffect(() => {
+        onChatSessionsChange?.(chatSessions);
+    }, [chatSessions, onChatSessionsChange]);
+
+    useEffect(() => {
+        onActiveSessionChange?.(sessionId);
+    }, [sessionId, onActiveSessionChange]);
 
     const resetConversation = () => {
         setMessages([
@@ -300,7 +313,6 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
             resetConversation();
             return;
         }
-        setIsSessionSwitching(true);
         try {
             const response = await fetch(`${apiBase}/chat/sessions/${encodeURIComponent(targetSessionId)}?limit=200`, {
                 method: 'GET',
@@ -336,38 +348,18 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
                 ...prev,
                 { role: 'assistant', content: 'Could not load that previous conversation. Please try again.' },
             ]);
-        } finally {
-            setIsSessionSwitching(false);
         }
     };
 
-    const deleteCurrentConversation = async () => {
-        if (!sessionId) {
-            resetConversation();
+    useEffect(() => {
+        if (!openSessionRequest?.sessionId) {
             return;
         }
-        const shouldDelete = window.confirm('Delete this conversation from history?');
-        if (!shouldDelete) {
+        if (openSessionRequest.sessionId === sessionId) {
             return;
         }
-        try {
-            const response = await fetch(`${apiBase}/chat/sessions/${encodeURIComponent(sessionId)}`, {
-                method: 'DELETE',
-                headers: authHeaders,
-            });
-            if (!response.ok) {
-                throw new Error(`Delete failed (${response.status})`);
-            }
-            resetConversation();
-            await loadChatSessions();
-        } catch (error) {
-            console.error('Delete conversation error:', error);
-            setMessages((prev) => [
-                ...prev,
-                { role: 'assistant', content: 'I could not delete this conversation right now. Please retry.' },
-            ]);
-        }
-    };
+        void openConversation(openSessionRequest.sessionId);
+    }, [openSessionRequest, sessionId]);
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -481,40 +473,6 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
                                 {status.replace('_', ' ')}
                              </span>
                         </div>
-                        <div className="hidden md:flex items-center gap-2 mr-2">
-                            <History size={14} className="text-on-surface-variant" />
-                            <select
-                                value={sessionId ?? ''}
-                                onChange={(e) => {
-                                    const nextId = e.target.value;
-                                    if (!nextId) {
-                                        resetConversation();
-                                        return;
-                                    }
-                                    void openConversation(nextId);
-                                }}
-                                disabled={isLoading || isSessionSwitching}
-                                className="max-w-[260px] rounded-xl border border-outline-variant/30 bg-white px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                                <option value="">
-                                    {isHistoryLoading ? 'Loading history...' : 'New conversation'}
-                                </option>
-                                {chatSessions.map((session) => (
-                                    <option key={session.session_id} value={session.session_id}>
-                                        {session.title}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <button
-                            onClick={deleteCurrentConversation}
-                            disabled={isLoading || isSessionSwitching || !sessionId}
-                            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface hover:bg-surface-container-low disabled:opacity-50"
-                            title="Delete current conversation"
-                        >
-                            <Trash2 size={13} />
-                            Delete
-                        </button>
                         <button
                             onClick={resetConversation}
                             className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface hover:bg-surface-container-low"

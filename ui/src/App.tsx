@@ -29,6 +29,21 @@ interface AuthUser {
   updated_at: string;
 }
 
+interface ChatHistoryItem {
+  session_id: string;
+  title: string;
+  last_message_at: string;
+  message_count: number;
+  preview?: string;
+}
+
+interface GeneratorHistoryItem {
+  id: string;
+  title: string;
+  created_at: string;
+  preview?: string;
+}
+
 function getApiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -48,6 +63,12 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState('generator');
   const [setupToken, setSetupToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get('setup_token'));
+  const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
+  const [generatorHistory, setGeneratorHistory] = useState<GeneratorHistoryItem[]>([]);
+  const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
+  const [activeGeneratorHistoryId, setActiveGeneratorHistoryId] = useState<string | null>(null);
+  const [chatOpenRequest, setChatOpenRequest] = useState<{ sessionId: string; nonce: number } | null>(null);
+  const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
 
   useEffect(() => {
     if (!authToken) {
@@ -85,6 +106,8 @@ export default function App() {
     setAuthToken(token);
     setCurrentUser(user);
     setActiveTab('generator');
+    setActiveChatSessionId(null);
+    setActiveGeneratorHistoryId(null);
     setAuthView('login');
   };
 
@@ -103,6 +126,12 @@ export default function App() {
     setAuthToken(null);
     setCurrentUser(null);
     setActiveTab('generator');
+    setChatHistory([]);
+    setGeneratorHistory([]);
+    setActiveChatSessionId(null);
+    setActiveGeneratorHistoryId(null);
+    setChatOpenRequest(null);
+    setGeneratorOpenRequest(null);
     setAuthView('login');
   };
 
@@ -112,6 +141,20 @@ export default function App() {
     const url = new URL(window.location.href);
     url.searchParams.delete('setup_token');
     window.history.replaceState({}, '', url.toString());
+  };
+
+  const openChatHistoryItem = (sessionId: string) => {
+    if (!sessionId) return;
+    setActiveTab('chat');
+    setActiveChatSessionId(sessionId);
+    setChatOpenRequest({ sessionId, nonce: Date.now() });
+  };
+
+  const openGeneratorHistoryItem = (id: string) => {
+    if (!id) return;
+    setActiveTab('generator');
+    setActiveGeneratorHistoryId(id);
+    setGeneratorOpenRequest({ id, nonce: Date.now() });
   };
 
   if (authLoading) {
@@ -143,7 +186,17 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-surface font-body overflow-hidden">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={currentUser.role === 'admin'} />
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isAdmin={currentUser.role === 'admin'}
+        chatHistory={chatHistory}
+        generatorHistory={generatorHistory}
+        activeChatSessionId={activeChatSessionId}
+        activeGeneratorHistoryId={activeGeneratorHistoryId}
+        onSelectChatHistory={openChatHistoryItem}
+        onSelectGeneratorHistory={openGeneratorHistoryItem}
+      />
       
       <main className="flex-1 ml-64 flex flex-col h-screen relative">
         <Header currentUserName={currentUser.name} onLogout={onLogout} />
@@ -167,7 +220,12 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col overflow-hidden"
             >
-              <LegalChat authToken={authToken} />
+              <LegalChat
+                authToken={authToken}
+                openSessionRequest={chatOpenRequest}
+                onChatSessionsChange={setChatHistory}
+                onActiveSessionChange={setActiveChatSessionId}
+              />
             </motion.div>
           ) : activeTab === 'generator' ? (
             <motion.div 
@@ -177,7 +235,12 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="flex-1 flex flex-col overflow-hidden"
             >
-              <DocumentGenerator authToken={authToken} />
+              <DocumentGenerator
+                authToken={authToken}
+                openHistoryRequest={generatorOpenRequest}
+                onHistoryChange={setGeneratorHistory}
+                onActiveHistoryChange={setActiveGeneratorHistoryId}
+              />
             </motion.div>
           ) : activeTab === 'admin' && currentUser.role === 'admin' ? (
             <motion.div

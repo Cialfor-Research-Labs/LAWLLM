@@ -24,6 +24,23 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (id: string) => void;
   isAdmin: boolean;
+  chatHistory: Array<{
+    session_id: string;
+    title: string;
+    last_message_at: string;
+    message_count: number;
+    preview?: string;
+  }>;
+  generatorHistory: Array<{
+    id: string;
+    title: string;
+    created_at: string;
+    preview?: string;
+  }>;
+  activeChatSessionId: string | null;
+  activeGeneratorHistoryId: string | null;
+  onSelectChatHistory: (sessionId: string) => void;
+  onSelectGeneratorHistory: (itemId: string) => void;
 }
 
 interface HeaderProps {
@@ -31,7 +48,17 @@ interface HeaderProps {
   onLogout: () => void;
 }
 
-export const Sidebar = ({ activeTab, setActiveTab, isAdmin }: SidebarProps) => {
+export const Sidebar = ({
+  activeTab,
+  setActiveTab,
+  isAdmin,
+  chatHistory,
+  generatorHistory,
+  activeChatSessionId,
+  activeGeneratorHistoryId,
+  onSelectChatHistory,
+  onSelectGeneratorHistory,
+}: SidebarProps) => {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   const moduleItems: NavItem[] = useMemo(() => {
@@ -54,6 +81,19 @@ export const Sidebar = ({ activeTab, setActiveTab, isAdmin }: SidebarProps) => {
     setIsLibraryOpen(false);
   };
 
+  const formatHistoryTime = (iso: string) => {
+    if (!iso) return '';
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const showChatHistory = activeTab === 'chat';
+  const showGeneratorHistory = activeTab === 'generator';
+
   return (
     <>
       <aside className="fixed left-0 top-0 h-full w-64 bg-slate-100 dark:bg-slate-900 flex flex-col p-4 z-50">
@@ -62,7 +102,7 @@ export const Sidebar = ({ activeTab, setActiveTab, isAdmin }: SidebarProps) => {
         <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-label font-bold">Legal AI Systems</p>
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1 min-h-0 flex flex-col">
         <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/60 p-4 space-y-2">
           <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 font-bold">
             Active Workspace
@@ -80,6 +120,66 @@ export const Sidebar = ({ activeTab, setActiveTab, isAdmin }: SidebarProps) => {
             Open Library
           </button>
         </div>
+
+        {(showChatHistory || showGeneratorHistory) && (
+          <div className="mt-4 min-h-0 rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/60 dark:bg-slate-800/50 p-3 flex-1 overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 dark:text-slate-400">
+                {showChatHistory ? 'Chat History' : 'Generator History'}
+              </p>
+              <span className="text-[10px] text-slate-400">
+                {showChatHistory ? chatHistory.length : generatorHistory.length}
+              </span>
+            </div>
+
+            <div className="space-y-1 overflow-y-auto max-h-[32vh] pr-1">
+              {showChatHistory &&
+                chatHistory.map((item) => (
+                  <button
+                    key={item.session_id}
+                    onClick={() => onSelectChatHistory(item.session_id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
+                      activeChatSessionId === item.session_id
+                        ? 'border-primary/35 bg-primary/10 text-primary'
+                        : 'border-transparent hover:border-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold truncate">{item.title || 'Untitled Chat'}</div>
+                    <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                      {item.preview || `${item.message_count} messages`}
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-1">{formatHistoryTime(item.last_message_at)}</div>
+                  </button>
+                ))}
+
+              {showGeneratorHistory &&
+                generatorHistory.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onSelectGeneratorHistory(item.id)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
+                      activeGeneratorHistoryId === item.id
+                        ? 'border-primary/35 bg-primary/10 text-primary'
+                        : 'border-transparent hover:border-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold truncate">{item.title || 'Generated Notice'}</div>
+                    <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                      {item.preview || 'Open saved draft'}
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-1">{formatHistoryTime(item.created_at)}</div>
+                  </button>
+                ))}
+
+              {showChatHistory && chatHistory.length === 0 && (
+                <p className="text-[11px] text-slate-500 px-2 py-3">No chat sessions yet.</p>
+              )}
+              {showGeneratorHistory && generatorHistory.length === 0 && (
+                <p className="text-[11px] text-slate-500 px-2 py-3">No generated notices yet.</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="pt-4 border-t border-slate-200/30">
