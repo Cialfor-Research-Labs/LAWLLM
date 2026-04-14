@@ -149,8 +149,6 @@ const markdownComponents: Components = {
 const DEFAULT_GREETING =
     'Hello. I am Vidhi AI. Describe your legal situation, and I will identify the core issues, ask necessary follow-up questions, and provide a full FIRAC legal assessment.';
 
-const RESET_GREETING = 'Legal Interview reset. Describe your situation to begin a new case assessment.';
-
 interface LegalChatProps {
     authToken: string;
     openSessionRequest?: { sessionId: string; nonce: number } | null;
@@ -294,7 +292,7 @@ export const LegalChat = ({
         setMessages([
             {
                 role: 'assistant',
-                content: RESET_GREETING,
+                content: DEFAULT_GREETING,
             },
         ]);
         setInput('');
