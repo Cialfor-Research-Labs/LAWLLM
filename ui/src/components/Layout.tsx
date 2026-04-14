@@ -1,15 +1,17 @@
 import React from 'react';
-import { 
-  MessageSquare, 
-  FileText, 
-  BarChart3, 
-  TrendingUp, 
+import { useMemo, useState } from 'react';
+import {
+  MessageSquare,
+  FileText,
+  BarChart3,
+  TrendingUp,
   ShieldCheck,
-  Plus, 
-  Library, 
-  Settings, 
+  Plus,
+  Library,
+  Settings,
   Bell,
   LogOut,
+  X,
 } from 'lucide-react';
 
 interface NavItem {
@@ -30,58 +32,126 @@ interface HeaderProps {
 }
 
 export const Sidebar = ({ activeTab, setActiveTab, isAdmin }: SidebarProps) => {
-  const navItems: NavItem[] = [
-    { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
-    { id: 'generator', label: 'Document Generator', icon: FileText },
-    { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
-    { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
-  ];
-  if (isAdmin) {
-    navItems.push({ id: 'admin', label: 'Admin Access', icon: ShieldCheck });
-  }
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+
+  const moduleItems: NavItem[] = useMemo(() => {
+    const items: NavItem[] = [
+      { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
+      { id: 'generator', label: 'Document Generator', icon: FileText },
+      { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
+      { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
+    ];
+    if (isAdmin) {
+      items.push({ id: 'admin', label: 'Admin Access', icon: ShieldCheck });
+    }
+    return items;
+  }, [isAdmin]);
+
+  const activeModule = moduleItems.find((item) => item.id === activeTab);
+
+  const selectModule = (id: string) => {
+    setActiveTab(id);
+    setIsLibraryOpen(false);
+  };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-slate-100 dark:bg-slate-900 flex flex-col p-4 z-50">
-      <div className="mb-8 px-2 py-4">
+    <>
+      <aside className="fixed left-0 top-0 h-full w-64 bg-slate-100 dark:bg-slate-900 flex flex-col p-4 z-50">
+      <div className="mb-6 px-2 py-4">
         <h1 className="text-xl font-headline font-bold text-primary">The Digital Atelier</h1>
         <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-label font-bold">Legal AI Systems</p>
       </div>
 
-      <nav className="flex-1 space-y-1">
-        {navItems.map((item) => (
+      <div className="flex-1">
+        <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/60 p-4 space-y-2">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 font-bold">
+            Active Workspace
+          </p>
+          <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
+            {activeModule ? <activeModule.icon size={18} /> : <Library size={18} />}
+            <span className="text-sm font-semibold">
+              {activeModule?.label ?? 'Select from Library'}
+            </span>
+          </div>
           <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-              activeTab === item.id 
-                ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold' 
-                : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-200/50'
-            }`}
+            onClick={() => setIsLibraryOpen(true)}
+            className="w-full mt-2 rounded-lg border border-primary/25 bg-primary/5 text-primary px-3 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors"
           >
-            <item.icon size={20} />
-            <span className="text-sm">{item.label}</span>
+            Open Library
           </button>
-        ))}
-      </nav>
+        </div>
+      </div>
 
       <div className="pt-4 border-t border-slate-200/30">
-        <button className="w-full bg-primary text-white rounded-xl py-3 px-4 flex items-center justify-center space-x-2 mb-6 hover:opacity-90 transition-opacity shadow-lg shadow-primary/10">
+        <button
+          onClick={() => selectModule('generator')}
+          className="w-full bg-primary text-white rounded-xl py-3 px-4 flex items-center justify-center space-x-2 mb-6 hover:opacity-90 transition-opacity shadow-lg shadow-primary/10"
+        >
           <Plus size={18} />
           <span className="text-sm font-semibold">New Brief</span>
         </button>
         
         <div className="space-y-1">
-          <button className="w-full flex items-center space-x-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-primary transition-all">
+          <button
+            onClick={() => setIsLibraryOpen(true)}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+              isLibraryOpen
+                ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-200/50'
+            }`}
+          >
             <Library size={20} />
             <span className="text-sm">Library</span>
           </button>
-          <button className="w-full flex items-center space-x-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-primary transition-all">
+          <button className="w-full flex items-center space-x-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-primary transition-all rounded-lg hover:bg-slate-200/50">
             <Settings size={20} />
             <span className="text-sm">Settings</span>
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+
+      {isLibraryOpen && (
+        <>
+          <button
+            aria-label="Close library picker"
+            onClick={() => setIsLibraryOpen(false)}
+            className="fixed inset-0 bg-slate-950/35 backdrop-blur-sm z-[60]"
+          />
+          <div className="fixed left-[17.5rem] top-1/2 -translate-y-1/2 w-[22rem] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-200/70 dark:border-slate-700/70 bg-white dark:bg-slate-900 shadow-2xl z-[70] p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-bold text-primary">Library</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Choose a workspace module</p>
+              </div>
+              <button
+                onClick={() => setIsLibraryOpen(false)}
+                className="p-2 rounded-lg text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {moduleItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => selectModule(item.id)}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                    activeTab === item.id
+                      ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                  }`}
+                >
+                  <item.icon size={18} />
+                  <span className="text-sm">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 };
 
