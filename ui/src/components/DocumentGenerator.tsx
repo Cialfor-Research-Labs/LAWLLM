@@ -62,6 +62,7 @@ interface GeneratorHistoryItem {
 interface DocumentGeneratorProps {
   authToken: string;
   openHistoryRequest?: { id: string; nonce: number } | null;
+  newSessionRequest?: number | null;
   onHistoryChange?: (items: Array<{ id: string; title: string; created_at: string; preview?: string }>) => void;
   onActiveHistoryChange?: (id: string | null) => void;
 }
@@ -109,6 +110,7 @@ const GENERATOR_HISTORY_LIMIT = 40;
 export const DocumentGenerator = ({
   authToken,
   openHistoryRequest,
+  newSessionRequest,
   onHistoryChange,
   onActiveHistoryChange,
 }: DocumentGeneratorProps) => {
@@ -349,6 +351,13 @@ export const DocumentGenerator = ({
     setError('');
     setActiveHistoryId(null);
   };
+
+  useEffect(() => {
+    if (newSessionRequest == null) {
+      return;
+    }
+    handleReset();
+  }, [newSessionRequest]);
 
   const selectedTypeLabel = noticeType === 'auto'
     ? 'Auto-detect'

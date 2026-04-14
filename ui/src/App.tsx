@@ -70,6 +70,7 @@ export default function App() {
   const [chatOpenRequest, setChatOpenRequest] = useState<{ sessionId: string; nonce: number } | null>(null);
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
+  const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authToken) {
@@ -133,6 +134,8 @@ export default function App() {
     setActiveGeneratorHistoryId(null);
     setChatOpenRequest(null);
     setGeneratorOpenRequest(null);
+    setChatNewSessionRequest(null);
+    setGeneratorNewSessionRequest(null);
     setAuthView('login');
   };
 
@@ -151,7 +154,20 @@ export default function App() {
     setChatOpenRequest({ sessionId, nonce: Date.now() });
   };
 
-  const startNewChatSession = () => {
+  const startNewSession = () => {
+    if (activeTab === 'generator') {
+      setActiveGeneratorHistoryId(null);
+      setGeneratorOpenRequest(null);
+      setGeneratorNewSessionRequest(Date.now());
+      return;
+    }
+    if (activeTab === 'chat') {
+      setActiveChatSessionId(null);
+      setChatOpenRequest(null);
+      setChatNewSessionRequest(Date.now());
+      return;
+    }
+    // Fallback: start a new chat session when current module has no session concept.
     setActiveTab('chat');
     setActiveChatSessionId(null);
     setChatOpenRequest(null);
@@ -198,7 +214,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isAdmin={currentUser.role === 'admin'}
-        onStartNewChatSession={startNewChatSession}
+        onStartNewSession={startNewSession}
         chatHistory={chatHistory}
         generatorHistory={generatorHistory}
         activeChatSessionId={activeChatSessionId}
@@ -248,6 +264,7 @@ export default function App() {
               <DocumentGenerator
                 authToken={authToken}
                 openHistoryRequest={generatorOpenRequest}
+                newSessionRequest={generatorNewSessionRequest}
                 onHistoryChange={setGeneratorHistory}
                 onActiveHistoryChange={setActiveGeneratorHistoryId}
               />
