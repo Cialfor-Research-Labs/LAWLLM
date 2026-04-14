@@ -4,11 +4,13 @@ import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import { 
   CheckCircle2, 
+  History,
   Loader2, 
   RotateCcw, 
   Scale, 
   Send, 
   Sparkles, 
+  Trash2,
   User, 
   FileText, 
   TrendingUp 
@@ -17,6 +19,31 @@ import {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface ChatSessionSummary {
+    session_id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+    last_message_at: string;
+    message_count: number;
+    preview: string;
+}
+
+interface ChatSessionListResponse {
+    ok: boolean;
+    sessions: ChatSessionSummary[];
+}
+
+interface ChatSessionDetailResponse {
+    ok: boolean;
+    session: ChatSessionSummary;
+    messages: Array<{
+        role: 'user' | 'assistant';
+        content: string;
+        created_at: string;
+    }>;
 }
 
 interface LegalOutput {
@@ -121,6 +148,11 @@ const markdownComponents: Components = {
   li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
 };
 
+const DEFAULT_GREETING =
+    'Hello. I am Vidhi AI. Describe your legal situation, and I will identify the core issues, ask necessary follow-up questions, and provide a full FIRAC legal assessment.';
+
+const RESET_GREETING = 'Legal Interview reset. Describe your situation to begin a new case assessment.';
+
 function getApiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -194,12 +226,15 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: 'Hello. I am Vidhi AI. Describe your legal situation, and I will identify the core issues, ask necessary follow-up questions, and provide a full FIRAC legal assessment.',
+            content: DEFAULT_GREETING,
         },
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+    const [isSessionSwitching, setIsSessionSwitching] = useState(false);
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const [chatSessions, setChatSessions] = useState<ChatSessionSummary[]>([]);
     const [legalOutput, setLegalOutput] = useState<LegalOutput | null>(null);
     const [isComplete, setIsComplete] = useState(false);
     const [status, setStatus] = useState<string>("interviewing");
@@ -216,11 +251,35 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
         }
     }, [messages, isLoading]);
 
+    const loadChatSessions = async () => {
+        setIsHistoryLoading(true);
+        try {
+            const response = await fetch(`${apiBase}/chat/sessions?limit=50`, {
+                method: 'GET',
+                headers: authHeaders,
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to load chat history (${response.status})`);
+            }
+            const data: ChatSessionListResponse = await response.json();
+            setChatSessions(Array.isArray(data.sessions) ? data.sessions : []);
+        } catch (error) {
+            console.error('History load error:', error);
+            setChatSessions([]);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadChatSessions();
+    }, [authToken]);
+
     const resetConversation = () => {
         setMessages([
             {
                 role: 'assistant',
-                content: 'Legal Interview reset. Describe your situation to begin a new case assessment.',
+                content: RESET_GREETING,
             },
         ]);
         setInput('');
@@ -234,6 +293,80 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
         setBehavioralPrimitives([]);
         setInterpretations([]);
         setApplicableLaws([]);
+    };
+
+    const openConversation = async (targetSessionId: string) => {
+        if (!targetSessionId) {
+            resetConversation();
+            return;
+        }
+        setIsSessionSwitching(true);
+        try {
+            const response = await fetch(`${apiBase}/chat/sessions/${encodeURIComponent(targetSessionId)}?limit=200`, {
+                method: 'GET',
+                headers: authHeaders,
+            });
+            if (!response.ok) {
+                throw new Error(`Could not open selected conversation (${response.status})`);
+            }
+            const data: ChatSessionDetailResponse = await response.json();
+            const loadedMessages: Message[] = (data.messages || []).map((item) => ({
+                role: item.role,
+                content: item.content,
+            }));
+            setSessionId(data.session?.session_id || targetSessionId);
+            setMessages(
+                loadedMessages.length
+                    ? loadedMessages
+                    : [{ role: 'assistant', content: DEFAULT_GREETING }],
+            );
+            setInput('');
+            setLegalOutput(null);
+            setIsComplete(false);
+            setStatus("interviewing");
+            setConfidence(0);
+            setSecondaryIssues([]);
+            setCaseModel(null);
+            setBehavioralPrimitives([]);
+            setInterpretations([]);
+            setApplicableLaws([]);
+        } catch (error) {
+            console.error('Open conversation error:', error);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: 'Could not load that previous conversation. Please try again.' },
+            ]);
+        } finally {
+            setIsSessionSwitching(false);
+        }
+    };
+
+    const deleteCurrentConversation = async () => {
+        if (!sessionId) {
+            resetConversation();
+            return;
+        }
+        const shouldDelete = window.confirm('Delete this conversation from history?');
+        if (!shouldDelete) {
+            return;
+        }
+        try {
+            const response = await fetch(`${apiBase}/chat/sessions/${encodeURIComponent(sessionId)}`, {
+                method: 'DELETE',
+                headers: authHeaders,
+            });
+            if (!response.ok) {
+                throw new Error(`Delete failed (${response.status})`);
+            }
+            resetConversation();
+            await loadChatSessions();
+        } catch (error) {
+            console.error('Delete conversation error:', error);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: 'I could not delete this conversation right now. Please retry.' },
+            ]);
+        }
     };
 
     const handleSend = async () => {
@@ -263,7 +396,8 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
 
             // Primary path: /query RAG response
             if ('answer' in data) {
-                setSessionId(data.meta?.session_id || sessionId);
+                const nextSessionId = data.meta?.session_id || sessionId || null;
+                setSessionId(nextSessionId);
                 setIsComplete(true);
                 setStatus("complete");
                 setSecondaryIssues([]);
@@ -274,6 +408,7 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
                 setApplicableLaws([]);
                 setConfidence(data.confidence || 0);
                 setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+                await loadChatSessions();
             } else {
                 // Backward compatible fallback if interview response is returned
                 setSessionId(data.session_id);
@@ -296,6 +431,7 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
                 setInterpretations(data.interpretations || []);
                 setApplicableLaws(data.applicable_laws || []);
                 setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
+                await loadChatSessions();
             }
             
         } catch (error: any) {
@@ -345,6 +481,40 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
                                 {status.replace('_', ' ')}
                              </span>
                         </div>
+                        <div className="hidden md:flex items-center gap-2 mr-2">
+                            <History size={14} className="text-on-surface-variant" />
+                            <select
+                                value={sessionId ?? ''}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    if (!nextId) {
+                                        resetConversation();
+                                        return;
+                                    }
+                                    void openConversation(nextId);
+                                }}
+                                disabled={isLoading || isSessionSwitching}
+                                className="max-w-[260px] rounded-xl border border-outline-variant/30 bg-white px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                                <option value="">
+                                    {isHistoryLoading ? 'Loading history...' : 'New conversation'}
+                                </option>
+                                {chatSessions.map((session) => (
+                                    <option key={session.session_id} value={session.session_id}>
+                                        {session.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <button
+                            onClick={deleteCurrentConversation}
+                            disabled={isLoading || isSessionSwitching || !sessionId}
+                            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface hover:bg-surface-container-low disabled:opacity-50"
+                            title="Delete current conversation"
+                        >
+                            <Trash2 size={13} />
+                            Delete
+                        </button>
                         <button
                             onClick={resetConversation}
                             className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface hover:bg-surface-container-low"
@@ -473,17 +643,22 @@ export const LegalChat = ({ authToken }: { authToken: string }) => {
                                         });
                                         const data: RagQueryResponse | InterviewChatResponse = await response.json();
                                         if ('answer' in data) {
+                                            const nextSessionId = data.meta?.session_id || sessionId || null;
+                                            setSessionId(nextSessionId);
                                             setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
                                             setStatus("complete");
                                             setConfidence(data.confidence || 0);
                                             setLegalOutput(null);
                                             setIsComplete(true);
+                                            await loadChatSessions();
                                         } else {
+                                            setSessionId(data.session_id);
                                             setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
                                             setStatus(data.status);
                                             setConfidence(data.confidence);
                                             setLegalOutput(data.legal_output);
                                             setIsComplete(data.is_complete);
+                                            await loadChatSessions();
                                         }
                                     } catch (e) {
                                         console.error(e);

@@ -100,6 +100,9 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstr
 PASSWORD_HASH_ITERATIONS = 120_000
 MAILER_NODE_BIN = os.getenv("MAILER_NODE_BIN", "node")
 MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join("ui", "scripts", "send_setup_email.cjs"))
+CHAT_HISTORY_PROMPT_LIMIT = int(os.getenv("CHAT_HISTORY_PROMPT_LIMIT", "24"))
+CHAT_HISTORY_DETAIL_LIMIT = int(os.getenv("CHAT_HISTORY_DETAIL_LIMIT", "200"))
+CHAT_HISTORY_LIST_LIMIT = int(os.getenv("CHAT_HISTORY_LIST_LIMIT", "50"))
 _DOTENV_CACHE: Optional[Dict[str, str]] = None
 
 
@@ -356,6 +359,42 @@ class PasswordSetupLinkResponse(BaseModel):
     expires_at: str
 
 
+class ChatSessionSummary(BaseModel):
+    session_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    last_message_at: str
+    message_count: int
+    preview: str = ""
+
+
+class ChatMessageView(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    created_at: str
+
+
+class ChatSessionListResponse(BaseModel):
+    ok: bool
+    sessions: List[ChatSessionSummary]
+
+
+class ChatSessionDetailResponse(BaseModel):
+    ok: bool
+    session: ChatSessionSummary
+    messages: List[ChatMessageView]
+
+
+class ChatSessionRenameRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+
+
+class ChatSessionMutationResponse(BaseModel):
+    ok: bool
+    message: str
+
+
 # =====================================================
 # PHASE 2/3 INTERVIEW MODELS
 # =====================================================
@@ -515,6 +554,34 @@ def _ensure_auth_schema() -> None:
                 revoked_at TEXT,
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_message_at TEXT NOT NULL,
+                archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_last
+            ON chat_sessions(user_id, last_message_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id
+            ON chat_messages(session_id, id);
             """
         )
         conn.commit()
@@ -683,6 +750,290 @@ def _create_session_for_user(user_id: int) -> str:
         )
         conn.commit()
     return raw_token
+
+
+CHAT_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$")
+
+
+def _sanitize_chat_session_id(session_id: Optional[str]) -> str:
+    raw = str(session_id or "").strip()
+    if not raw:
+        return str(uuid.uuid4())
+    if not CHAT_SESSION_ID_RE.fullmatch(raw):
+        raise HTTPException(status_code=400, detail="Invalid session_id format.")
+    return raw
+
+
+def _derive_chat_title(seed_text: str) -> str:
+    cleaned = " ".join(str(seed_text or "").split()).strip()
+    if not cleaned:
+        return "New Conversation"
+    if len(cleaned) <= 80:
+        return cleaned
+    return cleaned[:77].rstrip() + "..."
+
+
+def _get_chat_session_row(user_id: int, session_id: str) -> Optional[sqlite3.Row]:
+    with _db_conn() as conn:
+        return conn.execute(
+            """
+            SELECT session_id, title, created_at, updated_at, last_message_at
+            FROM chat_sessions
+            WHERE user_id = ? AND session_id = ? AND archived = 0
+            """,
+            (user_id, session_id),
+        ).fetchone()
+
+
+def _ensure_chat_session(user_id: int, session_id: str, seed_text: str = "") -> None:
+    now = _utc_now_iso()
+    title = _derive_chat_title(seed_text)
+    with _db_conn() as conn:
+        row = conn.execute(
+            "SELECT session_id, title, archived FROM chat_sessions WHERE user_id = ? AND session_id = ?",
+            (user_id, session_id),
+        ).fetchone()
+        if not row:
+            conn.execute(
+                """
+                INSERT INTO chat_sessions (session_id, user_id, title, created_at, updated_at, last_message_at, archived)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+                """,
+                (session_id, user_id, title, now, now, now),
+            )
+        elif int(row["archived"] or 0) == 1:
+            conn.execute(
+                """
+                UPDATE chat_sessions
+                SET archived = 0, updated_at = ?, last_message_at = ?
+                WHERE user_id = ? AND session_id = ?
+                """,
+                (now, now, user_id, session_id),
+            )
+        conn.commit()
+
+
+def _save_chat_turn(user_id: int, session_id: str, user_text: str, assistant_text: str) -> None:
+    now = _utc_now_iso()
+    title_candidate = _derive_chat_title(user_text)
+    with _db_conn() as conn:
+        row = conn.execute(
+            "SELECT title FROM chat_sessions WHERE user_id = ? AND session_id = ?",
+            (user_id, session_id),
+        ).fetchone()
+        if not row:
+            conn.execute(
+                """
+                INSERT INTO chat_sessions (session_id, user_id, title, created_at, updated_at, last_message_at, archived)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+                """,
+                (session_id, user_id, title_candidate, now, now, now),
+            )
+            current_title = title_candidate
+        else:
+            current_title = str(row["title"] or "").strip()
+
+        conn.executemany(
+            """
+            INSERT INTO chat_messages (session_id, user_id, role, content, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                (session_id, user_id, "user", str(user_text or ""), now),
+                (session_id, user_id, "assistant", str(assistant_text or ""), now),
+            ],
+        )
+
+        final_title = current_title
+        if not current_title or current_title.lower() in {"new conversation", "new chat", "untitled"}:
+            final_title = title_candidate
+
+        conn.execute(
+            """
+            UPDATE chat_sessions
+            SET title = ?, updated_at = ?, last_message_at = ?, archived = 0
+            WHERE user_id = ? AND session_id = ?
+            """,
+            (final_title, now, now, user_id, session_id),
+        )
+        conn.commit()
+
+
+def _record_chat_turn(user_id: int, session_id: str, user_text: str, assistant_text: str) -> None:
+    SESSIONS.setdefault(session_id, [])
+    SESSIONS[session_id].append({"role": "user", "content": str(user_text or "")})
+    SESSIONS[session_id].append({"role": "assistant", "content": str(assistant_text or "")})
+    _save_chat_turn(user_id, session_id, user_text, assistant_text)
+
+
+def _load_chat_history_for_prompt(user_id: int, session_id: str, limit: int = CHAT_HISTORY_PROMPT_LIMIT) -> List[Dict[str, str]]:
+    safe_limit = max(2, min(int(limit or CHAT_HISTORY_PROMPT_LIMIT), 200))
+    with _db_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT role, content
+            FROM chat_messages
+            WHERE user_id = ? AND session_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (user_id, session_id, safe_limit),
+        ).fetchall()
+    history = [{"role": str(row["role"]), "content": str(row["content"])} for row in reversed(rows)]
+    return history
+
+
+def _clear_chat_history(user_id: int, session_id: str) -> None:
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        conn.execute(
+            "DELETE FROM chat_messages WHERE user_id = ? AND session_id = ?",
+            (user_id, session_id),
+        )
+        conn.execute(
+            """
+            UPDATE chat_sessions
+            SET title = 'New Conversation', updated_at = ?, last_message_at = ?
+            WHERE user_id = ? AND session_id = ?
+            """,
+            (now, now, user_id, session_id),
+        )
+        conn.commit()
+    SESSIONS[session_id] = []
+
+
+def _load_chat_session_detail(user_id: int, session_id: str, limit: int = CHAT_HISTORY_DETAIL_LIMIT) -> Optional[Dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or CHAT_HISTORY_DETAIL_LIMIT), 500))
+    with _db_conn() as conn:
+        session_row = conn.execute(
+            """
+            SELECT
+                c.session_id,
+                c.title,
+                c.created_at,
+                c.updated_at,
+                c.last_message_at,
+                (
+                    SELECT COUNT(*)
+                    FROM chat_messages m
+                    WHERE m.session_id = c.session_id AND m.user_id = c.user_id
+                ) AS message_count,
+                COALESCE((
+                    SELECT substr(m2.content, 1, 220)
+                    FROM chat_messages m2
+                    WHERE m2.session_id = c.session_id AND m2.user_id = c.user_id
+                    ORDER BY m2.id DESC
+                    LIMIT 1
+                ), '') AS preview
+            FROM chat_sessions c
+            WHERE c.user_id = ? AND c.session_id = ? AND c.archived = 0
+            """,
+            (user_id, session_id),
+        ).fetchone()
+        if not session_row:
+            return None
+
+        messages_rows = conn.execute(
+            """
+            SELECT role, content, created_at
+            FROM chat_messages
+            WHERE user_id = ? AND session_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (user_id, session_id, safe_limit),
+        ).fetchall()
+
+    messages = [
+        {"role": str(row["role"]), "content": str(row["content"]), "created_at": str(row["created_at"])}
+        for row in reversed(messages_rows)
+    ]
+    summary = {
+        "session_id": str(session_row["session_id"]),
+        "title": str(session_row["title"] or "New Conversation"),
+        "created_at": str(session_row["created_at"]),
+        "updated_at": str(session_row["updated_at"]),
+        "last_message_at": str(session_row["last_message_at"]),
+        "message_count": int(session_row["message_count"] or 0),
+        "preview": str(session_row["preview"] or ""),
+    }
+    return {"session": summary, "messages": messages}
+
+
+def _list_chat_sessions(user_id: int, limit: int = CHAT_HISTORY_LIST_LIMIT) -> List[Dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or CHAT_HISTORY_LIST_LIMIT), 100))
+    with _db_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                c.session_id,
+                c.title,
+                c.created_at,
+                c.updated_at,
+                c.last_message_at,
+                (
+                    SELECT COUNT(*)
+                    FROM chat_messages m
+                    WHERE m.session_id = c.session_id AND m.user_id = c.user_id
+                ) AS message_count,
+                COALESCE((
+                    SELECT substr(m2.content, 1, 220)
+                    FROM chat_messages m2
+                    WHERE m2.session_id = c.session_id AND m2.user_id = c.user_id
+                    ORDER BY m2.id DESC
+                    LIMIT 1
+                ), '') AS preview
+            FROM chat_sessions c
+            WHERE c.user_id = ? AND c.archived = 0
+            ORDER BY c.last_message_at DESC
+            LIMIT ?
+            """,
+            (user_id, safe_limit),
+        ).fetchall()
+
+    return [
+        {
+            "session_id": str(row["session_id"]),
+            "title": str(row["title"] or "New Conversation"),
+            "created_at": str(row["created_at"]),
+            "updated_at": str(row["updated_at"]),
+            "last_message_at": str(row["last_message_at"]),
+            "message_count": int(row["message_count"] or 0),
+            "preview": str(row["preview"] or ""),
+        }
+        for row in rows
+    ]
+
+
+def _rename_chat_session(user_id: int, session_id: str, title: str) -> bool:
+    cleaned = " ".join(str(title or "").split()).strip()
+    if not cleaned:
+        return False
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        cur = conn.execute(
+            """
+            UPDATE chat_sessions
+            SET title = ?, updated_at = ?
+            WHERE user_id = ? AND session_id = ? AND archived = 0
+            """,
+            (cleaned[:120], now, user_id, session_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def _delete_chat_session(user_id: int, session_id: str) -> bool:
+    with _db_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM chat_sessions WHERE user_id = ? AND session_id = ?",
+            (user_id, session_id),
+        )
+        conn.commit()
+    if cur.rowcount > 0:
+        SESSIONS.pop(session_id, None)
+        return True
+    return False
 
 
 _initialize_auth_system()
@@ -2784,13 +3135,69 @@ def admin_generate_password_setup_link(
     return PasswordSetupLinkResponse(ok=True, setup_url=setup_url, expires_at=expires_at)
 
 
+@app.get("/chat/sessions", response_model=ChatSessionListResponse)
+def list_chat_sessions(
+    authorization: Optional[str] = Header(default=None),
+    limit: int = CHAT_HISTORY_LIST_LIMIT,
+) -> ChatSessionListResponse:
+    user_row = _require_product_access_user(authorization)
+    sessions = _list_chat_sessions(int(user_row["id"]), limit=limit)
+    return ChatSessionListResponse(ok=True, sessions=sessions)
+
+
+@app.get("/chat/sessions/{session_id}", response_model=ChatSessionDetailResponse)
+def get_chat_session(
+    session_id: str,
+    authorization: Optional[str] = Header(default=None),
+    limit: int = CHAT_HISTORY_DETAIL_LIMIT,
+) -> ChatSessionDetailResponse:
+    user_row = _require_product_access_user(authorization)
+    safe_session_id = _sanitize_chat_session_id(session_id)
+    detail = _load_chat_session_detail(int(user_row["id"]), safe_session_id, limit=limit)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Chat session not found.")
+    SESSIONS[safe_session_id] = [
+        {"role": str(item["role"]), "content": str(item["content"])}
+        for item in detail["messages"]
+    ]
+    return ChatSessionDetailResponse(ok=True, session=detail["session"], messages=detail["messages"])
+
+
+@app.patch("/chat/sessions/{session_id}", response_model=ChatSessionMutationResponse)
+def rename_chat_session(
+    session_id: str,
+    payload: ChatSessionRenameRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> ChatSessionMutationResponse:
+    user_row = _require_product_access_user(authorization)
+    safe_session_id = _sanitize_chat_session_id(session_id)
+    ok = _rename_chat_session(int(user_row["id"]), safe_session_id, payload.title)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Chat session not found.")
+    return ChatSessionMutationResponse(ok=True, message="Chat session renamed.")
+
+
+@app.delete("/chat/sessions/{session_id}", response_model=ChatSessionMutationResponse)
+def delete_chat_session(
+    session_id: str,
+    authorization: Optional[str] = Header(default=None),
+) -> ChatSessionMutationResponse:
+    user_row = _require_product_access_user(authorization)
+    safe_session_id = _sanitize_chat_session_id(session_id)
+    ok = _delete_chat_session(int(user_row["id"]), safe_session_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Chat session not found.")
+    return ChatSessionMutationResponse(ok=True, message="Chat session deleted.")
+
+
 # =========================
 # MAIN STRUCTURED RAG FLOW
 # =========================
 
 @app.post("/query", response_model=QueryResponse)
 def query(payload: QueryRequest, authorization: Optional[str] = Header(default=None)) -> QueryResponse:
-    _require_product_access_user(authorization)
+    user_row = _require_product_access_user(authorization)
+    user_id = int(user_row["id"])
     try:
         raw_query = payload.query
         requested_mode = str(payload.mode or "").strip().lower()
@@ -2817,11 +3224,15 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
         # 🛡️ 3. Domain Classifier (CLEARED as per user request)
         pass
         
-        # 🔑 Session Management
-        s_id = payload.session_id or str(uuid.uuid4())
-        if payload.reset_session or s_id not in SESSIONS:
-            SESSIONS[s_id] = []
-        history = SESSIONS[s_id]
+        # 🔑 Session Management (persistent chat memory)
+        s_id = _sanitize_chat_session_id(payload.session_id)
+        if payload.session_id:
+            _ensure_chat_session(user_id, s_id, seed_text=user_query)
+        if payload.reset_session:
+            _ensure_chat_session(user_id, s_id, seed_text=user_query)
+            _clear_chat_history(user_id, s_id)
+        history = _load_chat_history_for_prompt(user_id, s_id, limit=CHAT_HISTORY_PROMPT_LIMIT)
+        SESSIONS[s_id] = list(history)
 
         structured_query = extract_structured_query(user_query, payload.llm_model)
         debug_trace["structured_query"] = structured_query
@@ -2895,8 +3306,7 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             disclaimer = "\n\n---\n**Disclaimer**\nFor information only. Consult a professional."
             final_answer = format_final_answer(answer.strip(), [], suggested_laws=law_candidates) + disclaimer
 
-            SESSIONS[s_id].append({"role": "user", "content": user_query})
-            SESSIONS[s_id].append({"role": "assistant", "content": answer})
+            _record_chat_turn(user_id, s_id, user_query, answer)
 
             append_query_log(
                 {
@@ -2958,6 +3368,7 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
                 missing_answer = "No relevant statutory section found in the database."
                 if missing_section and missing_act:
                     missing_answer = f"Section {missing_section} was not found in the available text for {missing_act}."
+                _record_chat_turn(user_id, s_id, user_query, missing_answer)
                 return QueryResponse(
                     ok=True,
                     query=user_query,
@@ -2969,7 +3380,9 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
                     meta={"mode": effective_mode, "requested_mode": requested_mode, "reason": "no_match", "session_id": s_id},
                 )
             reasoning.append("Detected direct statute query; using deterministic section lookup.")
-            return _build_query_act_response(user_query, results, reasoning, s_id, effective_mode)
+            query_act_response = _build_query_act_response(user_query, results, reasoning, s_id, effective_mode)
+            _record_chat_turn(user_id, s_id, user_query, query_act_response.answer)
+            return query_act_response
         else:
             retrieval_corpus = "acts" if precise_statute_query else ("all" if USE_JUDGEMENT_EMBEDDINGS else "acts")
             allowed_docs = DEFAULT_ALLOWED_DOCS if structured_query.get("intent") == "legal_query" else {"acts"}
@@ -3092,6 +3505,7 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
                     "answer_validation": validation,
                 }
             )
+            _record_chat_turn(user_id, s_id, user_query, answer)
             return QueryResponse(
                 ok=True, query=user_query,
                 answer=final_answer,
@@ -3228,6 +3642,7 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
                     "validation": grounding,
                 }
             )
+            _record_chat_turn(user_id, s_id, user_query, conservative_answer)
             return QueryResponse(
                 ok=True,
                 query=user_query,
@@ -3277,8 +3692,7 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             }
         )
 
-        SESSIONS[s_id].append({"role": "user", "content": user_query})
-        SESSIONS[s_id].append({"role": "assistant", "content": answer})
+        _record_chat_turn(user_id, s_id, user_query, answer)
 
         return QueryResponse(
             ok=True, query=user_query, answer=final_answer, reasoning=reasoning,
