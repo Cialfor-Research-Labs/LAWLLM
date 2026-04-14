@@ -45,11 +45,21 @@ interface GeneratorHistoryItem {
 }
 
 const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
+const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
 const ALLOWED_TABS = new Set(['chat', 'generator', 'analyzer', 'predictor', 'admin']);
 
 function getInitialActiveTab(): string {
   const stored = (localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || '').trim().toLowerCase();
   return ALLOWED_TABS.has(stored) ? stored : 'generator';
+}
+
+function getInitialActiveChatSessionId(): string | null {
+  try {
+    const stored = (sessionStorage.getItem(ACTIVE_CHAT_SESSION_STORAGE_KEY) || '').trim();
+    return stored || null;
+  } catch {
+    return null;
+  }
 }
 
 function getApiBase(): string {
@@ -73,9 +83,12 @@ export default function App() {
   const [setupToken, setSetupToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get('setup_token'));
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const [generatorHistory, setGeneratorHistory] = useState<GeneratorHistoryItem[]>([]);
-  const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
+  const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(() => getInitialActiveChatSessionId());
   const [activeGeneratorHistoryId, setActiveGeneratorHistoryId] = useState<string | null>(null);
-  const [chatOpenRequest, setChatOpenRequest] = useState<{ sessionId: string; nonce: number } | null>(null);
+  const [chatOpenRequest, setChatOpenRequest] = useState<{ sessionId: string; nonce: number } | null>(() => {
+    const initial = getInitialActiveChatSessionId();
+    return initial ? { sessionId: initial, nonce: Date.now() } : null;
+  });
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
   const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
@@ -116,6 +129,18 @@ export default function App() {
       localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    try {
+      if (activeChatSessionId) {
+        sessionStorage.setItem(ACTIVE_CHAT_SESSION_STORAGE_KEY, activeChatSessionId);
+      } else {
+        sessionStorage.removeItem(ACTIVE_CHAT_SESSION_STORAGE_KEY);
+      }
+    } catch {
+      // no-op if sessionStorage is unavailable
+    }
+  }, [activeChatSessionId]);
 
   const onLoginSuccess = (token: string, user: AuthUser) => {
     localStorage.setItem('vidhi_auth_token', token);
