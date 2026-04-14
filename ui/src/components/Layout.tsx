@@ -24,6 +24,7 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (id: string) => void;
   isAdmin: boolean;
+  onStartNewChatSession: () => void;
   chatHistory: Array<{
     session_id: string;
     title: string;
@@ -52,6 +53,7 @@ export const Sidebar = ({
   activeTab,
   setActiveTab,
   isAdmin,
+  onStartNewChatSession,
   chatHistory,
   generatorHistory,
   activeChatSessionId,
@@ -183,6 +185,13 @@ export const Sidebar = ({
       </div>
 
       <div className="pt-4 border-t border-slate-200/30">
+        <button
+          onClick={onStartNewChatSession}
+          className="w-full bg-slate-800 text-white rounded-xl py-3 px-4 flex items-center justify-center space-x-2 mb-3 hover:opacity-90 transition-opacity shadow-lg"
+        >
+          <Plus size={18} />
+          <span className="text-sm font-semibold">New Session</span>
+        </button>
         <button
           onClick={() => selectModule('generator')}
           className="w-full bg-primary text-white rounded-xl py-3 px-4 flex items-center justify-center space-x-2 mb-6 hover:opacity-90 transition-opacity shadow-lg shadow-primary/10"

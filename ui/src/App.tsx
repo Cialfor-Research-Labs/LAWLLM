@@ -69,6 +69,7 @@ export default function App() {
   const [activeGeneratorHistoryId, setActiveGeneratorHistoryId] = useState<string | null>(null);
   const [chatOpenRequest, setChatOpenRequest] = useState<{ sessionId: string; nonce: number } | null>(null);
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
+  const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authToken) {
@@ -150,6 +151,13 @@ export default function App() {
     setChatOpenRequest({ sessionId, nonce: Date.now() });
   };
 
+  const startNewChatSession = () => {
+    setActiveTab('chat');
+    setActiveChatSessionId(null);
+    setChatOpenRequest(null);
+    setChatNewSessionRequest(Date.now());
+  };
+
   const openGeneratorHistoryItem = (id: string) => {
     if (!id) return;
     setActiveTab('generator');
@@ -190,6 +198,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isAdmin={currentUser.role === 'admin'}
+        onStartNewChatSession={startNewChatSession}
         chatHistory={chatHistory}
         generatorHistory={generatorHistory}
         activeChatSessionId={activeChatSessionId}
@@ -223,6 +232,7 @@ export default function App() {
               <LegalChat
                 authToken={authToken}
                 openSessionRequest={chatOpenRequest}
+                newSessionRequest={chatNewSessionRequest}
                 onChatSessionsChange={setChatHistory}
                 onActiveSessionChange={setActiveChatSessionId}
               />

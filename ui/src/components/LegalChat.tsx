@@ -154,6 +154,7 @@ const RESET_GREETING = 'Legal Interview reset. Describe your situation to begin 
 interface LegalChatProps {
     authToken: string;
     openSessionRequest?: { sessionId: string; nonce: number } | null;
+    newSessionRequest?: number | null;
     onChatSessionsChange?: (sessions: ChatSessionSummary[]) => void;
     onActiveSessionChange?: (sessionId: string | null) => void;
 }
@@ -221,6 +222,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 export const LegalChat = ({
     authToken,
     openSessionRequest,
+    newSessionRequest,
     onChatSessionsChange,
     onActiveSessionChange,
 }: LegalChatProps) => {
@@ -360,6 +362,13 @@ export const LegalChat = ({
         }
         void openConversation(openSessionRequest.sessionId);
     }, [openSessionRequest, sessionId]);
+
+    useEffect(() => {
+        if (newSessionRequest == null) {
+            return;
+        }
+        resetConversation();
+    }, [newSessionRequest]);
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
