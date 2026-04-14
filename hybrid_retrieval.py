@@ -4,9 +4,10 @@ import math
 import os
 import re
 import sqlite3
+import time
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from sentence_transformers import CrossEncoder, SentenceTransformer
@@ -210,6 +211,123 @@ def query_to_fts_match(query: str) -> str:
     return " OR ".join([f'"{t}"*' for t in terms])
 
 
+def _safe_norm_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def _looks_like_precise_query(query: str) -> bool:
+    q = _safe_norm_text(query)
+    precise_patterns = [
+        r"\bsection\s+\d+[a-z]?\b",
+        r"\bs\.?\s*\d+[a-z]?\b",
+        r"\b(?:ipc|crpc|iea|bns|bnss|bsa)\b",
+    ]
+    return any(re.search(pattern, q) for pattern in precise_patterns)
+
+
+def _looks_like_explanatory_query(query: str) -> bool:
+    q = _safe_norm_text(query)
+    explanatory_markers = ["explain", "meaning", "difference", "how", "why", "what is", "procedure", "steps"]
+    return any(marker in q for marker in explanatory_markers)
+
+
+def _query_profile(query: str) -> str:
+    if _looks_like_precise_query(query):
+        return "precise"
+    if _looks_like_explanatory_query(query):
+        return "explanatory"
+    return "general"
+
+
+def _dynamic_weights(query: str, dense_weight: float, bm25_weight: float) -> Tuple[float, float, str]:
+    profile = _query_profile(query)
+    d = float(dense_weight)
+    b = float(bm25_weight)
+
+    if profile == "precise":
+        d, b = 0.45, 0.55
+    elif profile == "explanatory":
+        d, b = 0.75, 0.25
+
+    total = max(d + b, 1e-9)
+    return d / total, b / total, profile
+
+
+def _era_preference(query: str, explicit_era_filter: Optional[str] = None) -> Optional[str]:
+    if explicit_era_filter:
+        return _safe_norm_text(explicit_era_filter)
+
+    q = _safe_norm_text(query)
+    modern_markers = ["bns", "bnss", "bsa", "bhartiya nyaya", "bhartiya nagrik", "bhartiya sakshya"]
+    legacy_markers = ["ipc", "crpc", "evidence act", "indian penal code", "code of criminal procedure"]
+    if any(marker in q for marker in modern_markers):
+        return "modern_criminal"
+    if any(marker in q for marker in legacy_markers):
+        return "legacy_criminal"
+    return None
+
+
+def _era_multiplier(item: Dict[str, Any], era_pref: Optional[str]) -> float:
+    if not era_pref:
+        return 1.0
+    hay = _safe_norm_text(
+        " ".join(
+            [
+                str(item.get("title") or ""),
+                str(item.get("document_id") or ""),
+                str(item.get("source_json") or ""),
+                str(item.get("chunk_text") or "")[:120],
+            ]
+        )
+    )
+    modern_markers = ["bns", "bnss", "bsa", "bhartiya nyaya", "bhartiya nagrik", "bhartiya sakshya"]
+    legacy_markers = ["ipc", "crpc", "evidence act", "indian penal code", "code of criminal procedure"]
+
+    if era_pref == "modern_criminal":
+        if any(marker in hay for marker in modern_markers):
+            return 1.2
+        if any(marker in hay for marker in legacy_markers):
+            return 0.82
+    if era_pref == "legacy_criminal":
+        if any(marker in hay for marker in legacy_markers):
+            return 1.2
+        if any(marker in hay for marker in modern_markers):
+            return 0.82
+    return 1.0
+
+
+def _passes_structural_filters(
+    item: Dict[str, Any],
+    act_filter: Optional[str],
+    section_filter: Optional[str],
+) -> bool:
+    if not act_filter and not section_filter:
+        return True
+
+    hay = _safe_norm_text(
+        " ".join(
+            [
+                str(item.get("title") or ""),
+                str(item.get("document_id") or ""),
+                str(item.get("source_json") or ""),
+            ]
+        )
+    )
+
+    if act_filter:
+        target = _safe_norm_text(act_filter)
+        if target and target not in hay:
+            return False
+
+    if section_filter:
+        target_sec = _safe_norm_text(section_filter).replace("section ", "").replace("s.", "").strip()
+        item_sec = _safe_norm_text(item.get("section_number"))
+        item_sec = item_sec.replace("section ", "").replace("s.", "").strip()
+        if target_sec and item_sec and target_sec != item_sec:
+            return False
+    return True
+
+
 def normalize_scores(score_map: Dict[int, float]) -> Dict[int, float]:
     if not score_map:
         return {}
@@ -318,6 +436,9 @@ def hybrid_search(
     dense_weight: float,
     bm25_weight: float,
     domain_filter: Optional[str] = None,
+    act_filter: Optional[str] = None,
+    section_filter: Optional[str] = None,
+    era_filter: Optional[str] = None,
 ) -> List[Dict]:
     # For judgements, use metadata.db directly from embedding_judgements/
     db_path = os.path.join(cfg.embeddings_dir, "metadata.db") if cfg.name == "judgements" else cfg.bm25_db_path
@@ -325,6 +446,7 @@ def hybrid_search(
     ensure_exists(cfg.faiss_path, "FAISS index")
     ensure_exists(db_path, "BM25 db")
 
+    t_total0 = time.time()
     import torch
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = load_embedding_model(cfg.model_name, device=device)
@@ -336,11 +458,18 @@ def hybrid_search(
     
     conn = connect_db(db_path)
 
+    t0 = time.time()
     dense_raw = dense_search(index, model, query, dense_k)
+    dense_ms = (time.time() - t0) * 1000.0
+
+    t0 = time.time()
     bm25_raw = bm25_search(conn, query, bm25_k, corpus_name=cfg.name)
+    bm25_ms = (time.time() - t0) * 1000.0
 
     dense_norm = normalize_scores(dense_raw)
     bm25_norm = normalize_scores(bm25_raw)
+    dynamic_dense_weight, dynamic_bm25_weight, q_profile = _dynamic_weights(query, dense_weight, bm25_weight)
+    era_pref = _era_preference(query, era_filter)
 
     all_ids = sorted(set(dense_norm.keys()) | set(bm25_norm.keys()))
     docs = fetch_docs(conn, all_ids, corpus_name=cfg.name)
@@ -363,15 +492,21 @@ def hybrid_search(
                 filtered_docs[doc_id] = item
         docs = filtered_docs
 
-
+    t0 = time.time()
     ranked = []
     for doc_id in all_ids:
-        d = dense_norm.get(doc_id, 0.0)
-        b = bm25_norm.get(doc_id, 0.0)
-        score = dense_weight * d + bm25_weight * b
         item = docs.get(doc_id)
         if not item:
             continue
+
+        if cfg.name == "acts" and not _passes_structural_filters(item, act_filter=act_filter, section_filter=section_filter):
+            continue
+
+        d = dense_norm.get(doc_id, 0.0)
+        b = bm25_norm.get(doc_id, 0.0)
+        score = dynamic_dense_weight * d + dynamic_bm25_weight * b
+        score *= _era_multiplier(item, era_pref)
+
         item.update(
             {
                 "id": doc_id,
@@ -379,9 +514,29 @@ def hybrid_search(
                 "dense_score": d,
                 "bm25_score": b,
                 "corpus": cfg.name,
+                "query_profile": q_profile,
+                "dense_weight_used": dynamic_dense_weight,
+                "bm25_weight_used": dynamic_bm25_weight,
+                "era_preference": era_pref,
+                "retrieval_trace": {
+                    "device": device,
+                    "query_profile": q_profile,
+                    "dense_ms": round(dense_ms, 2),
+                    "bm25_ms": round(bm25_ms, 2),
+                    "candidates_dense": len(dense_norm),
+                    "candidates_bm25": len(bm25_norm),
+                },
             }
         )
         ranked.append(item)
+
+    fusion_ms = (time.time() - t0) * 1000.0
+    total_ms = (time.time() - t_total0) * 1000.0
+    for item in ranked:
+        trace = item.get("retrieval_trace") or {}
+        trace["fusion_ms"] = round(fusion_ms, 2)
+        trace["total_ms"] = round(total_ms, 2)
+        item["retrieval_trace"] = trace
 
     ranked.sort(key=lambda x: x["hybrid_score"], reverse=True)
     return ranked[:top_k]
@@ -423,7 +578,17 @@ def rerank_results(
         print(f"[rerank] warning: unable to load reranker '{rerank_model}' ({exc}); using hybrid rank only.")
         return results[:top_k]
 
-    pairs = [[query, item.get("chunk_text", "")] for item in head]
+    pairs = []
+    for item in head:
+        enriched = "\n".join(
+            [
+                str(item.get("title") or ""),
+                f"Section {item.get('section_number')}: {item.get('section_title')}",
+                str(item.get("context_path") or ""),
+                str(item.get("chunk_text") or ""),
+            ]
+        ).strip()
+        pairs.append([query, enriched])
     scores = model.predict(pairs, batch_size=rerank_batch_size, show_progress_bar=False)
 
     for item, score in zip(head, scores):
@@ -431,12 +596,16 @@ def rerank_results(
         normalized_score = 1.0 / (1.0 + math.exp(-raw_score))
         item["rerank_score"] = normalized_score
         item["rerank_raw_score"] = raw_score
-        # PHASE 1: Use dense_score as primary signal; rerank is logged but not dominant
-        dense = float(item.get("dense_score", 0.0) or 0.0)
-        item["final_score"] = dense
+        hybrid = float(item.get("hybrid_score", 0.0) or 0.0)
+        # Keep reranker meaningful but avoid full overwrite of hybrid signal.
+        item["final_score"] = (0.65 * hybrid) + (0.35 * normalized_score)
 
     head.sort(key=lambda x: x["final_score"], reverse=True)
+    for item in tail:
+        if "final_score" not in item:
+            item["final_score"] = float(item.get("hybrid_score", 0.0) or 0.0)
     merged = head + tail
+    merged.sort(key=lambda x: float(x.get("final_score", x.get("hybrid_score", 0.0)) or 0.0), reverse=True)
     return merged[:top_k]
 
 
@@ -460,6 +629,9 @@ def parse_args() -> argparse.Namespace:
     p_query.add_argument("--rerank-model", default=BGE_RERANKER_MODEL)
     p_query.add_argument("--rerank-top-n", type=int, default=50)
     p_query.add_argument("--rerank-batch-size", type=int, default=16)
+    p_query.add_argument("--act-filter", default=None, help="Restrict acts retrieval to matching act title/id")
+    p_query.add_argument("--section-filter", default=None, help="Restrict acts retrieval to matching section number")
+    p_query.add_argument("--era-filter", default=None, help="Criminal law era preference: modern_criminal|legacy_criminal")
 
     return parser.parse_args()
 
@@ -489,6 +661,9 @@ def run_hybrid_retrieval(args: argparse.Namespace) -> List[Dict]:
         dense_weight=args.dense_weight,
         bm25_weight=args.bm25_weight,
         domain_filter=domain_filter,
+        act_filter=getattr(args, "act_filter", None),
+        section_filter=getattr(args, "section_filter", None),
+        era_filter=getattr(args, "era_filter", None),
     )
     final = results
     if getattr(args, "rerank", False):

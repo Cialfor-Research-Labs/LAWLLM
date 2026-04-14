@@ -63,6 +63,31 @@ def _normalize_hint_list(values: List[str]) -> List[str]:
     return [str(v).strip().lower() for v in values if str(v).strip()]
 
 
+def _apply_section_diversity(results: List[Dict], top_k: int, max_per_section: int = 2) -> List[Dict]:
+    if not results:
+        return results
+    section_counts: Dict[Tuple[str, str, str], int] = {}
+    diversified: List[Dict] = []
+    overflow: List[Dict] = []
+
+    for item in results:
+        key = (
+            str(item.get("corpus") or ""),
+            str(item.get("document_id") or item.get("title") or ""),
+            str(item.get("section_number") or item.get("context_path") or ""),
+        )
+        current = section_counts.get(key, 0)
+        if current < max_per_section:
+            section_counts[key] = current + 1
+            diversified.append(item)
+        else:
+            overflow.append(item)
+
+    if len(diversified) < top_k:
+        diversified.extend(overflow[: max(0, top_k - len(diversified))])
+    return diversified[:top_k]
+
+
 def _apply_law_focus(
     results: List[Dict],
     relevant_laws: List[str],
@@ -109,7 +134,11 @@ def run_retrieval(args: argparse.Namespace) -> List[Dict]:
     requested_domain = getattr(args, "legal_domain", "auto")
     domain = route.domain if requested_domain in (None, "", "auto") else requested_domain
 
-    candidate_k = max(args.top_k, args.rerank_top_n) if args.rerank else args.top_k
+    rerank_top_n = int(getattr(args, "rerank_top_n", args.top_k) or args.top_k)
+    candidate_k = max(args.top_k, rerank_top_n) if args.rerank else args.top_k
+    act_filter_arg = getattr(args, "act_filter", None)
+    section_filter_arg = getattr(args, "section_filter", None)
+    era_filter_arg = getattr(args, "era_filter", None)
 
     results = []
     if args.corpus == "all" or args.corpus == "acts":
@@ -124,6 +153,9 @@ def run_retrieval(args: argparse.Namespace) -> List[Dict]:
             dense_weight=args.dense_weight,
             bm25_weight=args.bm25_weight,
             domain_filter=domain_filter_arg,
+            act_filter=act_filter_arg,
+            section_filter=section_filter_arg,
+            era_filter=era_filter_arg,
         )
         results.extend(res_acts)
     
@@ -138,6 +170,9 @@ def run_retrieval(args: argparse.Namespace) -> List[Dict]:
             dense_weight=args.dense_weight,
             bm25_weight=args.bm25_weight,
             domain_filter=None, # domain_filter usually for acts
+            act_filter=None,
+            section_filter=None,
+            era_filter=era_filter_arg,
         )
         results.extend(res_judgements)
 
@@ -235,6 +270,9 @@ def run_retrieval(args: argparse.Namespace) -> List[Dict]:
         )
     else:
         results = results[: args.top_k]
+
+    # Keep section-level diversity in the final shortlist.
+    results = _apply_section_diversity(results, top_k=args.top_k, max_per_section=2)
 
     results = _apply_law_focus(
         results,
@@ -431,6 +469,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--rerank-model", default="BAAI/bge-reranker-base")
     p.add_argument("--rerank-top-n", type=int, default=50)
     p.add_argument("--rerank-batch-size", type=int, default=16)
+    p.add_argument("--act-filter", default=None)
+    p.add_argument("--section-filter", default=None)
+    p.add_argument("--era-filter", default=None)
     p.add_argument("--max-context-chars", type=int, default=45000)
     p.add_argument(
         "--legal-domain",

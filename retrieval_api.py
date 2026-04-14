@@ -1286,6 +1286,24 @@ def _deterministic_retrieval_queries(user_query: str, structured_query: Dict[str
     return []
 
 
+def _infer_era_filter(user_query: str, structured_query: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    q = (user_query or "").lower()
+    structured_query = structured_query or {}
+
+    explicit = str(structured_query.get("era") or "").strip().lower()
+    if explicit in {"modern_criminal", "legacy_criminal"}:
+        return explicit
+
+    modern_markers = ["bns", "bnss", "bsa", "bhartiya nyaya", "bhartiya nagrik", "bhartiya sakshya"]
+    legacy_markers = ["ipc", "crpc", "evidence act", "indian penal code", "code of criminal procedure"]
+
+    if any(marker in q for marker in modern_markers):
+        return "modern_criminal"
+    if any(marker in q for marker in legacy_markers):
+        return "legacy_criminal"
+    return None
+
+
 def generate_retrieval_queries(
     user_query: str,
     structured_query: Dict[str, Any],
@@ -1412,6 +1430,7 @@ def _result_score(item: Dict[str, Any]) -> float:
 
 
 def _result_summary(item: Dict[str, Any]) -> Dict[str, Any]:
+    trace = item.get("retrieval_trace") or {}
     return {
         "corpus": item.get("corpus"),
         "title": item.get("title"),
@@ -1422,8 +1441,17 @@ def _result_summary(item: Dict[str, Any]) -> Dict[str, Any]:
         "score": round(_result_score(item), 4),
         "dense_score": round(float(item.get("dense_score", 0.0) or 0.0), 4),
         "bm25_score": round(float(item.get("bm25_score", 0.0) or 0.0), 4),
+        "dense_weight_used": round(float(item.get("dense_weight_used", 0.0) or 0.0), 4),
+        "bm25_weight_used": round(float(item.get("bm25_weight_used", 0.0) or 0.0), 4),
+        "query_profile": item.get("query_profile"),
         "rerank_score": item.get("rerank_score"),
         "rerank_raw_score": item.get("rerank_raw_score"),
+        "retrieval_ms": {
+            "dense_ms": trace.get("dense_ms"),
+            "bm25_ms": trace.get("bm25_ms"),
+            "fusion_ms": trace.get("fusion_ms"),
+            "total_ms": trace.get("total_ms"),
+        },
         "text_preview": str(item.get("chunk_text") or "")[:200],
     }
 
@@ -1432,8 +1460,7 @@ def _apply_result_quality_controls(
     results: List[Dict[str, Any]],
     allowed_docs: set[str],
 ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """PHASE 1: No chunk is rejected due to score or BM25.
-    All chunks pass through. We only log diagnostic info."""
+    """Apply lightweight quality controls while preserving hybrid/rerank signals."""
     kept: List[Dict[str, Any]] = []
     rejected: List[Dict[str, Any]] = []
 
@@ -1442,26 +1469,40 @@ def _apply_result_quality_controls(
         log_notes: List[str] = []
         corpus = str(adjusted.get("corpus") or "").strip().lower()
 
-        # PHASE 1: corpus type mismatch is the ONLY hard rejection
+        # Corpus type mismatch remains the only hard rejection.
         if corpus not in allowed_docs:
             log_notes.append(f"rejected_doc_type:{corpus or 'unknown'}")
             rejected.append({**_result_summary(adjusted), "reasons": log_notes})
             continue
 
-        # PHASE 1: Use dense_score as the primary signal, ignore BM25/rerank noise
+        base_score = float(adjusted.get("final_score", adjusted.get("hybrid_score", 0.0)) or 0.0)
         dense_score = float(adjusted.get("dense_score", 0.0) or 0.0)
         bm25_score = float(adjusted.get("bm25_score", 0.0) or 0.0)
+        rerank_score = adjusted.get("rerank_score")
+        query_profile = str(adjusted.get("query_profile") or "").strip().lower()
 
-        # Log but NEVER block based on BM25 or rerank
+        # Diagnostic notes only.
         if bm25_score == 0.0:
-            log_notes.append("bm25_zero_note")  # logged, not penalized
+            log_notes.append("bm25_zero")
+        if dense_score < 0.15:
+            log_notes.append("weak_dense")
 
-        # PHASE 1: final_score = dense_score (simplified scoring)
-        adjusted["quality_score"] = dense_score
-        adjusted["final_score"] = dense_score
-        adjusted["hybrid_score"] = dense_score
+        if rerank_score is not None:
+            rr = float(rerank_score or 0.0)
+            if query_profile == "precise":
+                quality_score = (0.55 * base_score) + (0.45 * rr)
+            elif query_profile == "explanatory":
+                quality_score = (0.75 * base_score) + (0.25 * rr)
+            else:
+                quality_score = (0.65 * base_score) + (0.35 * rr)
+        else:
+            quality_score = base_score
 
-        # PHASE 1: ALL chunks pass — no score gating
+        adjusted["quality_score"] = quality_score
+        adjusted["final_score"] = quality_score
+        adjusted["hybrid_score"] = max(float(adjusted.get("hybrid_score", 0.0) or 0.0), quality_score)
+        if log_notes:
+            adjusted["quality_notes"] = log_notes
         kept.append(adjusted)
 
     kept.sort(key=_result_score, reverse=True)
@@ -1488,11 +1529,23 @@ def retrieve_for_queries(
                 "retrieved_chunks": [_result_summary(item) for item in raw_results],
                 "filtered_chunks": [_result_summary(item) for item in filtered_results],
                 "rejected_chunks": rejected_results,
+                "stage_metrics": (raw_results[0].get("retrieval_trace") if raw_results else {}),
             }
         )
 
     merged = merge_retrieval_results(result_sets, top_k=base_args.top_k)
-    return merged, {"expanded_queries": queries[:MAX_RETRIEVAL_QUERIES], "runs": debug_runs}
+    merged_scores = [float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0) for item in merged]
+    summary = {
+        "expanded_queries": queries[:MAX_RETRIEVAL_QUERIES],
+        "runs": debug_runs,
+        "summary": {
+            "queries_executed": len(debug_runs),
+            "merged_count": len(merged),
+            "max_score": max(merged_scores) if merged_scores else 0.0,
+            "avg_score": (sum(merged_scores) / len(merged_scores)) if merged_scores else 0.0,
+        },
+    }
+    return merged, summary
 
 
 def retrieve_with_keyword_fallback(
@@ -1518,6 +1571,7 @@ def retrieve_with_keyword_fallback(
     fallback_args = SimpleNamespace(**vars(base_args))
     fallback_args.rerank = False
     fallback_args.top_k = max(getattr(base_args, "top_k", 5), 5)
+    fallback_args.section_filter = None
     results, debug = retrieve_for_queries(keyword_queries, fallback_args, allowed_docs)
     debug["fallback"] = True
     return results, debug
@@ -2847,6 +2901,9 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
                 rerank_batch_size=16,
                 domain_filter=domain_filter,
                 legal_domain=structured_query.get("domain", "auto"),
+                act_filter=expanded_obj.filters.get("act"),
+                section_filter=expanded_obj.filters.get("section_number"),
+                era_filter=_infer_era_filter(user_query, structured_query),
                 intent_route=intent_route,
                 relevant_laws=law_focus.get("relevant_laws", []),
                 preferred_laws=law_focus.get("preferred_laws", []),
@@ -2854,6 +2911,15 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             )
             results, retrieval_debug = retrieve_for_queries(retrieval_queries, retrieval_args, allowed_docs=allowed_docs)
             debug_trace["retrieval"] = retrieval_debug
+            retrieval_summary = retrieval_debug.get("summary", {}) if isinstance(retrieval_debug, dict) else {}
+            if retrieval_summary:
+                reasoning.append(
+                    "Retrieval summary: "
+                    f"queries={retrieval_summary.get('queries_executed', 0)}, "
+                    f"merged={retrieval_summary.get('merged_count', 0)}, "
+                    f"max_score={float(retrieval_summary.get('max_score', 0.0) or 0.0):.2f}, "
+                    f"avg_score={float(retrieval_summary.get('avg_score', 0.0) or 0.0):.2f}"
+                )
             if not _query_mentions_specific_state(user_query):
                 reasoning.append("State-specific authorities suppressed because no Indian state was mentioned in the query.")
                 results = _filter_state_specific_results(user_query, results)
@@ -3607,6 +3673,9 @@ def query_lawyer_refine(payload: LawyerRefineRequest, authorization: Optional[st
         rerank_batch_size=16,
         domain_filter=refined_structured.get("domain") if refined_structured.get("domain") == "criminal" else None,
         legal_domain=refined_structured.get("domain", "auto"),
+        act_filter=None,
+        section_filter=None,
+        era_filter=_infer_era_filter(session.get("query", ""), refined_structured),
         intent_route=intent_route,
         relevant_laws=law_focus.get("relevant_laws", []),
         preferred_laws=law_focus.get("preferred_laws", []),
@@ -3729,6 +3798,9 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
                 rerank_batch_size=16,
                 domain_filter=None,
                 legal_domain="auto",
+                act_filter=None,
+                section_filter=None,
+                era_filter=_infer_era_filter(search_query, {}),
                 intent_route=None,
                 relevant_laws=[],
                 preferred_laws=[],
