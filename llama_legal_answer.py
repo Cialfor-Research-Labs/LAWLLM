@@ -196,11 +196,28 @@ def llm_rerank(user_query: str, results: List[Dict], model_name: str, timeout_se
 
     available_corpora = {r.get("corpus") for r in results if r.get("corpus")}
 
-    def _ensure_corpus(corpus_name: str, replace_from_end: bool = True) -> None:
+    def _is_viable_judgement(item: Dict) -> bool:
+        if str(item.get("corpus") or "").strip().lower() != "judgements":
+            return False
+        title = str(item.get("title") or "").strip().lower()
+        if not title or "title unavailable" in title:
+            return False
+        if title in {"judgement", "judgment", "case", "legal document", "untitled"}:
+            return False
+        score = float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0)
+        return score >= 0.2
+
+    def _ensure_corpus(corpus_name: str, replace_from_end: bool = True, predicate=None) -> None:
         selected_corpora = {r.get("corpus") for r in selected if r.get("corpus")}
         if corpus_name not in available_corpora or corpus_name in selected_corpora:
             return
-        candidate = next((r for r in results if r.get("corpus") == corpus_name), None)
+        candidate = next(
+            (
+                r for r in results
+                if r.get("corpus") == corpus_name and (predicate(r) if predicate else True)
+            ),
+            None,
+        )
         if candidate is None:
             return
         if len(selected) >= 3:
@@ -210,8 +227,8 @@ def llm_rerank(user_query: str, results: List[Dict], model_name: str, timeout_se
         else:
             selected.append(candidate)
 
-    # Keep one judgement and one act whenever available in retrieved results.
-    _ensure_corpus("judgements", replace_from_end=True)
+    # Keep one act whenever available; include a judgement only if it is meaningful.
+    _ensure_corpus("judgements", replace_from_end=True, predicate=_is_viable_judgement)
     _ensure_corpus("acts", replace_from_end=False)
 
     deduped = []

@@ -1006,16 +1006,24 @@ def merge_retrieval_results(result_sets: List[List[Dict[str, Any]]], top_k: int)
     if not top:
         return top
 
-    # Preserve corpus diversity: keep at least one judgement and one act when available.
+    # Preserve corpus diversity: keep at least one act, and include judgement only if usable.
     available_corpora = {str(item.get("corpus") or "").lower() for item in ranked}
     top_corpora = {str(item.get("corpus") or "").lower() for item in top}
 
-    def _inject_corpus(corpus_name: str) -> None:
+    def _inject_corpus(corpus_name: str, predicate: Optional[Any] = None) -> None:
         if top_k < 2:
             return
         if corpus_name not in available_corpora or corpus_name in top_corpora:
             return
-        candidate = next((item for item in ranked if str(item.get("corpus") or "").lower() == corpus_name), None)
+        candidate = next(
+            (
+                item
+                for item in ranked
+                if str(item.get("corpus") or "").lower() == corpus_name
+                and (predicate(item) if predicate else True)
+            ),
+            None,
+        )
         if not candidate:
             return
         # Replace the last item from another corpus to preserve list size.
@@ -1027,7 +1035,7 @@ def merge_retrieval_results(result_sets: List[List[Dict[str, Any]]], top_k: int)
         top_corpora.add(corpus_name)
 
     _inject_corpus("acts")
-    _inject_corpus("judgements")
+    _inject_corpus("judgements", predicate=lambda item: _is_usable_judgement_result(item, min_score=0.2))
 
     # Dedupe while preserving order, then refill from ranked if needed.
     deduped: List[Dict[str, Any]] = []
@@ -1203,6 +1211,36 @@ def _display_law_name(value: str) -> str:
         words = [token.upper() if token in acronym_tokens else token.capitalize() for token in cleaned.split()]
         return " ".join(words)
     return cleaned
+
+
+def _is_placeholder_judgement_title(value: str) -> bool:
+    title = re.sub(r"\s+", " ", str(value or "").strip().lower())
+    if not title:
+        return True
+    if "title unavailable" in title:
+        return True
+    if title in {"judgement", "judgment", "case", "legal document", "untitled"}:
+        return True
+    if title.startswith("judgement") and len(title) <= 22:
+        return True
+    if title.startswith("judgment") and len(title) <= 22:
+        return True
+    return False
+
+
+def _is_usable_judgement_result(item: Dict[str, Any], min_score: float = 0.0) -> bool:
+    if str(item.get("corpus") or "").strip().lower() != "judgements":
+        return False
+    title = _display_law_name(str(item.get("title") or "")).strip()
+    if _is_placeholder_judgement_title(title):
+        return False
+    score = float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0)
+    if score < float(min_score):
+        return False
+    text = str(item.get("chunk_text") or "")
+    if len(text.strip()) < 80:
+        return False
+    return True
 
 
 def _law_focus_candidates(law_focus: Dict[str, List[str]], limit: int = 6) -> List[str]:
@@ -1897,7 +1935,7 @@ def _build_context_grounded_fallback(user_query: str, context_blocks: List[Dict[
     judgement_authorities = []
     seen = set()
     for block in context_blocks:
-        title = str(block.get("title") or "").strip()
+        title = _display_law_name(str(block.get("title") or "")).strip()
         sec = str(block.get("section_number") or "").strip()
         corpus = str(block.get("corpus") or "").strip().lower()
         if not title:
@@ -1907,6 +1945,8 @@ def _build_context_grounded_fallback(user_query: str, context_blocks: List[Dict[
             continue
         seen.add(key)
         if corpus == "judgements":
+            if _is_placeholder_judgement_title(title):
+                continue
             judgement_authorities.append(f"- **{title}**")
         else:
             act_authorities.append(f"- **{title}**, Section {sec}" if sec else f"- **{title}**")
@@ -2103,6 +2143,8 @@ def _rebuild_applicable_law(
         if not title:
             continue
         if corpus == "judgements":
+            if _is_placeholder_judgement_title(title):
+                continue
             if title not in judgements:
                 judgements.append(title)
             continue
