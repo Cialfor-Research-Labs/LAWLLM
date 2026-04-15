@@ -5,7 +5,6 @@ import type { Components } from 'react-markdown';
 import { 
   CheckCircle2, 
   Loader2, 
-  RotateCcw, 
   Scale, 
   Send, 
   Sparkles, 
@@ -480,13 +479,6 @@ export const LegalChat = ({
                                 {status.replace('_', ' ')}
                              </span>
                         </div>
-                        <button
-                            onClick={resetConversation}
-                            className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface hover:bg-surface-container-low"
-                        >
-                            <RotateCcw size={14} />
-                            New Session
-                        </button>
                     </div>
                 </div>
             </div>
