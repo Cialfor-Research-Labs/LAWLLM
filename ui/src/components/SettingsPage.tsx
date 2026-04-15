@@ -7,6 +7,8 @@ interface SettingsUser {
   email: string;
   organization: string;
   use_case: string;
+  advocate_address: string;
+  advocate_mobile: string;
   role: 'admin' | 'user';
   status: 'pending' | 'granted' | 'denied';
   access_granted: boolean;
@@ -45,6 +47,8 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
   const [name, setName] = useState(currentUser.name || '');
   const [organization, setOrganization] = useState(currentUser.organization || '');
   const [useCase, setUseCase] = useState(currentUser.use_case || '');
+  const [advocateAddress, setAdvocateAddress] = useState(currentUser.advocate_address || '');
+  const [advocateMobile, setAdvocateMobile] = useState(currentUser.advocate_mobile || '');
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
@@ -60,6 +64,8 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
     setName(currentUser.name || '');
     setOrganization(currentUser.organization || '');
     setUseCase(currentUser.use_case || '');
+    setAdvocateAddress(currentUser.advocate_address || '');
+    setAdvocateMobile(currentUser.advocate_mobile || '');
   }, [currentUser]);
 
   const saveProfile = async (e: React.FormEvent) => {
@@ -70,6 +76,14 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
     const cleanName = name.trim();
     if (cleanName.length < 2) {
       setProfileError('Name must be at least 2 characters.');
+      return;
+    }
+    if (advocateAddress.trim().length < 5) {
+      setProfileError('Advocate address is required.');
+      return;
+    }
+    if (advocateMobile.trim().length < 8) {
+      setProfileError('Advocate mobile is required.');
       return;
     }
 
@@ -85,6 +99,8 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
           name: cleanName,
           organization: organization.trim(),
           use_case: useCase.trim(),
+          advocate_address: advocateAddress.trim(),
+          advocate_mobile: advocateMobile.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -207,6 +223,26 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
                   onChange={(e) => setUseCase(e.target.value)}
                   className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
                   placeholder="How you use this platform"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Advocate Address *</label>
+                <input
+                  value={advocateAddress}
+                  onChange={(e) => setAdvocateAddress(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  placeholder="Chamber or correspondence address"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Advocate Mobile *</label>
+                <input
+                  value={advocateMobile}
+                  onChange={(e) => setAdvocateMobile(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  placeholder="e.g. +91 9876543210"
+                  required
                 />
               </div>
               <div className="md:col-span-2">

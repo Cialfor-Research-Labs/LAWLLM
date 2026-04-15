@@ -312,6 +312,9 @@ def auto_detect_notice_type(claim: str, facts: List[str]) -> str:
 def build_notice_prompt(
     sender_name: str,
     advocate_name: str,
+    advocate_address: str,
+    advocate_mobile: str,
+    advocate_email: str,
     advocate_contact: str,
     receiver_name: str,
     relationship: str,
@@ -349,7 +352,9 @@ def build_notice_prompt(
     today = datetime.now().strftime("%d %B %Y")
     deadline_date = (datetime.now() + timedelta(days=deadline)).strftime("%d %B %Y")
     advocate_name_display = advocate_name or "[Your Name]"
-    advocate_contact_display = advocate_contact or "[Your Contact Details]"
+    advocate_address_display = advocate_address or "[Your Address]"
+    advocate_mobile_display = advocate_mobile or "[Your Mobile]"
+    advocate_email_display = advocate_email or "[Your Email]"
 
     return (
         "You are a senior Indian advocate drafting a formal legal notice.\n\n"
@@ -366,8 +371,10 @@ def build_notice_prompt(
         "[Address]\n"
         "Through,\n"
         f"{advocate_name_display}, Advocate\n"
-        "[Your Address]\n"
-        f"{advocate_contact_display}\n\n"
+        f"{advocate_address_display}\n"
+        f"Mobile: {advocate_mobile_display}\n"
+        f"Email: {advocate_email_display}\n"
+        "\n"
         "Subject: Legal Notice under [applicable law(s)]\n\n"
         "Sir/Madam,\n\n"
         "Under instructions from and on behalf of my client, I hereby serve upon you "
@@ -390,6 +397,9 @@ def build_notice_prompt(
         "INPUT DETAILS:\n\n"
         f"Sender: {sender_name}\n"
         f"Advocate: {advocate_name or 'Not provided'}\n"
+        f"Advocate Address: {advocate_address or 'Not provided'}\n"
+        f"Advocate Mobile: {advocate_mobile or 'Not provided'}\n"
+        f"Advocate Email: {advocate_email or 'Not provided'}\n"
         f"Advocate Contact: {advocate_contact or 'Not provided'}\n"
         f"Receiver: {receiver_name}\n"
         f"Relationship: {relationship}\n"
@@ -410,7 +420,7 @@ def build_notice_prompt(
         "- End with proper advocate signature block\n"
         "- Mention that a copy is kept for records\n"
         "- Keep the exact opening block labels: To, From, Through\n"
-        "- 'Through' must always contain advocate name and advocate contact details (not client details)\n"
+        "- 'Through' must always contain advocate name, advocate address, and advocate mobile (not client details)\n"
     )
 
 

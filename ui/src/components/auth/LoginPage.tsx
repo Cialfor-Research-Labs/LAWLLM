@@ -6,6 +6,8 @@ interface AuthUser {
   email: string;
   organization: string;
   use_case: string;
+  advocate_address: string;
+  advocate_mobile: string;
   role: 'admin' | 'user';
   status: 'pending' | 'granted' | 'denied';
   access_granted: boolean;

@@ -308,6 +308,8 @@ class UpdateProfileRequest(BaseModel):
     name: str = Field(..., min_length=2)
     organization: str = Field("", min_length=0)
     use_case: str = Field("", min_length=0)
+    advocate_address: str = Field(..., min_length=5)
+    advocate_mobile: str = Field(..., min_length=8)
 
 
 class AccessUpdateRequest(BaseModel):
@@ -322,6 +324,8 @@ class AuthUserView(BaseModel):
     email: str
     organization: str = ""
     use_case: str = ""
+    advocate_address: str = ""
+    advocate_mobile: str = ""
     role: str
     status: str
     access_granted: bool
@@ -503,6 +507,8 @@ def _row_to_user_view(row: sqlite3.Row) -> Dict[str, Any]:
         "email": row["email"],
         "organization": row["organization"] or "",
         "use_case": row["use_case"] or "",
+        "advocate_address": row["advocate_address"] or "",
+        "advocate_mobile": row["advocate_mobile"] or "",
         "role": row["role"],
         "status": row["status"],
         "access_granted": bool(row["access_granted"]),
@@ -521,6 +527,8 @@ def _ensure_auth_schema() -> None:
                 email TEXT NOT NULL UNIQUE,
                 organization TEXT NOT NULL DEFAULT '',
                 use_case TEXT NOT NULL DEFAULT '',
+                advocate_address TEXT NOT NULL DEFAULT '',
+                advocate_mobile TEXT NOT NULL DEFAULT '',
                 role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
                 status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
                 access_granted INTEGER NOT NULL DEFAULT 0 CHECK (access_granted IN (0, 1)),
@@ -601,6 +609,11 @@ def _ensure_auth_schema() -> None:
             ON chat_messages(session_id, id);
             """
         )
+        user_cols = {str(row["name"]) for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+        if "advocate_address" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN advocate_address TEXT NOT NULL DEFAULT ''")
+        if "advocate_mobile" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN advocate_mobile TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -2990,17 +3003,31 @@ def auth_update_me(
     clean_name = payload.name.strip()
     clean_organization = payload.organization.strip()
     clean_use_case = payload.use_case.strip()
+    clean_advocate_address = payload.advocate_address.strip()
+    clean_advocate_mobile = payload.advocate_mobile.strip()
     if len(clean_name) < 2:
         raise HTTPException(status_code=400, detail="Name must be at least 2 characters.")
+    if len(clean_advocate_address) < 5:
+        raise HTTPException(status_code=400, detail="Advocate address is required.")
+    if len(clean_advocate_mobile) < 8:
+        raise HTTPException(status_code=400, detail="Advocate mobile is required.")
 
     with _db_conn() as conn:
         conn.execute(
             """
             UPDATE users
-            SET name = ?, organization = ?, use_case = ?, updated_at = ?
+            SET name = ?, organization = ?, use_case = ?, advocate_address = ?, advocate_mobile = ?, updated_at = ?
             WHERE id = ?
             """,
-            (clean_name, clean_organization, clean_use_case, now, int(user_row["id"])),
+            (
+                clean_name,
+                clean_organization,
+                clean_use_case,
+                clean_advocate_address,
+                clean_advocate_mobile,
+                now,
+                int(user_row["id"]),
+            ),
         )
         conn.commit()
         updated_row = conn.execute("SELECT * FROM users WHERE id = ?", (int(user_row["id"]),)).fetchone()
@@ -4318,6 +4345,14 @@ class NoticeRequest(BaseModel):
         default=None,
         description="Advocate name used in notice signature block",
     )
+    advocate_address: Optional[str] = Field(
+        default=None,
+        description="Advocate address used in notice signature block",
+    )
+    advocate_mobile: Optional[str] = Field(
+        default=None,
+        description="Advocate mobile number used in notice signature block",
+    )
     advocate_contact: Optional[str] = Field(
         default=None,
         description="Advocate contact detail (email/phone) used in notice signature",
@@ -4347,13 +4382,32 @@ class NoticeResponse(BaseModel):
     meta: Dict[str, Any] = {}
 
 
-def _replace_notice_identity_placeholders(notice_text: str, advocate_name: str, advocate_contact: str) -> str:
+def _compose_advocate_contact_line(advocate_mobile: str, advocate_email: str) -> str:
+    parts: List[str] = []
+    if advocate_mobile:
+        parts.append(f"Mobile: {advocate_mobile}")
+    if advocate_email:
+        parts.append(f"Email: {advocate_email}")
+    return " | ".join(parts).strip()
+
+
+def _replace_notice_identity_placeholders(
+    notice_text: str,
+    advocate_name: str,
+    advocate_address: str,
+    advocate_mobile: str,
+    advocate_email: str,
+    advocate_contact: str,
+) -> str:
     """Resolve common signature placeholders to advocate identity details."""
     text = str(notice_text or "")
     if not text:
         return text
 
     clean_name = str(advocate_name or "").strip()
+    clean_address = str(advocate_address or "").strip()
+    clean_mobile = str(advocate_mobile or "").strip()
+    clean_email = str(advocate_email or "").strip()
     clean_contact = str(advocate_contact or "").strip()
 
     if clean_name:
@@ -4366,6 +4420,14 @@ def _replace_notice_identity_placeholders(notice_text: str, advocate_name: str, 
         text = re.sub(
             r"(?im)^\s*name\s*[:\-]\s*(?:\[\s*your\s+name\s*\]|your\s+name)?\s*$",
             f"Name: {clean_name}",
+            text,
+        )
+
+    if clean_address:
+        text = re.sub(r"\[\s*your\s+address\s*\]", clean_address, text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"(?im)^\s*your\s+address\s*[:\-]?\s*$",
+            f"Address: {clean_address}",
             text,
         )
 
@@ -4384,6 +4446,22 @@ def _replace_notice_identity_placeholders(notice_text: str, advocate_name: str, 
         )
         text = re.sub(r"(?im)^\s*email\s*[:\-]\s*$", f"Email: {clean_contact}", text)
 
+    if clean_mobile:
+        text = re.sub(r"\[\s*your\s+mobile\s*\]", clean_mobile, text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"(?im)^\s*mobile\s*[:\-]\s*(?:\[\s*your\s+mobile\s*\])?\s*$",
+            f"Mobile: {clean_mobile}",
+            text,
+        )
+
+    if clean_email:
+        text = re.sub(r"\[\s*your\s+email\s*\]", clean_email, text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"(?im)^\s*email\s*[:\-]\s*(?:\[\s*your\s+email\s*\])?\s*$",
+            f"Email: {clean_email}",
+            text,
+        )
+
     return text
 
 
@@ -4400,9 +4478,22 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
     """Generate a professional legal notice from structured input."""
     try:
         advocate_name = str(payload.advocate_name or requesting_user["name"] or "").strip()
-        advocate_contact = str(
-            payload.advocate_contact or payload.sender_contact or requesting_user["email"] or ""
+        advocate_email = str(requesting_user["email"] or "").strip()
+        advocate_address = str(
+            payload.advocate_address or requesting_user["advocate_address"] or ""
         ).strip()
+        advocate_mobile = str(
+            payload.advocate_mobile or requesting_user["advocate_mobile"] or ""
+        ).strip()
+        advocate_contact = str(payload.advocate_contact or payload.sender_contact or "").strip()
+        if not advocate_contact:
+            advocate_contact = _compose_advocate_contact_line(advocate_mobile, advocate_email)
+
+        if not advocate_address or not advocate_mobile:
+            raise HTTPException(
+                status_code=400,
+                detail="Advocate address and mobile are required. Update them in Settings > Details.",
+            )
 
         # STEP 1: Determine notice type
         if payload.notice_type == "auto":
@@ -4459,6 +4550,9 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
         prompt = build_notice_prompt(
             sender_name=payload.sender_name,
             advocate_name=advocate_name,
+            advocate_address=advocate_address,
+            advocate_mobile=advocate_mobile,
+            advocate_email=advocate_email,
             advocate_contact=advocate_contact,
             receiver_name=payload.receiver_name,
             relationship=payload.relationship,
@@ -4503,6 +4597,9 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
         final_notice = _replace_notice_identity_placeholders(
             final_notice,
             advocate_name=advocate_name,
+            advocate_address=advocate_address,
+            advocate_mobile=advocate_mobile,
+            advocate_email=advocate_email,
             advocate_contact=advocate_contact,
         )
 
@@ -4534,6 +4631,8 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
                 "has_retrieval_context": has_retrieval,
                 "detected_type": detected_type,
                 "advocate_name_applied": bool(advocate_name),
+                "advocate_address_applied": bool(advocate_address),
+                "advocate_mobile_applied": bool(advocate_mobile),
                 "advocate_contact_applied": bool(advocate_contact),
             },
         )

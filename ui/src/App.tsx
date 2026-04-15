@@ -23,6 +23,8 @@ interface AuthUser {
   email: string;
   organization: string;
   use_case: string;
+  advocate_address: string;
+  advocate_mobile: string;
   role: 'admin' | 'user';
   status: 'pending' | 'granted' | 'denied';
   access_granted: boolean;
@@ -313,6 +315,8 @@ export default function App() {
                 authToken={authToken}
                 currentUserName={currentUser.name}
                 currentUserEmail={currentUser.email}
+                currentUserAdvocateAddress={currentUser.advocate_address}
+                currentUserAdvocateMobile={currentUser.advocate_mobile}
                 openHistoryRequest={generatorOpenRequest}
                 newSessionRequest={generatorNewSessionRequest}
                 onHistoryChange={setGeneratorHistory}

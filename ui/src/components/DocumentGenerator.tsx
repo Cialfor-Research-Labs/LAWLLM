@@ -63,6 +63,8 @@ interface DocumentGeneratorProps {
   authToken: string;
   currentUserName?: string;
   currentUserEmail?: string;
+  currentUserAdvocateAddress?: string;
+  currentUserAdvocateMobile?: string;
   openHistoryRequest?: { id: string; nonce: number } | null;
   newSessionRequest?: number | null;
   onHistoryChange?: (items: Array<{ id: string; title: string; created_at: string; preview?: string }>) => void;
@@ -107,11 +109,21 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const GENERATOR_HISTORY_LIMIT = 40;
 
-function applyAdvocateIdentityToNotice(notice: string, advocateName: string, advocateContact: string): string {
+function applyAdvocateIdentityToNotice(
+  notice: string,
+  advocateName: string,
+  advocateAddress: string,
+  advocateMobile: string,
+  advocateEmail: string,
+  advocateContact: string,
+): string {
   let text = notice || '';
   if (!text) return text;
 
   const name = advocateName.trim();
+  const address = advocateAddress.trim();
+  const mobile = advocateMobile.trim();
+  const email = advocateEmail.trim();
   const contact = advocateContact.trim();
 
   if (name) {
@@ -128,6 +140,21 @@ function applyAdvocateIdentityToNotice(notice: string, advocateName: string, adv
     text = text.replace(/^\s*email\s*[:\-]\s*$/gim, `Email: ${contact}`);
   }
 
+  if (address) {
+    text = text.replace(/\[\s*your\s+address\s*\]/gi, address);
+    text = text.replace(/^\s*your\s+address\s*[:\-]?\s*$/gim, `Address: ${address}`);
+  }
+
+  if (mobile) {
+    text = text.replace(/\[\s*your\s+mobile\s*\]/gi, mobile);
+    text = text.replace(/^\s*mobile\s*[:\-]\s*(?:\[\s*your\s+mobile\s*\])?\s*$/gim, `Mobile: ${mobile}`);
+  }
+
+  if (email) {
+    text = text.replace(/\[\s*your\s+email\s*\]/gi, email);
+    text = text.replace(/^\s*email\s*[:\-]\s*(?:\[\s*your\s+email\s*\])?\s*$/gim, `Email: ${email}`);
+  }
+
   return text;
 }
 
@@ -137,6 +164,8 @@ export const DocumentGenerator = ({
   authToken,
   currentUserName = '',
   currentUserEmail = '',
+  currentUserAdvocateAddress = '',
+  currentUserAdvocateMobile = '',
   openHistoryRequest,
   newSessionRequest,
   onHistoryChange,
@@ -152,7 +181,15 @@ export const DocumentGenerator = ({
   );
 
   const advocateName = currentUserName.trim();
-  const advocateContact = currentUserEmail.trim();
+  const advocateAddress = currentUserAdvocateAddress.trim();
+  const advocateMobile = currentUserAdvocateMobile.trim();
+  const advocateEmail = currentUserEmail.trim();
+  const advocateContact = [
+    advocateMobile ? `Mobile: ${advocateMobile}` : '',
+    advocateEmail ? `Email: ${advocateEmail}` : '',
+  ]
+    .filter(Boolean)
+    .join(' | ');
 
   // Form state
   const [senderName, setSenderName] = useState('');
@@ -208,7 +245,17 @@ export const DocumentGenerator = ({
             confidence_label: 'high',
             meta: { synced: true }
         };
-        setResult(syncedResult);
+        setResult({
+          ...syncedResult,
+          notice: applyAdvocateIdentityToNotice(
+            syncedResult.notice,
+            advocateName,
+            advocateAddress,
+            advocateMobile,
+            advocateEmail,
+            advocateContact,
+          ),
+        });
         localStorage.removeItem('pending_legal_notice'); // Consume the draft
       }
     };
@@ -217,7 +264,7 @@ export const DocumentGenerator = ({
     handleSync();
     const interval = setInterval(handleSync, 2000); 
     return () => clearInterval(interval);
-  }, []);
+  }, [advocateAddress, advocateContact, advocateEmail, advocateMobile, advocateName]);
 
   const toHistorySummary = (items: GeneratorHistoryItem[]) =>
     items.map((item) => ({
@@ -311,6 +358,10 @@ export const DocumentGenerator = ({
 
   const handleGenerate = async () => {
     if (!isFormValid) return;
+    if (!advocateAddress || !advocateMobile) {
+      setError('Please complete Advocate Address and Advocate Mobile in Settings > Details before generating a notice.');
+      return;
+    }
     setIsLoading(true);
     setError('');
     setResult(null);
@@ -326,6 +377,8 @@ export const DocumentGenerator = ({
         tone,
       };
       if (advocateName) body.advocate_name = advocateName;
+      if (advocateAddress) body.advocate_address = advocateAddress;
+      if (advocateMobile) body.advocate_mobile = advocateMobile;
       if (advocateContact) body.advocate_contact = advocateContact;
       if (deadline) body.custom_deadline = Number(deadline);
       if (customRelief.trim()) {
@@ -345,7 +398,14 @@ export const DocumentGenerator = ({
       const data: NoticeResponse = await response.json();
       const normalized: NoticeResponse = {
         ...data,
-        notice: applyAdvocateIdentityToNotice(data.notice, advocateName, advocateContact),
+        notice: applyAdvocateIdentityToNotice(
+          data.notice,
+          advocateName,
+          advocateAddress,
+          advocateMobile,
+          advocateEmail,
+          advocateContact,
+        ),
       };
       setResult(normalized);
       pushHistoryItem(normalized);
