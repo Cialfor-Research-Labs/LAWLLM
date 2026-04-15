@@ -299,6 +299,17 @@ class SetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+
+
+class UpdateProfileRequest(BaseModel):
+    name: str = Field(..., min_length=2)
+    organization: str = Field("", min_length=0)
+    use_case: str = Field("", min_length=0)
+
+
 class AccessUpdateRequest(BaseModel):
     status: Literal["pending", "granted", "denied"]
     access_granted: bool
@@ -333,6 +344,12 @@ class LoginResponse(BaseModel):
 
 class MeResponse(BaseModel):
     ok: bool
+    user: AuthUserView
+
+
+class AuthUserUpdateResponse(BaseModel):
+    ok: bool
+    message: str
     user: AuthUserView
 
 
@@ -2960,6 +2977,70 @@ def auth_logout(authorization: Optional[str] = Header(default=None)) -> LogoutRe
 def auth_me(authorization: Optional[str] = Header(default=None)) -> MeResponse:
     user_row = _require_authenticated_user(authorization)
     return MeResponse(ok=True, user=AuthUserView(**_row_to_user_view(user_row)))
+
+
+@app.patch("/auth/me", response_model=AuthUserUpdateResponse)
+def auth_update_me(
+    payload: UpdateProfileRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> AuthUserUpdateResponse:
+    user_row = _require_authenticated_user(authorization)
+    now = _utc_now_iso()
+
+    clean_name = payload.name.strip()
+    clean_organization = payload.organization.strip()
+    clean_use_case = payload.use_case.strip()
+    if len(clean_name) < 2:
+        raise HTTPException(status_code=400, detail="Name must be at least 2 characters.")
+
+    with _db_conn() as conn:
+        conn.execute(
+            """
+            UPDATE users
+            SET name = ?, organization = ?, use_case = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (clean_name, clean_organization, clean_use_case, now, int(user_row["id"])),
+        )
+        conn.commit()
+        updated_row = conn.execute("SELECT * FROM users WHERE id = ?", (int(user_row["id"]),)).fetchone()
+
+    if not updated_row:
+        raise HTTPException(status_code=404, detail="User not found after update.")
+
+    return AuthUserUpdateResponse(
+        ok=True,
+        message="Profile details updated successfully.",
+        user=AuthUserView(**_row_to_user_view(updated_row)),
+    )
+
+
+@app.post("/auth/change-password", response_model=RequestAccessResponse)
+def auth_change_password(
+    payload: ChangePasswordRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> RequestAccessResponse:
+    user_row = _require_authenticated_user(authorization)
+
+    existing_password_hash = str(user_row["password_hash"] or "").strip()
+    if not existing_password_hash:
+        raise HTTPException(status_code=400, detail="Password is not set for this account.")
+
+    if not _verify_password(payload.current_password, existing_password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from current password.")
+
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?",
+            (_hash_password(payload.new_password), now, int(user_row["id"])),
+        )
+        conn.commit()
+
+    return RequestAccessResponse(ok=True, message="Password changed successfully.")
 
 
 @app.post("/auth/set-password", response_model=RequestAccessResponse)

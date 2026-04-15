@@ -11,6 +11,7 @@ import { DocumentAnalyzer } from './components/DocumentAnalyzer';
 import { LegalChat } from './components/LegalChat';
 import { DocumentGenerator } from './components/DocumentGenerator';
 import { WinPredictor } from './components/WinPredictor';
+import { SettingsPage } from './components/SettingsPage';
 import { LoginPage } from './components/auth/LoginPage';
 import { RequestAccessPage } from './components/auth/RequestAccessPage';
 import { SetPasswordPage } from './components/auth/SetPasswordPage';
@@ -46,7 +47,7 @@ interface GeneratorHistoryItem {
 
 const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
 const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
-const ALLOWED_TABS = new Set(['chat', 'generator', 'analyzer', 'predictor', 'admin']);
+const ALLOWED_TABS = new Set(['chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
 
 function getInitialActiveTab(): string {
   const stored = (localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || '').trim().toLowerCase();
@@ -329,6 +330,20 @@ export default function App() {
               className="flex-1 flex flex-col overflow-hidden"
             >
               <WinPredictor />
+            </motion.div>
+          ) : activeTab === 'settings' ? (
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col overflow-hidden"
+            >
+              <SettingsPage
+                authToken={authToken}
+                currentUser={currentUser}
+                onUserUpdated={setCurrentUser}
+              />
             </motion.div>
           ) : (
             <motion.div 

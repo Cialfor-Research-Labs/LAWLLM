@@ -212,7 +212,14 @@ export const Sidebar = ({
             <Library size={20} />
             <span className="text-sm">Library</span>
           </button>
-          <button className="w-full flex items-center space-x-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-primary transition-all rounded-lg hover:bg-slate-200/50">
+          <button
+            onClick={() => selectModule('settings')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+              activeTab === 'settings'
+                ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-200/50'
+            }`}
+          >
             <Settings size={20} />
             <span className="text-sm">Settings</span>
           </button>
