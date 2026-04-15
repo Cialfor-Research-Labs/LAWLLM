@@ -348,18 +348,26 @@ def build_notice_prompt(
 
     today = datetime.now().strftime("%d %B %Y")
     deadline_date = (datetime.now() + timedelta(days=deadline)).strftime("%d %B %Y")
+    advocate_name_display = advocate_name or "[Your Name]"
+    advocate_contact_display = advocate_contact or "[Your Contact Details]"
 
     return (
         "You are a senior Indian advocate drafting a formal legal notice.\n\n"
         f"{tone_instruction}\n\n"
-        "Draft a professional legal notice following this EXACT structure:\n\n"
+        "Draft a professional legal notice following this EXACT structure and ordering:\n\n"
         "---\n"
         "LEGAL NOTICE\n\n"
         f"Date: {today}\n\n"
         "To,\n"
-        "[Receiver details]\n\n"
+        f"{receiver_name}\n"
+        "[Address]\n\n"
         "From,\n"
-        "[Sender details through Advocate]\n\n"
+        f"{sender_name}\n"
+        "[Address]\n"
+        "Through,\n"
+        f"{advocate_name_display}, Advocate\n"
+        "[Your Address]\n"
+        f"{advocate_contact_display}\n\n"
         "Subject: Legal Notice under [applicable law(s)]\n\n"
         "Sir/Madam,\n\n"
         "Under instructions from and on behalf of my client, I hereby serve upon you "
@@ -401,7 +409,8 @@ def build_notice_prompt(
         "- Do NOT include any disclaimer about being AI-generated\n"
         "- End with proper advocate signature block\n"
         "- Mention that a copy is kept for records\n"
-        "- Do NOT use placeholders like [Your Name] or [Contact Details]; use Advocate and Advocate Contact exactly\n"
+        "- Keep the exact opening block labels: To, From, Through\n"
+        "- 'Through' must always contain advocate name and advocate contact details (not client details)\n"
     )
 
 
@@ -423,6 +432,7 @@ def build_refinement_prompt(draft_notice: str, tone: str = "firm") -> str:
         "5. Making section citations more precise\n"
         f"6. {tone_instruction}\n"
         "7. Ensuring the deadline and consequences are clearly stated\n\n"
+        "8. Preserve the exact To/From/Through opening format and label order\n\n"
         "Do NOT change the fundamental structure or facts.\n"
         "Do NOT add any AI disclaimer.\n"
         "Return the complete refined notice.\n\n"
