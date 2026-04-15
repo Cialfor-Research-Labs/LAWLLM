@@ -257,7 +257,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen bg-surface font-body overflow-hidden">
+    <div className="relative flex min-h-screen overflow-hidden bg-surface font-body text-on-surface">
+      <div className="atmosphere" />
+      <div className="atmosphere-glow" />
       <Sidebar
         activeTab={activeTab}
         activeSettingsSection={activeSettingsSection}
@@ -273,7 +275,7 @@ export default function App() {
         onSelectSettingsSection={openSettingsSection}
       />
       
-      <main className="flex-1 ml-64 flex flex-col h-screen relative">
+      <main className="relative z-10 ml-64 flex h-screen flex-1 flex-col">
         <Header currentUserName={currentUser.name} onLogout={onLogout} />
         
         <AnimatePresence mode="wait">

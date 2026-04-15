@@ -119,121 +119,117 @@ export const Sidebar = ({
 
   return (
     <>
-      <aside className="fixed left-0 top-0 h-full w-64 bg-slate-100 dark:bg-slate-900 flex flex-col p-4 z-50">
-      <div className="mb-6 px-2 py-4">
-        <h1 className="text-xl font-headline font-bold text-primary">The Digital Atelier</h1>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-label font-bold">Legal AI Systems</p>
-      </div>
-
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="rounded-xl border border-slate-200/70 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/60 p-4 space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 font-bold">
-            Active Workspace
-          </p>
-          <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
-            {activeModule ? <activeModule.icon size={18} /> : <Library size={18} />}
-            <span className="text-sm font-semibold">
-              {activeModule?.label ?? 'Select from Library'}
-            </span>
-          </div>
+      <aside className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-outline-variant/15 bg-surface-container-low p-4">
+        <div className="mb-6 px-2 py-4">
+          <h1 className="text-xl font-headline font-bold text-primary">The Digital Atelier</h1>
+          <p className="font-label text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">Legal AI Systems</p>
         </div>
 
-        {(showChatHistory || showGeneratorHistory) && (
-          <div className="mt-4 min-h-0 rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/60 dark:bg-slate-800/50 p-3 flex-1 overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 dark:text-slate-400">
-                {showChatHistory ? 'Chat History' : 'Generator History'}
-              </p>
-              <span className="text-[10px] text-slate-400">
-                {showChatHistory ? chatHistory.length : generatorHistory.length}
-              </span>
-            </div>
-
-            <div className="space-y-1 overflow-y-auto max-h-[32vh] pr-1">
-              {showChatHistory &&
-                chatHistory.map((item) => (
-                  <button
-                    key={item.session_id}
-                    onClick={() => onSelectChatHistory(item.session_id)}
-                    className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
-                      activeChatSessionId === item.session_id
-                        ? 'border-primary/35 bg-primary/10 text-primary'
-                        : 'border-transparent hover:border-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold truncate">{item.title || 'Untitled Chat'}</div>
-                    <div className="text-[10px] text-slate-500 truncate mt-0.5">
-                      {item.preview || `${item.message_count} messages`}
-                    </div>
-                    <div className="text-[9px] text-slate-400 mt-1">{formatHistoryTime(item.last_message_at)}</div>
-                  </button>
-                ))}
-
-              {showGeneratorHistory &&
-                generatorHistory.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onSelectGeneratorHistory(item.id)}
-                    className={`w-full text-left px-2.5 py-2 rounded-lg border transition-colors ${
-                      activeGeneratorHistoryId === item.id
-                        ? 'border-primary/35 bg-primary/10 text-primary'
-                        : 'border-transparent hover:border-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold truncate">{item.title || 'Generated Notice'}</div>
-                    <div className="text-[10px] text-slate-500 truncate mt-0.5">
-                      {item.preview || 'Open saved draft'}
-                    </div>
-                    <div className="text-[9px] text-slate-400 mt-1">{formatHistoryTime(item.created_at)}</div>
-                  </button>
-                ))}
-
-              {showChatHistory && chatHistory.length === 0 && (
-                <p className="text-[11px] text-slate-500 px-2 py-3">No chat sessions yet.</p>
-              )}
-              {showGeneratorHistory && generatorHistory.length === 0 && (
-                <p className="text-[11px] text-slate-500 px-2 py-3">No generated notices yet.</p>
-              )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="space-y-2 rounded-xl border border-outline-variant/25 bg-surface-container p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Active Workspace</p>
+            <div className="flex items-center gap-3 text-on-surface">
+              {activeModule ? <activeModule.icon size={18} /> : <Library size={18} />}
+              <span className="text-sm font-semibold">{activeModule?.label ?? 'Select from Library'}</span>
             </div>
           </div>
-        )}
-      </div>
 
-      <div className="pt-4 border-t border-slate-200/30">
-        <button
-          onClick={onStartNewSession}
-          className="w-full bg-slate-800 text-white rounded-xl py-3 px-4 flex items-center justify-center space-x-2 mb-3 hover:opacity-90 transition-opacity shadow-lg"
-        >
-          <Plus size={18} />
-          <span className="text-sm font-semibold">New Session</span>
-        </button>
-        <div className="mb-6" />
-        
-        <div className="space-y-1">
-          <button
-            onClick={openLibrary}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-              isLibraryOpen
-                ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-200/50'
-            }`}
-          >
-            <Library size={20} />
-            <span className="text-sm">Library</span>
-          </button>
-          <button
-            onClick={openSettings}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-              isSettingsOpen || activeTab === 'settings'
-                ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-200/50'
-            }`}
-          >
-            <Settings size={20} />
-            <span className="text-sm">Settings</span>
-          </button>
+          {(showChatHistory || showGeneratorHistory) && (
+            <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-outline-variant/25 bg-surface-container-high/50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                  {showChatHistory ? 'Chat History' : 'Generator History'}
+                </p>
+                <span className="text-[10px] text-on-surface-variant/80">
+                  {showChatHistory ? chatHistory.length : generatorHistory.length}
+                </span>
+              </div>
+
+              <div className="max-h-[32vh] space-y-1 overflow-y-auto pr-1">
+                {showChatHistory &&
+                  chatHistory.map((item) => (
+                    <button
+                      key={item.session_id}
+                      onClick={() => onSelectChatHistory(item.session_id)}
+                      className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                        activeChatSessionId === item.session_id
+                          ? 'border-primary/35 bg-primary/10 text-primary'
+                          : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
+                      }`}
+                    >
+                      <div className="truncate text-xs font-semibold">{item.title || 'Untitled Chat'}</div>
+                      <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
+                        {item.preview || `${item.message_count} messages`}
+                      </div>
+                      <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.last_message_at)}</div>
+                    </button>
+                  ))}
+
+                {showGeneratorHistory &&
+                  generatorHistory.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => onSelectGeneratorHistory(item.id)}
+                      className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                        activeGeneratorHistoryId === item.id
+                          ? 'border-primary/35 bg-primary/10 text-primary'
+                          : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
+                      }`}
+                    >
+                      <div className="truncate text-xs font-semibold">{item.title || 'Generated Notice'}</div>
+                      <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
+                        {item.preview || 'Open saved draft'}
+                      </div>
+                      <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.created_at)}</div>
+                    </button>
+                  ))}
+
+                {showChatHistory && chatHistory.length === 0 && (
+                  <p className="px-2 py-3 text-[11px] text-on-surface-variant">No chat sessions yet.</p>
+                )}
+                {showGeneratorHistory && generatorHistory.length === 0 && (
+                  <p className="px-2 py-3 text-[11px] text-on-surface-variant">No generated notices yet.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+
+        <div className="border-t border-outline-variant/20 pt-4">
+          <button
+            onClick={onStartNewSession}
+            className="mb-3 flex w-full items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-primary to-primary-container px-4 py-3 text-sm font-semibold text-on-primary shadow-lg shadow-black/30 transition-opacity hover:opacity-90"
+          >
+            <Plus size={18} />
+            <span>New Session</span>
+          </button>
+          <div className="mb-6" />
+
+          <div className="space-y-1">
+            <button
+              onClick={openLibrary}
+              className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
+                isLibraryOpen
+                  ? 'bg-surface-container-highest text-primary font-semibold'
+                  : 'text-on-surface-variant hover:bg-surface-container-high/50 hover:text-primary'
+              }`}
+            >
+              <Library size={20} />
+              <span className="text-sm">Library</span>
+            </button>
+            <button
+              onClick={openSettings}
+              className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
+                isSettingsOpen || activeTab === 'settings'
+                  ? 'bg-surface-container-highest text-primary font-semibold'
+                  : 'text-on-surface-variant hover:bg-surface-container-high/50 hover:text-primary'
+              }`}
+            >
+              <Settings size={20} />
+              <span className="text-sm">Settings</span>
+            </button>
+          </div>
+        </div>
       </aside>
 
       {isLibraryOpen && (
@@ -241,17 +237,17 @@ export const Sidebar = ({
           <button
             aria-label="Close library picker"
             onClick={() => setIsLibraryOpen(false)}
-            className="fixed inset-0 bg-slate-950/35 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 z-[60] bg-surface/50 backdrop-blur-sm"
           />
-          <div className="fixed left-[17.5rem] top-1/2 -translate-y-1/2 w-[22rem] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-200/70 dark:border-slate-700/70 bg-white dark:bg-slate-900 shadow-2xl z-[70] p-4">
-            <div className="flex items-center justify-between mb-4">
+          <div className="fixed left-[17.5rem] top-1/2 z-[70] max-h-[70vh] w-[22rem] -translate-y-1/2 overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-2xl shadow-black/60">
+            <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-primary">Library</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Choose a workspace module</p>
+                <p className="text-xs text-on-surface-variant">Choose a workspace module</p>
               </div>
               <button
                 onClick={() => setIsLibraryOpen(false)}
-                className="p-2 rounded-lg text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/40 hover:text-primary"
               >
                 <X size={16} />
               </button>
@@ -262,10 +258,10 @@ export const Sidebar = ({
                 <button
                   key={item.id}
                   onClick={() => selectModule(item.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                  className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
                     activeTab === item.id
-                      ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                      ? 'bg-surface-container-highest text-primary font-semibold'
+                      : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-primary'
                   }`}
                 >
                   <item.icon size={18} />
@@ -282,17 +278,17 @@ export const Sidebar = ({
           <button
             aria-label="Close settings picker"
             onClick={() => setIsSettingsOpen(false)}
-            className="fixed inset-0 bg-slate-950/35 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 z-[60] bg-surface/50 backdrop-blur-sm"
           />
-          <div className="fixed left-[17.5rem] top-1/2 -translate-y-1/2 w-[22rem] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-200/70 dark:border-slate-700/70 bg-white dark:bg-slate-900 shadow-2xl z-[70] p-4">
-            <div className="flex items-center justify-between mb-4">
+          <div className="fixed left-[17.5rem] top-1/2 z-[70] max-h-[70vh] w-[22rem] -translate-y-1/2 overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-2xl shadow-black/60">
+            <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-primary">Settings</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Choose a settings section</p>
+                <p className="text-xs text-on-surface-variant">Choose a settings section</p>
               </div>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className="p-2 rounded-lg text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/40 hover:text-primary"
               >
                 <X size={16} />
               </button>
@@ -301,10 +297,10 @@ export const Sidebar = ({
             <div className="space-y-2">
               <button
                 onClick={() => selectSettingsSection('details')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
                   activeTab === 'settings' && activeSettingsSection === 'details'
-                    ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                    ? 'bg-surface-container-highest text-primary font-semibold'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-primary'
                 }`}
               >
                 <Settings size={18} />
@@ -312,10 +308,10 @@ export const Sidebar = ({
               </button>
               <button
                 onClick={() => selectSettingsSection('password')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
                   activeTab === 'settings' && activeSettingsSection === 'password'
-                    ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                    ? 'bg-surface-container-highest text-primary font-semibold'
+                    : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-primary'
                 }`}
               >
                 <Settings size={18} />
@@ -330,36 +326,38 @@ export const Sidebar = ({
 };
 
 export const Header = ({ currentUserName, onLogout }: HeaderProps) => (
-  <header className="sticky top-0 w-full px-8 py-4 glass-panel z-40 flex justify-between items-center">
+  <header className="glass-panel sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/15 px-8 py-4 shadow-2xl shadow-black/30">
     <div className="flex items-center">
       <span className="text-2xl font-headline italic text-primary">Vidhi AI</span>
     </div>
-    
+
     <div className="flex items-center space-x-8">
       <nav className="flex items-center space-x-6">
-        <a href="#" className="text-sm text-on-surface-variant hover:text-primary transition-colors">Explorer</a>
-        <a href="#" className="text-sm font-bold text-primary border-b-2 border-primary pb-1">Workspace</a>
+        <a href="#" className="text-sm text-on-surface-variant transition-colors hover:text-primary">
+          Explorer
+        </a>
+        <a href="#" className="border-b-2 border-primary pb-1 text-sm font-bold text-primary">
+          Workspace
+        </a>
       </nav>
-      
+
       <div className="flex items-center space-x-4">
-        <button className="p-2 hover:bg-surface-container rounded-full transition-colors text-on-surface-variant">
+        <button className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/60 hover:text-primary">
           <Bell size={20} />
         </button>
         <button
           onClick={onLogout}
-          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:text-primary hover:border-primary/30"
+          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:border-primary/30 hover:text-primary"
         >
           <LogOut size={14} />
           Logout
         </button>
-        <span className="text-xs font-semibold text-on-surface-variant hidden md:block">
-          {currentUserName}
-        </span>
-        <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/30">
-          <img 
-            src="https://picsum.photos/seed/lawyer/100/100" 
-            alt="User Profile" 
-            className="w-full h-full object-cover"
+        <span className="hidden text-xs font-semibold text-on-surface-variant md:block">{currentUserName}</span>
+        <div className="w-8 h-8 overflow-hidden rounded-full border border-primary/30 ring-2 ring-primary/10">
+          <img
+            src="https://picsum.photos/seed/lawyer/100/100"
+            alt="User Profile"
+            className="h-full w-full object-cover"
             referrerPolicy="no-referrer"
           />
         </div>
