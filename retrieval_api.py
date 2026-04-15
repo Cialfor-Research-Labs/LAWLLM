@@ -4341,6 +4341,7 @@ def health():
 
 class NoticeRequest(BaseModel):
     sender_name: str = Field(..., min_length=2)
+    sender_address: str = Field(..., min_length=5)
     advocate_name: Optional[str] = Field(
         default=None,
         description="Advocate name used in notice signature block",
@@ -4360,6 +4361,7 @@ class NoticeRequest(BaseModel):
     # Backward-compat alias for older clients. Prefer advocate_contact.
     sender_contact: Optional[str] = None
     receiver_name: str = Field(..., min_length=2)
+    receiver_address: str = Field(..., min_length=5)
     relationship: str = Field("", description="e.g. employee-employer, landlord-tenant")
     facts: List[str] = Field(..., min_items=1)
     claim: str = Field(..., min_length=2)
@@ -4465,6 +4467,41 @@ def _replace_notice_identity_placeholders(
     return text
 
 
+def _replace_party_address_placeholders(notice_text: str, sender_address: str, receiver_address: str) -> str:
+    """Resolve sender/receiver generic [Address] placeholders in notice headers."""
+    text = str(notice_text or "")
+    if not text:
+        return text
+
+    clean_sender = str(sender_address or "").strip()
+    clean_receiver = str(receiver_address or "").strip()
+
+    if clean_receiver:
+        text = re.sub(r"\[\s*receiver\s+address\s*\]", clean_receiver, text, flags=re.IGNORECASE)
+    if clean_sender:
+        text = re.sub(r"\[\s*sender\s+address\s*\]", clean_sender, text, flags=re.IGNORECASE)
+
+    address_values: List[str] = []
+    if clean_receiver:
+        address_values.append(clean_receiver)
+    if clean_sender:
+        address_values.append(clean_sender)
+
+    if address_values:
+        idx = {"value": 0}
+
+        def _replace_generic_address(_: re.Match) -> str:
+            if idx["value"] < len(address_values):
+                value = address_values[idx["value"]]
+                idx["value"] += 1
+                return value
+            return _.group(0)
+
+        text = re.sub(r"\[\s*address\s*\]", _replace_generic_address, text, flags=re.IGNORECASE)
+
+    return text
+
+
 @app.get("/generate/notice-types")
 def get_notice_types(authorization: Optional[str] = Header(default=None)):
     _require_product_access_user(authorization)
@@ -4549,12 +4586,14 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
         # STEP 4: Build notice prompt
         prompt = build_notice_prompt(
             sender_name=payload.sender_name,
+            sender_address=payload.sender_address,
             advocate_name=advocate_name,
             advocate_address=advocate_address,
             advocate_mobile=advocate_mobile,
             advocate_email=advocate_email,
             advocate_contact=advocate_contact,
             receiver_name=payload.receiver_name,
+            receiver_address=payload.receiver_address,
             relationship=payload.relationship,
             facts=payload.facts,
             claim=payload.claim,
@@ -4601,6 +4640,11 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             advocate_mobile=advocate_mobile,
             advocate_email=advocate_email,
             advocate_contact=advocate_contact,
+        )
+        final_notice = _replace_party_address_placeholders(
+            final_notice,
+            sender_address=payload.sender_address,
+            receiver_address=payload.receiver_address,
         )
 
         # STEP 8: Compute confidence

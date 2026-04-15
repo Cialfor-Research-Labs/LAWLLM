@@ -311,12 +311,14 @@ def auto_detect_notice_type(claim: str, facts: List[str]) -> str:
 
 def build_notice_prompt(
     sender_name: str,
+    sender_address: str,
     advocate_name: str,
     advocate_address: str,
     advocate_mobile: str,
     advocate_email: str,
     advocate_contact: str,
     receiver_name: str,
+    receiver_address: str,
     relationship: str,
     facts: List[str],
     claim: str,
@@ -355,6 +357,8 @@ def build_notice_prompt(
     advocate_address_display = advocate_address or "[Your Address]"
     advocate_mobile_display = advocate_mobile or "[Your Mobile]"
     advocate_email_display = advocate_email or "[Your Email]"
+    sender_address_display = sender_address or "[Address]"
+    receiver_address_display = receiver_address or "[Address]"
 
     return (
         "You are a senior Indian advocate drafting a formal legal notice.\n\n"
@@ -365,10 +369,10 @@ def build_notice_prompt(
         f"Date: {today}\n\n"
         "To,\n"
         f"{receiver_name}\n"
-        "[Address]\n\n"
+        f"{receiver_address_display}\n\n"
         "From,\n"
         f"{sender_name}\n"
-        "[Address]\n"
+        f"{sender_address_display}\n"
         "Through,\n"
         f"{advocate_name_display}, Advocate\n"
         f"{advocate_address_display}\n"
@@ -396,12 +400,14 @@ def build_notice_prompt(
         "---\n\n"
         "INPUT DETAILS:\n\n"
         f"Sender: {sender_name}\n"
+        f"Sender Address: {sender_address or 'Not provided'}\n"
         f"Advocate: {advocate_name or 'Not provided'}\n"
         f"Advocate Address: {advocate_address or 'Not provided'}\n"
         f"Advocate Mobile: {advocate_mobile or 'Not provided'}\n"
         f"Advocate Email: {advocate_email or 'Not provided'}\n"
         f"Advocate Contact: {advocate_contact or 'Not provided'}\n"
         f"Receiver: {receiver_name}\n"
+        f"Receiver Address: {receiver_address or 'Not provided'}\n"
         f"Relationship: {relationship}\n"
         f"Jurisdiction: {jurisdiction}\n"
         f"Claim Type: {config['label']}\n\n"

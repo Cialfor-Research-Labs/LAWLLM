@@ -41,6 +41,8 @@ type Tone = 'firm' | 'aggressive' | 'polite';
 interface GeneratorFormSnapshot {
   senderName: string;
   receiverName: string;
+  senderAddress: string;
+  receiverAddress: string;
   relationship: string;
   facts: string[];
   claim: string;
@@ -194,6 +196,8 @@ export const DocumentGenerator = ({
   // Form state
   const [senderName, setSenderName] = useState('');
   const [receiverName, setReceiverName] = useState('');
+  const [senderAddress, setSenderAddress] = useState('');
+  const [receiverAddress, setReceiverAddress] = useState('');
   const [relationship, setRelationship] = useState('');
   const [facts, setFacts] = useState<string[]>(['']);
   const [claim, setClaim] = useState('');
@@ -277,6 +281,8 @@ export const DocumentGenerator = ({
   const applyHistoryItem = (item: GeneratorHistoryItem) => {
     setSenderName(item.form.senderName);
     setReceiverName(item.form.receiverName);
+    setSenderAddress(item.form.senderAddress || '');
+    setReceiverAddress(item.form.receiverAddress || '');
     setRelationship(item.form.relationship);
     setFacts(item.form.facts?.length ? item.form.facts : ['']);
     setClaim(item.form.claim);
@@ -326,6 +332,8 @@ export const DocumentGenerator = ({
     const snapshot: GeneratorFormSnapshot = {
       senderName,
       receiverName,
+      senderAddress,
+      receiverAddress,
       relationship,
       facts,
       claim,
@@ -354,7 +362,13 @@ export const DocumentGenerator = ({
   const updateFact = (index: number, value: string) =>
     setFacts((prev) => prev.map((f, i) => (i === index ? value : f)));
 
-  const isFormValid = senderName.trim() && receiverName.trim() && claim.trim() && facts.some((f) => f.trim());
+  const isFormValid =
+    senderName.trim() &&
+    receiverName.trim() &&
+    senderAddress.trim() &&
+    receiverAddress.trim() &&
+    claim.trim() &&
+    facts.some((f) => f.trim());
 
   const handleGenerate = async () => {
     if (!isFormValid) return;
@@ -370,6 +384,8 @@ export const DocumentGenerator = ({
       const body: Record<string, unknown> = {
         sender_name: senderName.trim(),
         receiver_name: receiverName.trim(),
+        sender_address: senderAddress.trim(),
+        receiver_address: receiverAddress.trim(),
         relationship: relationship.trim(),
         facts: facts.filter((f) => f.trim()),
         claim: claim.trim(),
@@ -437,6 +453,8 @@ export const DocumentGenerator = ({
   const handleReset = () => {
     setSenderName('');
     setReceiverName('');
+    setSenderAddress('');
+    setReceiverAddress('');
     setRelationship('');
     setFacts(['']);
     setClaim('');
@@ -529,6 +547,26 @@ export const DocumentGenerator = ({
                 value={receiverName}
                 onChange={(e) => setReceiverName(e.target.value)}
                 placeholder="e.g. ABC Pvt Ltd"
+                className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Sender Address *</label>
+              <input
+                value={senderAddress}
+                onChange={(e) => setSenderAddress(e.target.value)}
+                placeholder="e.g. Kaushik, Delhi, India"
+                className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Receiver Address *</label>
+              <input
+                value={receiverAddress}
+                onChange={(e) => setReceiverAddress(e.target.value)}
+                placeholder="e.g. BMS Pvt Ltd, Bengaluru, Karnataka"
                 className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
               />
             </div>
