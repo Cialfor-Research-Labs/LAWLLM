@@ -152,6 +152,42 @@ function formatNoticeAsWordHtml(notice: string): string {
     .join('');
 }
 
+function normalizeBrokenListMarkers(notice: string): string {
+  const text = String(notice || '');
+  if (!text) return text;
+
+  const markerOnlyRe = /^(\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
+  const srcLines = text.split('\n');
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < srcLines.length) {
+    const line = srcLines[i];
+    const markerMatch = markerOnlyRe.exec(line);
+    if (!markerMatch) {
+      out.push(line);
+      i += 1;
+      continue;
+    }
+
+    let j = i + 1;
+    while (j < srcLines.length && !srcLines[j].trim()) {
+      j += 1;
+    }
+
+    if (j < srcLines.length) {
+      out.push(`${markerMatch[1]} ${srcLines[j].trimStart()}`);
+      i = j + 1;
+      continue;
+    }
+
+    out.push(line);
+    i += 1;
+  }
+
+  return out.join('\n');
+}
+
 function applyAdvocateIdentityToNotice(
   notice: string,
   advocateName: string,
@@ -198,7 +234,7 @@ function applyAdvocateIdentityToNotice(
     text = text.replace(/^\s*email\s*[:\-]\s*(?:\[\s*your\s+email\s*\])?\s*$/gim, `Email: ${email}`);
   }
 
-  return text;
+  return normalizeBrokenListMarkers(text);
 }
 
 // ---- Component ----
@@ -331,7 +367,10 @@ export const DocumentGenerator = ({
     setTone(item.form.tone || 'firm');
     setDeadline(item.form.deadline ?? '');
     setCustomRelief(item.form.customRelief || '');
-    setResult(item.result);
+    setResult({
+      ...item.result,
+      notice: normalizeBrokenListMarkers(item.result.notice),
+    });
     setError('');
     setActiveHistoryId(item.id);
   };
