@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import { jsPDF } from 'jspdf';
 import {
   FileText,
   Plus,
@@ -110,6 +111,16 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const GENERATOR_HISTORY_LIMIT = 40;
+const DOWNLOAD_DATE_FORMATTER = () => new Date().toISOString().slice(0, 10);
+
+function escapeHtml(input: string): string {
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function applyAdvocateIdentityToNotice(
   notice: string,
@@ -439,15 +450,52 @@ export const DocumentGenerator = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
+  const handleDownloadWord = () => {
     if (!result?.notice) return;
-    const blob = new Blob([result.notice], { type: 'text/plain;charset=utf-8' });
+    const safeNotice = escapeHtml(result.notice).replace(/\n/g, '<br/>');
+    const htmlDoc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Legal Notice</title>
+</head>
+<body style="font-family: 'Times New Roman', serif; line-height: 1.5; margin: 28px;">
+  ${safeNotice}
+</body>
+</html>`;
+    const blob = new Blob(['\ufeff', htmlDoc], { type: 'application/msword;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `legal_notice_${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `legal_notice_${DOWNLOAD_DATE_FORMATTER()}.doc`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPdf = () => {
+    if (!result?.notice) return;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 48;
+    const lineHeight = 16;
+    const textWidth = pageWidth - margin * 2;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11);
+    const lines = doc.splitTextToSize(result.notice, textWidth) as string[];
+    let y = margin;
+
+    for (const line of lines) {
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    }
+
+    doc.save(`legal_notice_${DOWNLOAD_DATE_FORMATTER()}.pdf`);
   };
 
   const handleReset = () => {
@@ -806,11 +854,18 @@ export const DocumentGenerator = ({
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                   <button
-                    onClick={handleDownload}
+                    onClick={handleDownloadPdf}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:opacity-90 transition shadow-lg shadow-primary/20"
                   >
                     <Download size={14} />
-                    Download .txt
+                    Download PDF
+                  </button>
+                  <button
+                    onClick={handleDownloadWord}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/20 text-xs font-semibold text-on-surface hover:border-primary/30 hover:bg-primary/5 transition"
+                  >
+                    <Download size={14} />
+                    Download Word
                   </button>
                 </div>
               </div>
