@@ -18,6 +18,7 @@ interface SettingsPageProps {
   authToken: string;
   currentUser: SettingsUser;
   onUserUpdated: (user: SettingsUser) => void;
+  activeSection: 'details' | 'password';
 }
 
 interface UpdateProfileResponse {
@@ -39,7 +40,7 @@ function getApiBase(): string {
   return '/api';
 }
 
-export const SettingsPage = ({ authToken, currentUser, onUserUpdated }: SettingsPageProps) => {
+export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSection }: SettingsPageProps) => {
   const apiBase = useMemo(() => getApiBase(), []);
   const [name, setName] = useState(currentUser.name || '');
   const [organization, setOrganization] = useState(currentUser.organization || '');
@@ -149,134 +150,138 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated }: Settings
         <div>
           <h2 className="text-2xl font-headline font-bold text-primary">Settings</h2>
           <p className="text-sm text-on-surface-variant mt-1">
-            Manage your profile details and account password.
+            {activeSection === 'details'
+              ? 'Manage your profile details (email cannot be edited).'
+              : 'Reset your account password securely.'}
           </p>
         </div>
 
-        <section className="rounded-2xl border border-outline-variant/15 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-on-surface">Profile Details</h3>
-          <p className="text-xs text-on-surface-variant mt-1">Email is fixed and cannot be changed.</p>
+        {activeSection === 'details' ? (
+          <section className="rounded-2xl border border-outline-variant/15 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-on-surface">Profile Details</h3>
+            <p className="text-xs text-on-surface-variant mt-1">Email is fixed and cannot be changed.</p>
 
-          {profileError && (
-            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {profileError}
-            </div>
-          )}
-          {profileMessage && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              <CheckCircle2 size={14} />
-              {profileMessage}
-            </div>
-          )}
+            {profileError && (
+              <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {profileError}
+              </div>
+            )}
+            {profileMessage && (
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <CheckCircle2 size={14} />
+                {profileMessage}
+              </div>
+            )}
 
-          <form onSubmit={saveProfile} className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Full Name</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Email</label>
-              <input
-                value={currentUser.email}
-                disabled
-                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant cursor-not-allowed"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Organization</label>
-              <input
-                value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-                placeholder="Your organization"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Use Case</label>
-              <input
-                value={useCase}
-                onChange={(e) => setUseCase(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-                placeholder="How you use this platform"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <button
-                type="submit"
-                disabled={profileLoading}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-              >
-                {profileLoading && <Loader2 size={14} className="animate-spin" />}
-                Save Details
-              </button>
-            </div>
-          </form>
-        </section>
+            <form onSubmit={saveProfile} className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Full Name</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Email</label>
+                <input
+                  value={currentUser.email}
+                  disabled
+                  className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Organization</label>
+                <input
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  placeholder="Your organization"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Use Case</label>
+                <input
+                  value={useCase}
+                  onChange={(e) => setUseCase(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  placeholder="How you use this platform"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={profileLoading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                >
+                  {profileLoading && <Loader2 size={14} className="animate-spin" />}
+                  Save Details
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : (
+          <section className="rounded-2xl border border-outline-variant/15 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-on-surface">Change Password</h3>
+            <p className="text-xs text-on-surface-variant mt-1">Use at least 8 characters.</p>
 
-        <section className="rounded-2xl border border-outline-variant/15 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-on-surface">Change Password</h3>
-          <p className="text-xs text-on-surface-variant mt-1">Use at least 8 characters.</p>
+            {passwordError && (
+              <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {passwordError}
+              </div>
+            )}
+            {passwordMessage && (
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <CheckCircle2 size={14} />
+                {passwordMessage}
+              </div>
+            )}
 
-          {passwordError && (
-            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              {passwordError}
-            </div>
-          )}
-          {passwordMessage && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-              <CheckCircle2 size={14} />
-              {passwordMessage}
-            </div>
-          )}
-
-          <form onSubmit={changePassword} className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Current Password</label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">New Password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Confirm Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-                required
-              />
-            </div>
-            <div className="md:col-span-3">
-              <button
-                type="submit"
-                disabled={passwordLoading}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-              >
-                {passwordLoading && <Loader2 size={14} className="animate-spin" />}
-                Change Password
-              </button>
-            </div>
-          </form>
-        </section>
+            <form onSubmit={changePassword} className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
+                  required
+                />
+              </div>
+              <div className="md:col-span-3">
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                >
+                  {passwordLoading && <Loader2 size={14} className="animate-spin" />}
+                  Change Password
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
       </div>
     </div>
   );

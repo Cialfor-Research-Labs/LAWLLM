@@ -22,6 +22,7 @@ interface NavItem {
 
 interface SidebarProps {
   activeTab: string;
+  activeSettingsSection: 'details' | 'password';
   setActiveTab: (id: string) => void;
   isAdmin: boolean;
   onStartNewSession: () => void;
@@ -42,6 +43,7 @@ interface SidebarProps {
   activeGeneratorHistoryId: string | null;
   onSelectChatHistory: (sessionId: string) => void;
   onSelectGeneratorHistory: (itemId: string) => void;
+  onSelectSettingsSection: (section: 'details' | 'password') => void;
 }
 
 interface HeaderProps {
@@ -51,6 +53,7 @@ interface HeaderProps {
 
 export const Sidebar = ({
   activeTab,
+  activeSettingsSection,
   setActiveTab,
   isAdmin,
   onStartNewSession,
@@ -60,8 +63,10 @@ export const Sidebar = ({
   activeGeneratorHistoryId,
   onSelectChatHistory,
   onSelectGeneratorHistory,
+  onSelectSettingsSection,
 }: SidebarProps) => {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const moduleItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
@@ -81,6 +86,22 @@ export const Sidebar = ({
   const selectModule = (id: string) => {
     setActiveTab(id);
     setIsLibraryOpen(false);
+    setIsSettingsOpen(false);
+  };
+
+  const openLibrary = () => {
+    setIsSettingsOpen(false);
+    setIsLibraryOpen(true);
+  };
+
+  const openSettings = () => {
+    setIsLibraryOpen(false);
+    setIsSettingsOpen(true);
+  };
+
+  const selectSettingsSection = (section: 'details' | 'password') => {
+    onSelectSettingsSection(section);
+    setIsSettingsOpen(false);
   };
 
   const formatHistoryTime = (iso: string) => {
@@ -116,7 +137,7 @@ export const Sidebar = ({
             </span>
           </div>
           <button
-            onClick={() => setIsLibraryOpen(true)}
+            onClick={openLibrary}
             className="w-full mt-2 rounded-lg border border-primary/25 bg-primary/5 text-primary px-3 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors"
           >
             Open Library
@@ -202,7 +223,7 @@ export const Sidebar = ({
         
         <div className="space-y-1">
           <button
-            onClick={() => setIsLibraryOpen(true)}
+            onClick={openLibrary}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
               isLibraryOpen
                 ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
@@ -213,9 +234,9 @@ export const Sidebar = ({
             <span className="text-sm">Library</span>
           </button>
           <button
-            onClick={() => selectModule('settings')}
+            onClick={openSettings}
             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-              activeTab === 'settings'
+              isSettingsOpen || activeTab === 'settings'
                 ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-200/50'
             }`}
@@ -263,6 +284,55 @@ export const Sidebar = ({
                   <span className="text-sm">{item.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {isSettingsOpen && (
+        <>
+          <button
+            aria-label="Close settings picker"
+            onClick={() => setIsSettingsOpen(false)}
+            className="fixed inset-0 bg-slate-950/35 backdrop-blur-sm z-[60]"
+          />
+          <div className="fixed left-[17.5rem] top-1/2 -translate-y-1/2 w-[22rem] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-200/70 dark:border-slate-700/70 bg-white dark:bg-slate-900 shadow-2xl z-[70] p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-bold text-primary">Settings</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Choose a settings section</p>
+              </div>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="p-2 rounded-lg text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => selectSettingsSection('details')}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                  activeTab === 'settings' && activeSettingsSection === 'details'
+                    ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                }`}
+              >
+                <Settings size={18} />
+                <span className="text-sm">Details</span>
+              </button>
+              <button
+                onClick={() => selectSettingsSection('password')}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                  activeTab === 'settings' && activeSettingsSection === 'password'
+                    ? 'bg-slate-200 dark:bg-slate-800 text-primary dark:text-white font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                }`}
+              >
+                <Settings size={18} />
+                <span className="text-sm">Reset Password</span>
+              </button>
             </div>
           </div>
         </>

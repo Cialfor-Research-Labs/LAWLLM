@@ -90,6 +90,7 @@ export default function App() {
     const initial = getInitialActiveChatSessionId();
     return initial ? { sessionId: initial, nonce: Date.now() } : null;
   });
+  const [activeSettingsSection, setActiveSettingsSection] = useState<'details' | 'password'>('details');
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
   const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
@@ -221,6 +222,11 @@ export default function App() {
     setGeneratorOpenRequest({ id, nonce: Date.now() });
   };
 
+  const openSettingsSection = (section: 'details' | 'password') => {
+    setActiveSettingsSection(section);
+    setActiveTab('settings');
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-container-low">
@@ -252,6 +258,7 @@ export default function App() {
     <div className="flex min-h-screen bg-surface font-body overflow-hidden">
       <Sidebar
         activeTab={activeTab}
+        activeSettingsSection={activeSettingsSection}
         setActiveTab={setActiveTab}
         isAdmin={currentUser.role === 'admin'}
         onStartNewSession={startNewSession}
@@ -261,6 +268,7 @@ export default function App() {
         activeGeneratorHistoryId={activeGeneratorHistoryId}
         onSelectChatHistory={openChatHistoryItem}
         onSelectGeneratorHistory={openGeneratorHistoryItem}
+        onSelectSettingsSection={openSettingsSection}
       />
       
       <main className="flex-1 ml-64 flex flex-col h-screen relative">
@@ -343,6 +351,7 @@ export default function App() {
                 authToken={authToken}
                 currentUser={currentUser}
                 onUserUpdated={setCurrentUser}
+                activeSection={activeSettingsSection}
               />
             </motion.div>
           ) : (
