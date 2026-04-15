@@ -1,17 +1,17 @@
 import React from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   MessageSquare,
   FileText,
   BarChart3,
   TrendingUp,
   ShieldCheck,
+  Gavel,
   Plus,
-  Library,
   Settings,
+  KeyRound,
   Bell,
   LogOut,
-  X,
 } from 'lucide-react';
 
 interface NavItem {
@@ -65,9 +65,6 @@ export const Sidebar = ({
   onSelectGeneratorHistory,
   onSelectSettingsSection,
 }: SidebarProps) => {
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
   const moduleItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
       { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
@@ -85,23 +82,6 @@ export const Sidebar = ({
 
   const selectModule = (id: string) => {
     setActiveTab(id);
-    setIsLibraryOpen(false);
-    setIsSettingsOpen(false);
-  };
-
-  const openLibrary = () => {
-    setIsSettingsOpen(false);
-    setIsLibraryOpen(true);
-  };
-
-  const openSettings = () => {
-    setIsLibraryOpen(false);
-    setIsSettingsOpen(true);
-  };
-
-  const selectSettingsSection = (section: 'details' | 'password') => {
-    onSelectSettingsSection(section);
-    setIsSettingsOpen(false);
   };
 
   const formatHistoryTime = (iso: string) => {
@@ -119,23 +99,61 @@ export const Sidebar = ({
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-50 flex h-full w-64 flex-col border-r border-outline-variant/15 bg-surface-container-low p-4">
-        <div className="mb-6 px-2 py-4">
-          <h1 className="text-xl font-headline font-bold text-primary">The Digital Atelier</h1>
-          <p className="font-label text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">Legal AI Systems</p>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="space-y-2 rounded-xl border border-outline-variant/25 bg-surface-container p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Active Workspace</p>
-            <div className="flex items-center gap-3 text-on-surface">
-              {activeModule ? <activeModule.icon size={18} /> : <Library size={18} />}
-              <span className="text-sm font-semibold">{activeModule?.label ?? 'Select from Library'}</span>
+      <aside className="fixed left-0 top-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-outline-variant/15 bg-surface-container-low">
+        <div className="p-6">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container shadow-lg">
+              <Gavel className="h-6 w-6 text-on-primary-container" />
+            </div>
+            <div>
+              <h1 className="text-xl leading-none font-headline italic text-primary">Vidhi AI</h1>
+              <p className="mt-1 font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Jurisprudential Engine</p>
             </div>
           </div>
 
-          {(showChatHistory || showGeneratorHistory) && (
-            <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-outline-variant/25 bg-surface-container-high/50 p-3">
+          <button
+            className="mb-8 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-container py-3 font-label text-xs font-bold uppercase tracking-widest text-on-primary shadow-xl shadow-black/30 transition-all hover:brightness-110 active:scale-95"
+            onClick={onStartNewSession}
+          >
+            <Plus className="h-4 w-4" />
+            New Session
+          </button>
+
+          <nav className="space-y-1">
+            {moduleItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => selectModule(item.id)}
+                className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
+                  activeTab === item.id
+                    ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+                }`}
+              >
+                <item.icon
+                  className={`h-5 w-5 transition-transform duration-500 ${
+                    activeTab !== item.id ? 'group-hover:rotate-12' : ''
+                  }`}
+                />
+                <span className="font-label text-xs uppercase tracking-widest">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
+          {activeModule && (
+            <div className="mb-3 rounded-lg border border-outline-variant/20 bg-surface-container p-3">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Active Workspace</p>
+              <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+                <activeModule.icon size={16} />
+                <span>{activeModule.label}</span>
+              </div>
+            </div>
+          )}
+
+          {(showChatHistory || showGeneratorHistory) ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container p-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
                   {showChatHistory ? 'Chat History' : 'Generator History'}
@@ -145,7 +163,7 @@ export const Sidebar = ({
                 </span>
               </div>
 
-              <div className="max-h-[32vh] space-y-1 overflow-y-auto pr-1">
+              <div className="space-y-1 overflow-y-auto pr-1 no-scrollbar">
                 {showChatHistory &&
                   chatHistory.map((item) => (
                     <button
@@ -192,135 +210,44 @@ export const Sidebar = ({
                 )}
               </div>
             </div>
+          ) : (
+            <div className="flex-1" />
           )}
         </div>
 
-        <div className="border-t border-outline-variant/20 pt-4">
+        <div className="mt-auto space-y-1 border-t border-outline-variant/15 p-6">
           <button
-            onClick={onStartNewSession}
-            className="mb-3 flex w-full items-center justify-center space-x-2 rounded-xl bg-gradient-to-r from-primary to-primary-container px-4 py-3 text-sm font-semibold text-on-primary shadow-lg shadow-black/30 transition-opacity hover:opacity-90"
+            onClick={() => onSelectSettingsSection('details')}
+            className={`group flex w-full items-center gap-4 px-6 py-3 transition-all ${
+              activeTab === 'settings' && activeSettingsSection === 'details'
+                ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
+                : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+            }`}
           >
-            <Plus size={18} />
-            <span>New Session</span>
+            <Settings
+              className={`h-5 w-5 transition-transform duration-500 ${
+                !(activeTab === 'settings' && activeSettingsSection === 'details') ? 'group-hover:rotate-12' : ''
+              }`}
+            />
+            <span className="font-label text-xs uppercase tracking-widest">Settings</span>
           </button>
-          <div className="mb-6" />
-
-          <div className="space-y-1">
-            <button
-              onClick={openLibrary}
-              className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
-                isLibraryOpen
-                  ? 'bg-surface-container-highest text-primary font-semibold'
-                  : 'text-on-surface-variant hover:bg-surface-container-high/50 hover:text-primary'
+          <button
+            onClick={() => onSelectSettingsSection('password')}
+            className={`group flex w-full items-center gap-4 px-6 py-3 transition-all ${
+              activeTab === 'settings' && activeSettingsSection === 'password'
+                ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
+                : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+            }`}
+          >
+            <KeyRound
+              className={`h-5 w-5 transition-transform duration-500 ${
+                !(activeTab === 'settings' && activeSettingsSection === 'password') ? 'group-hover:rotate-12' : ''
               }`}
-            >
-              <Library size={20} />
-              <span className="text-sm">Library</span>
-            </button>
-            <button
-              onClick={openSettings}
-              className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
-                isSettingsOpen || activeTab === 'settings'
-                  ? 'bg-surface-container-highest text-primary font-semibold'
-                  : 'text-on-surface-variant hover:bg-surface-container-high/50 hover:text-primary'
-              }`}
-            >
-              <Settings size={20} />
-              <span className="text-sm">Settings</span>
-            </button>
-          </div>
+            />
+            <span className="font-label text-xs uppercase tracking-widest">Reset Password</span>
+          </button>
         </div>
       </aside>
-
-      {isLibraryOpen && (
-        <>
-          <button
-            aria-label="Close library picker"
-            onClick={() => setIsLibraryOpen(false)}
-            className="fixed inset-0 z-[60] bg-surface/50 backdrop-blur-sm"
-          />
-          <div className="fixed left-[17.5rem] top-1/2 z-[70] max-h-[70vh] w-[22rem] -translate-y-1/2 overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-2xl shadow-black/60">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-primary">Library</h3>
-                <p className="text-xs text-on-surface-variant">Choose a workspace module</p>
-              </div>
-              <button
-                onClick={() => setIsLibraryOpen(false)}
-                className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/40 hover:text-primary"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {moduleItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => selectModule(item.id)}
-                  className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
-                    activeTab === item.id
-                      ? 'bg-surface-container-highest text-primary font-semibold'
-                      : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-primary'
-                  }`}
-                >
-                  <item.icon size={18} />
-                  <span className="text-sm">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {isSettingsOpen && (
-        <>
-          <button
-            aria-label="Close settings picker"
-            onClick={() => setIsSettingsOpen(false)}
-            className="fixed inset-0 z-[60] bg-surface/50 backdrop-blur-sm"
-          />
-          <div className="fixed left-[17.5rem] top-1/2 z-[70] max-h-[70vh] w-[22rem] -translate-y-1/2 overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-2xl shadow-black/60">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-primary">Settings</h3>
-                <p className="text-xs text-on-surface-variant">Choose a settings section</p>
-              </div>
-              <button
-                onClick={() => setIsSettingsOpen(false)}
-                className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/40 hover:text-primary"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                onClick={() => selectSettingsSection('details')}
-                className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
-                  activeTab === 'settings' && activeSettingsSection === 'details'
-                    ? 'bg-surface-container-highest text-primary font-semibold'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-primary'
-                }`}
-              >
-                <Settings size={18} />
-                <span className="text-sm">Details</span>
-              </button>
-              <button
-                onClick={() => selectSettingsSection('password')}
-                className={`flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all ${
-                  activeTab === 'settings' && activeSettingsSection === 'password'
-                    ? 'bg-surface-container-highest text-primary font-semibold'
-                    : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-primary'
-                }`}
-              >
-                <Settings size={18} />
-                <span className="text-sm">Reset Password</span>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </>
   );
 };
