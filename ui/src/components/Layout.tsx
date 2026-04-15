@@ -136,12 +136,6 @@ export const Sidebar = ({
               {activeModule?.label ?? 'Select from Library'}
             </span>
           </div>
-          <button
-            onClick={openLibrary}
-            className="w-full mt-2 rounded-lg border border-primary/25 bg-primary/5 text-primary px-3 py-2 text-xs font-semibold hover:bg-primary/10 transition-colors"
-          >
-            Open Library
-          </button>
         </div>
 
         {(showChatHistory || showGeneratorHistory) && (
