@@ -53,6 +53,24 @@
   h6 {
     @apply font-headline;
   }
+
+  button,
+  input,
+  textarea,
+  select {
+    @apply font-body;
+  }
+
+  label {
+    @apply font-label;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
 }
 
 @layer components {
