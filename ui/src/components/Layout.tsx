@@ -213,13 +213,7 @@ export const Sidebar = ({
           <Plus size={18} />
           <span className="text-sm font-semibold">New Session</span>
         </button>
-        <button
-          onClick={() => selectModule('generator')}
-          className="w-full bg-primary text-white rounded-xl py-3 px-4 flex items-center justify-center space-x-2 mb-6 hover:opacity-90 transition-opacity shadow-lg shadow-primary/10"
-        >
-          <Plus size={18} />
-          <span className="text-sm font-semibold">New Brief</span>
-        </button>
+        <div className="mb-6" />
         
         <div className="space-y-1">
           <button
