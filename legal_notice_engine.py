@@ -366,7 +366,7 @@ def build_notice_prompt(
         "Draft a professional legal notice following this EXACT structure and ordering:\n\n"
         "---\n"
         "LEGAL NOTICE\n"
-        "(Under Applicable Indian Law)\n\n"
+        "\n"
         f"Date: {today}\n\n"
         "To,\n"
         f"{receiver_name}\n"
@@ -380,7 +380,7 @@ def build_notice_prompt(
         f"Mobile: {advocate_mobile_display}\n"
         f"Email: {advocate_email_display}\n"
         "\n"
-        "**Subject:** Legal Notice under [applicable law(s)]\n\n"
+        "**Subject: Legal Notice under [applicable law(s)]**\n\n"
         "Sir/Madam,\n\n"
         "Under instructions from and on behalf of my client, I hereby serve upon you "
         "the following legal notice:\n\n"
@@ -429,7 +429,7 @@ def build_notice_prompt(
         "- Keep the exact opening block labels: To, From, Through\n"
         "- 'Through' must always contain advocate name, advocate address, and advocate mobile (not client details)\n"
         "- The heading must be exactly 'LEGAL NOTICE' (all caps)\n"
-        "- Subject line must be bold markdown, exactly in this pattern: **Subject:** ...\n"
+        "- Entire subject line must be bold markdown, exactly in this pattern: **Subject: ...**\n"
     )
 
 
@@ -452,7 +452,7 @@ def build_refinement_prompt(draft_notice: str, tone: str = "firm") -> str:
         f"6. {tone_instruction}\n"
         "7. Ensuring the deadline and consequences are clearly stated\n\n"
         "8. Preserve the exact To/From/Through opening format and label order\n\n"
-        "9. Preserve the heading as LEGAL NOTICE and keep subject line bold (**Subject:** ...)\n\n"
+        "9. Preserve the heading as LEGAL NOTICE and keep the entire subject line bold (**Subject: ...**)\n\n"
         "Do NOT change the fundamental structure or facts.\n"
         "Do NOT add any AI disclaimer.\n"
         "Return the complete refined notice.\n\n"

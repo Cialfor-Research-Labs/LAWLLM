@@ -4502,6 +4502,36 @@ def _replace_party_address_placeholders(notice_text: str, sender_address: str, r
     return text
 
 
+def _enforce_notice_heading_and_subject_format(notice_text: str) -> str:
+    """Normalize heading/subject format for deterministic presentation."""
+    text = str(notice_text or "").strip()
+    if not text:
+        return text
+
+    lines = text.splitlines()
+    heading_idx = -1
+    for idx, line in enumerate(lines):
+        if re.fullmatch(r"\s*(?:\#{1,6}\s*)?legal\s+notice\s*", line, flags=re.IGNORECASE):
+            heading_idx = idx
+            break
+        if re.search(r"formal\s+complaint", line, flags=re.IGNORECASE):
+            heading_idx = idx
+            break
+
+    if heading_idx >= 0:
+        lines[heading_idx] = "LEGAL NOTICE"
+    else:
+        lines = ["LEGAL NOTICE", "", *lines]
+
+    for idx, line in enumerate(lines):
+        plain = re.sub(r"\*+", "", line).strip()
+        if re.match(r"(?i)^subject\s*:", plain):
+            lines[idx] = f"**{plain}**"
+            break
+
+    return "\n".join(lines).strip()
+
+
 @app.get("/generate/notice-types")
 def get_notice_types(authorization: Optional[str] = Header(default=None)):
     _require_product_access_user(authorization)
@@ -4646,6 +4676,7 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             sender_address=payload.sender_address,
             receiver_address=payload.receiver_address,
         )
+        final_notice = _enforce_notice_heading_and_subject_format(final_notice)
 
         # STEP 8: Compute confidence
         has_retrieval = bool(retrieved_context)

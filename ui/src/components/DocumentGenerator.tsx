@@ -86,7 +86,20 @@ function getApiBase(): string {
 
 const markdownComponents: Components = {
   strong: ({ children }) => <strong className="font-extrabold text-primary">{children}</strong>,
-  p: ({ children }) => <p className="mb-3 last:mb-0 leading-7">{children}</p>,
+  p: ({ children }) => {
+    const rawText = React.Children.toArray(children)
+      .map((child) => (typeof child === 'string' ? child : ''))
+      .join('')
+      .trim();
+    if (/^legal notice$/i.test(rawText)) {
+      return (
+        <p className="mb-4 text-center text-2xl font-black uppercase tracking-[0.08em] text-primary">
+          LEGAL NOTICE
+        </p>
+      );
+    }
+    return <p className="mb-3 last:mb-0 leading-7">{children}</p>;
+  },
   ol: ({ children }) => <ol className="mb-3 ml-5 list-decimal space-y-1">{children}</ol>,
   ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-1">{children}</ul>,
   li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
@@ -123,10 +136,20 @@ function escapeHtml(input: string): string {
 }
 
 function formatNoticeAsWordHtml(notice: string): string {
-  let safe = escapeHtml(notice || '');
-  safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  safe = safe.replace(/^(\s*Subject:[^\n]*)$/gim, '<strong>$1</strong>');
-  return safe.replace(/\n/g, '<br/>');
+  const lines = (notice || '').split('\n');
+  return lines
+    .map((line) => {
+      const plain = line.replace(/\*\*/g, '').trim();
+      if (/^legal notice$/i.test(plain)) {
+        return '<div style="text-align:center;font-weight:700;font-size:22px;text-transform:uppercase;letter-spacing:1px;">LEGAL NOTICE</div>';
+      }
+      if (/^subject\s*:/i.test(plain)) {
+        return `<div><strong>${escapeHtml(plain)}</strong></div>`;
+      }
+      const safe = escapeHtml(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      return `<div>${safe || '&nbsp;'}</div>`;
+    })
+    .join('');
 }
 
 function applyAdvocateIdentityToNotice(
@@ -493,9 +516,10 @@ export const DocumentGenerator = ({
     const rawLines = result.notice.split('\n');
     for (const rawLine of rawLines) {
       const cleanLine = rawLine.replace(/\*\*(.*?)\*\*/g, '$1');
+      const isHeadingLine = /^\s*legal\s+notice\s*$/i.test(cleanLine.trim());
       const isSubjectLine = /^\s*subject:/i.test(cleanLine.trim());
-      doc.setFont('times', isSubjectLine ? 'bold' : 'normal');
-      doc.setFontSize(11);
+      doc.setFont('times', isHeadingLine || isSubjectLine ? 'bold' : 'normal');
+      doc.setFontSize(isHeadingLine ? 16 : 11);
 
       const wrappedLines = doc.splitTextToSize(cleanLine, textWidth) as string[];
       for (const line of wrappedLines) {
@@ -503,7 +527,11 @@ export const DocumentGenerator = ({
           doc.addPage();
           y = margin;
         }
-        doc.text(line, margin, y);
+        if (isHeadingLine) {
+          doc.text(line.trim().toUpperCase(), pageWidth / 2, y, { align: 'center' });
+        } else {
+          doc.text(line, margin, y);
+        }
         y += lineHeight;
       }
     }
