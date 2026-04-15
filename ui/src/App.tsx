@@ -302,6 +302,8 @@ export default function App() {
             >
               <DocumentGenerator
                 authToken={authToken}
+                currentUserName={currentUser.name}
+                currentUserEmail={currentUser.email}
                 openHistoryRequest={generatorOpenRequest}
                 newSessionRequest={generatorNewSessionRequest}
                 onHistoryChange={setGeneratorHistory}

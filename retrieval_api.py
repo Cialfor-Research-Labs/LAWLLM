@@ -4233,6 +4233,10 @@ def health():
 
 class NoticeRequest(BaseModel):
     sender_name: str = Field(..., min_length=2)
+    sender_contact: Optional[str] = Field(
+        default=None,
+        description="Sender contact detail (email/phone) used in notice signature",
+    )
     receiver_name: str = Field(..., min_length=2)
     relationship: str = Field("", description="e.g. employee-employer, landlord-tenant")
     facts: List[str] = Field(..., min_items=1)
@@ -4256,6 +4260,46 @@ class NoticeResponse(BaseModel):
     meta: Dict[str, Any] = {}
 
 
+def _replace_notice_identity_placeholders(notice_text: str, sender_name: str, sender_contact: str) -> str:
+    """Resolve common signature placeholders to concrete sender identity details."""
+    text = str(notice_text or "")
+    if not text:
+        return text
+
+    clean_name = str(sender_name or "").strip()
+    clean_contact = str(sender_contact or "").strip()
+
+    if clean_name:
+        text = re.sub(r"\[\s*your\s+name\s*\]", clean_name, text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"(?im)^\s*your\s+name\s*[:\-]?\s*$",
+            f"Name: {clean_name}",
+            text,
+        )
+        text = re.sub(
+            r"(?im)^\s*name\s*[:\-]\s*(?:\[\s*your\s+name\s*\]|your\s+name)?\s*$",
+            f"Name: {clean_name}",
+            text,
+        )
+
+    if clean_contact:
+        text = re.sub(r"\[\s*your\s+contact\s+details?\s*\]", clean_contact, text, flags=re.IGNORECASE)
+        text = re.sub(r"\[\s*contact\s+details?\s*\]", clean_contact, text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"(?im)^\s*your\s+contact\s+details?\s*[:\-]?\s*$",
+            f"Contact Details: {clean_contact}",
+            text,
+        )
+        text = re.sub(
+            r"(?im)^\s*contact\s+details?\s*[:\-]\s*(?:\[\s*contact\s+details?\s*\])?\s*$",
+            f"Contact Details: {clean_contact}",
+            text,
+        )
+        text = re.sub(r"(?im)^\s*email\s*[:\-]\s*$", f"Email: {clean_contact}", text)
+
+    return text
+
+
 @app.get("/generate/notice-types")
 def get_notice_types(authorization: Optional[str] = Header(default=None)):
     _require_product_access_user(authorization)
@@ -4265,9 +4309,11 @@ def get_notice_types(authorization: Optional[str] = Header(default=None)):
 
 @app.post("/generate/notice", response_model=NoticeResponse)
 def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Header(default=None)) -> NoticeResponse:
-    _require_product_access_user(authorization)
+    requesting_user = _require_product_access_user(authorization)
     """Generate a professional legal notice from structured input."""
     try:
+        sender_contact = str(payload.sender_contact or requesting_user["email"] or "").strip()
+
         # STEP 1: Determine notice type
         if payload.notice_type == "auto":
             detected_type = auto_detect_notice_type(payload.claim, payload.facts)
@@ -4322,6 +4368,7 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
         # STEP 4: Build notice prompt
         prompt = build_notice_prompt(
             sender_name=payload.sender_name,
+            sender_contact=sender_contact,
             receiver_name=payload.receiver_name,
             relationship=payload.relationship,
             facts=payload.facts,
@@ -4362,6 +4409,11 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
         final_notice = refined_notice.strip()
         if authority_appendix:
             final_notice += "\n" + authority_appendix
+        final_notice = _replace_notice_identity_placeholders(
+            final_notice,
+            sender_name=payload.sender_name,
+            sender_contact=sender_contact,
+        )
 
         # STEP 8: Compute confidence
         has_retrieval = bool(retrieved_context)
@@ -4390,6 +4442,7 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
                 "heuristics_matched": len(heuristic_matches),
                 "has_retrieval_context": has_retrieval,
                 "detected_type": detected_type,
+                "sender_contact_applied": bool(sender_contact),
             },
         )
 

@@ -311,6 +311,7 @@ def auto_detect_notice_type(claim: str, facts: List[str]) -> str:
 
 def build_notice_prompt(
     sender_name: str,
+    sender_contact: str,
     receiver_name: str,
     relationship: str,
     facts: List[str],
@@ -379,6 +380,7 @@ def build_notice_prompt(
         "---\n\n"
         "INPUT DETAILS:\n\n"
         f"Sender: {sender_name}\n"
+        f"Sender Contact: {sender_contact or 'Not provided'}\n"
         f"Receiver: {receiver_name}\n"
         f"Relationship: {relationship}\n"
         f"Jurisdiction: {jurisdiction}\n"
@@ -397,6 +399,7 @@ def build_notice_prompt(
         "- Do NOT include any disclaimer about being AI-generated\n"
         "- End with proper advocate signature block\n"
         "- Mention that a copy is kept for records\n"
+        "- Do NOT use placeholders like [Your Name] or [Contact Details]; use Sender and Sender Contact exactly\n"
     )
 
 

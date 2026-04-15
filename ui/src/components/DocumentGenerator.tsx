@@ -61,6 +61,8 @@ interface GeneratorHistoryItem {
 
 interface DocumentGeneratorProps {
   authToken: string;
+  currentUserName?: string;
+  currentUserEmail?: string;
   openHistoryRequest?: { id: string; nonce: number } | null;
   newSessionRequest?: number | null;
   onHistoryChange?: (items: Array<{ id: string; title: string; created_at: string; preview?: string }>) => void;
@@ -109,6 +111,8 @@ const GENERATOR_HISTORY_LIMIT = 40;
 
 export const DocumentGenerator = ({
   authToken,
+  currentUserName = '',
+  currentUserEmail = '',
   openHistoryRequest,
   newSessionRequest,
   onHistoryChange,
@@ -123,8 +127,11 @@ export const DocumentGenerator = ({
     [authToken],
   );
 
+  const defaultSenderName = currentUserName.trim();
+  const senderContact = currentUserEmail.trim();
+
   // Form state
-  const [senderName, setSenderName] = useState('');
+  const [senderName, setSenderName] = useState(defaultSenderName);
   const [receiverName, setReceiverName] = useState('');
   const [relationship, setRelationship] = useState('');
   const [facts, setFacts] = useState<string[]>(['']);
@@ -294,6 +301,7 @@ export const DocumentGenerator = ({
         notice_type: noticeType,
         tone,
       };
+      if (senderContact) body.sender_contact = senderContact;
       if (deadline) body.custom_deadline = Number(deadline);
       if (customRelief.trim()) {
         body.custom_relief = customRelief
@@ -338,7 +346,7 @@ export const DocumentGenerator = ({
   };
 
   const handleReset = () => {
-    setSenderName('');
+    setSenderName(defaultSenderName);
     setReceiverName('');
     setRelationship('');
     setFacts(['']);
