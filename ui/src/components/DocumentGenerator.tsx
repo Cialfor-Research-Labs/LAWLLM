@@ -107,6 +107,30 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const GENERATOR_HISTORY_LIMIT = 40;
 
+function applyAdvocateIdentityToNotice(notice: string, advocateName: string, advocateContact: string): string {
+  let text = notice || '';
+  if (!text) return text;
+
+  const name = advocateName.trim();
+  const contact = advocateContact.trim();
+
+  if (name) {
+    text = text.replace(/\[\s*your\s+name\s*\]/gi, name);
+    text = text.replace(/^\s*your\s+name\s*[:\-]?\s*$/gim, `Name: ${name}`);
+    text = text.replace(/^\s*name\s*[:\-]\s*(?:\[\s*your\s+name\s*\]|your\s+name)?\s*$/gim, `Name: ${name}`);
+  }
+
+  if (contact) {
+    text = text.replace(/\[\s*your\s+contact\s+details?\s*\]/gi, contact);
+    text = text.replace(/\[\s*contact\s+details?\s*\]/gi, contact);
+    text = text.replace(/^\s*your\s+contact\s+details?\s*[:\-]?\s*$/gim, `Contact Details: ${contact}`);
+    text = text.replace(/^\s*contact\s+details?\s*[:\-]\s*(?:\[\s*contact\s+details?\s*\])?\s*$/gim, `Contact Details: ${contact}`);
+    text = text.replace(/^\s*email\s*[:\-]\s*$/gim, `Email: ${contact}`);
+  }
+
+  return text;
+}
+
 // ---- Component ----
 
 export const DocumentGenerator = ({
@@ -319,8 +343,12 @@ export const DocumentGenerator = ({
 
       if (!response.ok) throw new Error(`Server responded with ${response.status}`);
       const data: NoticeResponse = await response.json();
-      setResult(data);
-      pushHistoryItem(data);
+      const normalized: NoticeResponse = {
+        ...data,
+        notice: applyAdvocateIdentityToNotice(data.notice, advocateName, advocateContact),
+      };
+      setResult(normalized);
+      pushHistoryItem(normalized);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to generate notice');
     } finally {
