@@ -4233,10 +4233,16 @@ def health():
 
 class NoticeRequest(BaseModel):
     sender_name: str = Field(..., min_length=2)
-    sender_contact: Optional[str] = Field(
+    advocate_name: Optional[str] = Field(
         default=None,
-        description="Sender contact detail (email/phone) used in notice signature",
+        description="Advocate name used in notice signature block",
     )
+    advocate_contact: Optional[str] = Field(
+        default=None,
+        description="Advocate contact detail (email/phone) used in notice signature",
+    )
+    # Backward-compat alias for older clients. Prefer advocate_contact.
+    sender_contact: Optional[str] = None
     receiver_name: str = Field(..., min_length=2)
     relationship: str = Field("", description="e.g. employee-employer, landlord-tenant")
     facts: List[str] = Field(..., min_items=1)
@@ -4260,14 +4266,14 @@ class NoticeResponse(BaseModel):
     meta: Dict[str, Any] = {}
 
 
-def _replace_notice_identity_placeholders(notice_text: str, sender_name: str, sender_contact: str) -> str:
-    """Resolve common signature placeholders to concrete sender identity details."""
+def _replace_notice_identity_placeholders(notice_text: str, advocate_name: str, advocate_contact: str) -> str:
+    """Resolve common signature placeholders to advocate identity details."""
     text = str(notice_text or "")
     if not text:
         return text
 
-    clean_name = str(sender_name or "").strip()
-    clean_contact = str(sender_contact or "").strip()
+    clean_name = str(advocate_name or "").strip()
+    clean_contact = str(advocate_contact or "").strip()
 
     if clean_name:
         text = re.sub(r"\[\s*your\s+name\s*\]", clean_name, text, flags=re.IGNORECASE)
@@ -4312,7 +4318,10 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
     requesting_user = _require_product_access_user(authorization)
     """Generate a professional legal notice from structured input."""
     try:
-        sender_contact = str(payload.sender_contact or requesting_user["email"] or "").strip()
+        advocate_name = str(payload.advocate_name or requesting_user["name"] or "").strip()
+        advocate_contact = str(
+            payload.advocate_contact or payload.sender_contact or requesting_user["email"] or ""
+        ).strip()
 
         # STEP 1: Determine notice type
         if payload.notice_type == "auto":
@@ -4368,7 +4377,8 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
         # STEP 4: Build notice prompt
         prompt = build_notice_prompt(
             sender_name=payload.sender_name,
-            sender_contact=sender_contact,
+            advocate_name=advocate_name,
+            advocate_contact=advocate_contact,
             receiver_name=payload.receiver_name,
             relationship=payload.relationship,
             facts=payload.facts,
@@ -4411,8 +4421,8 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             final_notice += "\n" + authority_appendix
         final_notice = _replace_notice_identity_placeholders(
             final_notice,
-            sender_name=payload.sender_name,
-            sender_contact=sender_contact,
+            advocate_name=advocate_name,
+            advocate_contact=advocate_contact,
         )
 
         # STEP 8: Compute confidence
@@ -4442,7 +4452,8 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
                 "heuristics_matched": len(heuristic_matches),
                 "has_retrieval_context": has_retrieval,
                 "detected_type": detected_type,
-                "sender_contact_applied": bool(sender_contact),
+                "advocate_name_applied": bool(advocate_name),
+                "advocate_contact_applied": bool(advocate_contact),
             },
         )
 
