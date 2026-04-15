@@ -122,6 +122,13 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function formatNoticeAsWordHtml(notice: string): string {
+  let safe = escapeHtml(notice || '');
+  safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  safe = safe.replace(/^(\s*Subject:[^\n]*)$/gim, '<strong>$1</strong>');
+  return safe.replace(/\n/g, '<br/>');
+}
+
 function applyAdvocateIdentityToNotice(
   notice: string,
   advocateName: string,
@@ -452,7 +459,7 @@ export const DocumentGenerator = ({
 
   const handleDownloadWord = () => {
     if (!result?.notice) return;
-    const safeNotice = escapeHtml(result.notice).replace(/\n/g, '<br/>');
+    const safeNotice = formatNoticeAsWordHtml(result.notice);
     const htmlDoc = `<!DOCTYPE html>
 <html>
 <head>
@@ -481,18 +488,24 @@ export const DocumentGenerator = ({
     const lineHeight = 16;
     const textWidth = pageWidth - margin * 2;
 
-    doc.setFont('times', 'normal');
-    doc.setFontSize(11);
-    const lines = doc.splitTextToSize(result.notice, textWidth) as string[];
     let y = margin;
 
-    for (const line of lines) {
-      if (y > pageHeight - margin) {
-        doc.addPage();
-        y = margin;
+    const rawLines = result.notice.split('\n');
+    for (const rawLine of rawLines) {
+      const cleanLine = rawLine.replace(/\*\*(.*?)\*\*/g, '$1');
+      const isSubjectLine = /^\s*subject:/i.test(cleanLine.trim());
+      doc.setFont('times', isSubjectLine ? 'bold' : 'normal');
+      doc.setFontSize(11);
+
+      const wrappedLines = doc.splitTextToSize(cleanLine, textWidth) as string[];
+      for (const line of wrappedLines) {
+        if (y > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(line, margin, y);
+        y += lineHeight;
       }
-      doc.text(line, margin, y);
-      y += lineHeight;
     }
 
     doc.save(`legal_notice_${DOWNLOAD_DATE_FORMATTER()}.pdf`);
