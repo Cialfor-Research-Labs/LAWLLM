@@ -102,7 +102,7 @@ const markdownComponents: Components = {
   },
   ol: ({ children }) => <ol className="mb-3 ml-5 list-decimal space-y-1">{children}</ol>,
   ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-1">{children}</ul>,
-  li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
+  li: ({ children }) => <li className="pl-1 leading-7 [&>p]:m-0">{children}</li>,
   h1: ({ children }) => <h1 className="text-xl font-bold text-primary mt-4 mb-2">{children}</h1>,
   h2: ({ children }) => <h2 className="text-lg font-bold text-primary mt-3 mb-2">{children}</h2>,
   h3: ({ children }) => <h3 className="text-base font-bold mt-2 mb-1">{children}</h3>,
@@ -185,7 +185,12 @@ function normalizeBrokenListMarkers(notice: string): string {
     i += 1;
   }
 
-  return out.join('\n');
+  let normalized = out.join('\n');
+  normalized = normalized.replace(
+    /(^|\n)(\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
+    '$1$2 ',
+  );
+  return normalized;
 }
 
 function applyAdvocateIdentityToNotice(
@@ -292,6 +297,10 @@ export const DocumentGenerator = ({
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>([]);
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
+  const normalizedNotice = useMemo(
+    () => normalizeBrokenListMarkers(result?.notice || ''),
+    [result?.notice],
+  );
 
   // Fetch notice types on mount
   useEffect(() => {
@@ -513,15 +522,15 @@ export const DocumentGenerator = ({
   };
 
   const handleCopy = () => {
-    if (!result?.notice) return;
-    navigator.clipboard.writeText(result.notice);
+    if (!normalizedNotice) return;
+    navigator.clipboard.writeText(normalizedNotice);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownloadWord = () => {
-    if (!result?.notice) return;
-    const safeNotice = formatNoticeAsWordHtml(result.notice);
+    if (!normalizedNotice) return;
+    const safeNotice = formatNoticeAsWordHtml(normalizedNotice);
     const htmlDoc = `<!DOCTYPE html>
 <html>
 <head>
@@ -542,7 +551,7 @@ export const DocumentGenerator = ({
   };
 
   const handleDownloadPdf = () => {
-    if (!result?.notice) return;
+    if (!normalizedNotice) return;
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -552,7 +561,7 @@ export const DocumentGenerator = ({
 
     let y = margin;
 
-    const rawLines = result.notice.split('\n');
+    const rawLines = normalizedNotice.split('\n');
     for (const rawLine of rawLines) {
       const cleanLine = rawLine.replace(/\*\*(.*?)\*\*/g, '$1');
       const isHeadingLine = /^\s*legal\s+notice\s*$/i.test(cleanLine.trim());
@@ -967,7 +976,7 @@ export const DocumentGenerator = ({
                       </div>
                     </div>
                     <div className="px-8 py-6 text-on-surface text-sm leading-relaxed font-body markdown-body whitespace-pre-wrap">
-                      <Markdown components={markdownComponents}>{result.notice}</Markdown>
+                      <Markdown components={markdownComponents}>{normalizedNotice}</Markdown>
                     </div>
                   </div>
 
