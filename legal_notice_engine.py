@@ -425,11 +425,14 @@ def build_notice_prompt(
         "- Use formal legal language throughout\n"
         "- Do NOT include any disclaimer about being AI-generated\n"
         "- End with proper advocate signature block\n"
+        "- Do NOT use closings like 'Yours faithfully' or 'Yours sincerely'\n"
+        "- Use a signature line instead: Signature: ________________________\n"
         "- Mention that a copy is kept for records\n"
         "- Keep the exact opening block labels: To, From, Through\n"
         "- 'Through' must always contain advocate name, advocate address, and advocate mobile (not client details)\n"
         "- The heading must be exactly 'LEGAL NOTICE' (all caps)\n"
         "- Entire subject line must be bold markdown, exactly in this pattern: **Subject: ...**\n"
+        "- Keep bullet markers and bullet text on the same line (no marker-only line)\n"
     )
 
 
@@ -453,6 +456,8 @@ def build_refinement_prompt(draft_notice: str, tone: str = "firm") -> str:
         "7. Ensuring the deadline and consequences are clearly stated\n\n"
         "8. Preserve the exact To/From/Through opening format and label order\n\n"
         "9. Preserve the heading as LEGAL NOTICE and keep the entire subject line bold (**Subject: ...**)\n\n"
+        "10. Remove valedictions like 'Yours faithfully' and use: Signature: ________________________\n\n"
+        "11. Keep each bullet marker with its text on the same line (no broken bullet markers)\n\n"
         "Do NOT change the fundamental structure or facts.\n"
         "Do NOT add any AI disclaimer.\n"
         "Return the complete refined notice.\n\n"

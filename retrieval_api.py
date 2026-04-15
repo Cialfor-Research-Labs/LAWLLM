@@ -4529,7 +4529,35 @@ def _enforce_notice_heading_and_subject_format(notice_text: str) -> str:
             lines[idx] = f"**{plain}**"
             break
 
-    return "\n".join(lines).strip()
+    text = "\n".join(lines).strip()
+
+    # Replace valedictions with an explicit signature line.
+    text = re.sub(
+        r"(?im)^\s*yours\s+(?:faithfully|sincerely|truly)\s*,?\s*$",
+        "Signature: ________________________",
+        text,
+    )
+
+    # Fix broken bullet markers where marker appears on one line and content starts on the next line.
+    bullet_marker_re = re.compile(r"^(\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)]))\s*$")
+    src_lines = text.splitlines()
+    normalized_lines: List[str] = []
+    i = 0
+    while i < len(src_lines):
+        line = src_lines[i]
+        marker_match = bullet_marker_re.match(line)
+        if marker_match:
+            j = i + 1
+            while j < len(src_lines) and not src_lines[j].strip():
+                j += 1
+            if j < len(src_lines):
+                normalized_lines.append(f"{marker_match.group(1)} {src_lines[j].lstrip()}")
+                i = j + 1
+                continue
+        normalized_lines.append(line)
+        i += 1
+
+    return "\n".join(normalized_lines).strip()
 
 
 @app.get("/generate/notice-types")
