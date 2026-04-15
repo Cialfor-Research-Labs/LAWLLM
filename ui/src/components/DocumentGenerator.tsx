@@ -295,6 +295,7 @@ export const DocumentGenerator = ({
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [showDownloadChooser, setShowDownloadChooser] = useState(false);
   const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>([]);
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
   const normalizedNotice = useMemo(
@@ -548,6 +549,7 @@ export const DocumentGenerator = ({
     a.download = `legal_notice_${DOWNLOAD_DATE_FORMATTER()}.doc`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowDownloadChooser(false);
   };
 
   const handleDownloadPdf = () => {
@@ -585,6 +587,7 @@ export const DocumentGenerator = ({
     }
 
     doc.save(`legal_notice_${DOWNLOAD_DATE_FORMATTER()}.pdf`);
+    setShowDownloadChooser(false);
   };
 
   const handleReset = () => {
@@ -934,7 +937,7 @@ export const DocumentGenerator = ({
                     Laws: <strong className="text-on-surface">{result.laws_used.length}</strong>
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="relative flex items-center gap-2">
                   <button
                     onClick={handleCopy}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/20 text-xs font-semibold text-on-surface hover:border-primary/30 hover:bg-primary/5 transition"
@@ -943,19 +946,47 @@ export const DocumentGenerator = ({
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                   <button
-                    onClick={handleDownloadPdf}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:opacity-90 transition shadow-lg shadow-primary/20"
+                    onClick={() => setShowDownloadChooser((prev) => !prev)}
+                    aria-label="Open download options"
+                    className="inline-flex items-center justify-center rounded-xl bg-primary text-white w-10 h-10 hover:opacity-90 transition shadow-lg shadow-primary/20"
                   >
-                    <Download size={14} />
-                    Download PDF
+                    <Download size={16} />
                   </button>
-                  <button
-                    onClick={handleDownloadWord}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/20 text-xs font-semibold text-on-surface hover:border-primary/30 hover:bg-primary/5 transition"
-                  >
-                    <Download size={14} />
-                    Download Word
-                  </button>
+
+                  <AnimatePresence>
+                    {showDownloadChooser && (
+                      <>
+                        <button
+                          aria-label="Close download options"
+                          onClick={() => setShowDownloadChooser(false)}
+                          className="fixed inset-0 z-20 bg-transparent"
+                        />
+                        <motion.div
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20 }}
+                          transition={{ duration: 0.18 }}
+                          className="absolute right-0 top-12 z-30 min-w-44 rounded-2xl border border-outline-variant/20 bg-white p-2 shadow-ambient"
+                        >
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                            Download As
+                          </div>
+                          <button
+                            onClick={handleDownloadPdf}
+                            className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container-low transition"
+                          >
+                            PDF
+                          </button>
+                          <button
+                            onClick={handleDownloadWord}
+                            className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container-low transition"
+                          >
+                            Word
+                          </button>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
