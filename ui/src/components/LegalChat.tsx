@@ -504,7 +504,7 @@ export const LegalChat = ({
                                     className={`rounded-2xl border px-6 py-5 shadow-sm ${
                                         msg.role === 'user'
                                             ? 'bg-primary text-white border-primary/20'
-                                            : 'bg-white text-on-surface border-outline-variant/10'
+                                            : 'bg-surface-container-high text-on-surface border-outline-variant/20'
                                     }`}
                                 >
                                     <Markdown components={markdownComponents}>{msg.content}</Markdown>
@@ -516,7 +516,7 @@ export const LegalChat = ({
 
                 {isLoading && (
                     <div className="flex justify-start">
-                        <div className="flex items-center gap-4 rounded-2xl border border-outline-variant/10 bg-white px-5 py-4 shadow-sm">
+                        <div className="flex items-center gap-4 rounded-2xl border border-outline-variant/20 bg-surface-container-high px-5 py-4 shadow-sm">
                             <Loader2 size={18} className="animate-spin text-primary" />
                             <div className="text-sm font-medium text-on-surface">
                                 Preparing a guided legal response...
