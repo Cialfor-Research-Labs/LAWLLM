@@ -189,7 +189,8 @@ def _coerce_bool(value: Any) -> bool:
 def _executemany(conn: Any, sql: str, rows: Sequence[Sequence[Any]]) -> None:
     if not rows:
         return
-    conn.executemany(sql, rows)
+    with conn.cursor() as cur:
+        cur.executemany(sql, rows)
 
 
 def _reset_identity_sequences(conn: Any) -> None:
