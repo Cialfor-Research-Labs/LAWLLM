@@ -199,36 +199,6 @@ export const Sidebar = ({
                         ))}
                       </div>
 
-                      <div className="h-px bg-outline-variant/20" />
-
-                      <div className="max-h-72 space-y-3 overflow-y-auto pt-2 pr-1 no-scrollbar">
-                        <div className="space-y-1">
-                          <p className="px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Document History</p>
-                          {generatorHistory.slice(0, 8).map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => {
-                                onSelectGeneratorHistory(item.id);
-                                setIsLibraryMenuOpen(false);
-                              }}
-                              className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
-                                activeGeneratorHistoryId === item.id
-                                  ? 'border-primary/35 bg-primary/10 text-primary'
-                                  : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
-                              }`}
-                            >
-                              <div className="truncate text-xs font-semibold">{item.title || 'Generated Notice'}</div>
-                              <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
-                                {item.preview || 'Open saved draft'}
-                              </div>
-                              <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.created_at)}</div>
-                            </button>
-                          ))}
-                          {generatorHistory.length === 0 && (
-                            <p className="px-2 py-1 text-[11px] text-on-surface-variant">No generated notices yet.</p>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>

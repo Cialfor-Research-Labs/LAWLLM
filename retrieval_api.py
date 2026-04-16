@@ -2471,8 +2471,26 @@ def _build_context_grounded_fallback(user_query: str, context_blocks: List[Dict[
 def get_static_greeting(text: str) -> Optional[str]:
     clean = text.lower().strip("?!. ")
     greetings = {"hi", "hello", "hey", "hi there", "hello there", "namaste"}
+    acknowledgements = {
+        "ok",
+        "okay",
+        "ok thanks",
+        "okay thanks",
+        "thanks",
+        "thank you",
+        "thx",
+        "got it",
+        "understood",
+        "noted",
+        "fine",
+        "alright",
+        "all right",
+        "sure",
+    }
     if clean in greetings:
         return f"{text.strip()}! I am your Vidhi AI assistant. How can I help you today?"
+    if clean in acknowledgements:
+        return "Understood. If you want, I can explain the last answer, help with a new legal question, or draft the next step."
     if any(h in clean for h in ["good morning", "good afternoon", "good evening"]):
         return f"{text.strip()}! How can I assist you with your legal research today?"
     return None
