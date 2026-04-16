@@ -49,11 +49,11 @@ interface GeneratorHistoryItem {
 
 const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
 const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
-const ALLOWED_TABS = new Set(['chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
+const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
 
 function getInitialActiveTab(): string {
   const stored = (localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || '').trim().toLowerCase();
-  return ALLOWED_TABS.has(stored) ? stored : 'generator';
+  return ALLOWED_TABS.has(stored) ? stored : 'library';
 }
 
 function getInitialActiveChatSessionId(): string | null {
@@ -124,7 +124,7 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser?.role !== 'admin' && activeTab === 'admin') {
-      setActiveTab('generator');
+      setActiveTab('library');
     }
   }, [currentUser, activeTab]);
 
@@ -150,7 +150,7 @@ export default function App() {
     localStorage.setItem('vidhi_auth_token', token);
     setAuthToken(token);
     setCurrentUser(user);
-    setActiveTab('generator');
+    setActiveTab('library');
     setActiveChatSessionId(null);
     setActiveGeneratorHistoryId(null);
     setAuthView('login');
@@ -170,7 +170,7 @@ export default function App() {
     localStorage.removeItem('vidhi_auth_token');
     setAuthToken(null);
     setCurrentUser(null);
-    setActiveTab('generator');
+    setActiveTab('library');
     setChatHistory([]);
     setGeneratorHistory([]);
     setActiveChatSessionId(null);

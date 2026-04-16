@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Library as LibraryIcon,
   MessageSquare,
   FileText,
   BarChart3,
@@ -69,8 +70,7 @@ export const Sidebar = ({
 
   const moduleItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
-      { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
-      { id: 'generator', label: 'Document Generator', icon: FileText },
+      { id: 'library', label: 'Library', icon: LibraryIcon },
       { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
       { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
     ];
@@ -80,7 +80,13 @@ export const Sidebar = ({
     return items;
   }, [isAdmin]);
 
-  const activeModule = moduleItems.find((item) => item.id === activeTab);
+  const activeModule =
+    moduleItems.find((item) => item.id === activeTab) ||
+    (activeTab === 'chat'
+      ? { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare }
+      : activeTab === 'generator'
+        ? { id: 'generator', label: 'Document Generator', icon: FileText }
+        : undefined);
 
   const selectModule = (id: string) => {
     setActiveTab(id);
@@ -101,6 +107,8 @@ export const Sidebar = ({
       setHistoryView('chat');
     } else if (activeTab === 'generator') {
       setHistoryView('generator');
+    } else if (activeTab === 'library') {
+      setHistoryView('workspace');
     }
   }, [activeTab]);
 
@@ -205,7 +213,30 @@ export const Sidebar = ({
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
-                Generator
+                Document
+              </button>
+            </div>
+
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded-md bg-surface-container-low p-1">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                  activeTab === 'chat'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Open Chat
+              </button>
+              <button
+                onClick={() => setActiveTab('generator')}
+                className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                  activeTab === 'generator'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Open Docs
               </button>
             </div>
 
@@ -238,7 +269,7 @@ export const Sidebar = ({
 
               {showGeneratorHistory && (
                 <div className="space-y-1">
-                  <p className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Generator History</p>
+                  <p className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Document Generation History</p>
                   {generatorHistory.map((item) => (
                     <button
                       key={item.id}
