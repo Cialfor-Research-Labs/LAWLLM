@@ -215,6 +215,57 @@ function formatInterviewResponse(data: InterviewChatResponse) {
     return lines.join('\n').trim();
 }
 
+function formatInterviewResponseClean(data: InterviewChatResponse) {
+    const out = data.legal_output;
+
+    if (!out) {
+        const lines = [
+            `**Status**: ${data.status.replace('_', ' ').toUpperCase()}`,
+            '',
+            'I need a bit more detail before I can provide a legal assessment. Please describe the specific incident or legal problem you are facing.',
+        ];
+
+        if (data.questions.length > 0) {
+            lines.push('');
+            lines.push('**Follow-up Question:**');
+            lines.push(data.questions[0]);
+        }
+
+        return lines.join('\n').trim();
+    }
+
+    const lines = [
+        `**Status**: ${data.is_complete ? 'Case Complete' : 'Interviewing'}`,
+        '',
+        `> ${out.summary}`,
+        '',
+        out.analysis,
+        '',
+        '**Next Strategic Steps**',
+        ...out.case_strategy.map((step) => `- ${step}`),
+    ];
+
+    if (out.evidence_checklist && out.evidence_checklist.length > 0) {
+        lines.push('');
+        lines.push('**Evidence & Proof Checklist**');
+        out.evidence_checklist.forEach((item) => lines.push(`- [ ] ${item}`));
+    }
+
+    if (data.questions.length > 0 && !data.is_complete) {
+        lines.push('');
+        lines.push('**Follow-up Question:**');
+        lines.push(data.questions[0]);
+    }
+
+    if (data.is_complete && out.notice_draft) {
+        lines.push('');
+        lines.push('---');
+        lines.push('**Legal Notice Ready**: You can view the full draft in the "Document Generator" tab.');
+    }
+
+    return lines.join('\n').trim();
+}
+
 
 export const LegalChat = ({
     authToken,
@@ -428,7 +479,7 @@ export const LegalChat = ({
                 setBehavioralPrimitives(data.behavioral_primitives || []);
                 setInterpretations(data.interpretations || []);
                 setApplicableLaws(data.applicable_laws || []);
-                setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
+                setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
                 await loadChatSessions();
             }
             
@@ -449,17 +500,28 @@ export const LegalChat = ({
         alert('Legal Notice draft sent to Document Generator tab!');
     };
 
+    const progressLabel =
+        status === 'clarification_required'
+            ? 'Signal Low'
+            : status === 'complete'
+                ? 'Factual Certainty'
+                : 'Analyzing Situation';
+    const systemModeLabel = status.replace('_', ' ');
+
     return (
-        <div className="flex-1 flex flex-col h-full bg-surface-container-low overflow-hidden">
-            <div className="px-8 py-6 border-b border-outline-variant/10 bg-surface">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <h2 className="text-2xl font-headline font-bold text-primary">Vidhi AI: Intelligent Interviewer</h2>
-                        <p className="text-sm text-on-surface-variant">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-gradient-to-b from-surface to-surface-container-low">
+            <div className="border-b border-outline-variant/10 bg-surface/90 px-8 py-6 backdrop-blur-sm">
+                <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
+                    <div className="max-w-3xl">
+                        <h2 className="text-3xl font-headline font-bold text-primary">Vidhi AI: Intelligent Interviewer</h2>
+                        <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
+                        <p className="mt-2 text-base text-on-surface-variant">
+                            Unified Legal Case Engine · Factual Extraction · FIRAC Analysis
+                        </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="hidden items-center gap-3">
                         <div className="flex flex-col items-end mr-4">
                             <span className="text-[10px] font-bold uppercase text-on-surface-variant">
                                 {status === "clarification_required" ? "âš ï¸ Signal Low" : status === "complete" ? "âœ… Factual Certainty" : "ðŸ” Analyzing Situation"}
@@ -480,10 +542,32 @@ export const LegalChat = ({
                              </span>
                         </div>
                     </div>
+                    <div className="flex min-w-[260px] items-center gap-3">
+                        <div className="flex flex-1 flex-col items-end rounded-2xl border border-outline-variant/15 bg-surface-container-low px-4 py-3 shadow-sm">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                                {progressLabel}
+                            </span>
+                            <div className="mt-2 h-2 w-40 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
+                                <motion.div
+                                    className={`h-full ${confidence < 0.4 ? 'bg-amber-500' : confidence < 0.7 ? 'bg-primary' : 'bg-emerald-500'}`}
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${confidence * 100}%` }}
+                                    transition={{ duration: 0.5 }}
+                                />
+                            </div>
+                        </div>
+                        <div className="hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 shadow-sm sm:flex sm:flex-col">
+                            <span className="text-[9px] font-black uppercase tracking-[0.12em] text-on-surface-variant/70 leading-none">System Mode</span>
+                            <span className={`mt-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-normal ${status === 'complete' ? 'text-emerald-600' : status === 'clarification_required' ? 'text-amber-600' : 'text-primary'}`}>
+                                {systemModeLabel}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-6 no-scrollbar">
+                <div className="mx-auto flex max-w-6xl flex-col gap-5">
                 <AnimatePresence initial={false}>
                     {messages.map((msg, idx) => (
                         <motion.div
@@ -492,19 +576,19 @@ export const LegalChat = ({
                             animate={{ opacity: 1, y: 0 }}
                             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
-                            <div className={`flex max-w-[85%] space-x-4 ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                            <div className={`flex max-w-[82%] items-start gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                                 <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                    className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm ${
                                         msg.role === 'user' ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-on-primary'
                                     }`}
                                 >
                                     {msg.role === 'user' ? <User size={18} /> : <Sparkles size={18} />}
                                 </div>
                                 <div
-                                    className={`rounded-2xl border px-6 py-5 shadow-sm ${
+                                    className={`rounded-[28px] border px-6 py-5 shadow-sm ${
                                         msg.role === 'user'
-                                            ? 'bg-primary text-on-primary border-primary/20'
-                                            : 'bg-surface-container-high text-on-surface border-outline-variant/20'
+                                            ? 'border-primary/20 bg-primary text-on-primary'
+                                            : 'border-outline-variant/15 bg-surface text-on-surface shadow-[0_18px_40px_rgba(72,75,106,0.08)]'
                                     }`}
                                 >
                                     <Markdown components={markdownComponents}>{msg.content}</Markdown>
@@ -516,7 +600,7 @@ export const LegalChat = ({
 
                 {isLoading && (
                     <div className="flex justify-start">
-                        <div className="flex items-center gap-4 rounded-2xl border border-outline-variant/20 bg-surface-container-high px-5 py-4 shadow-sm">
+                        <div className="flex items-center gap-4 rounded-[24px] border border-outline-variant/15 bg-surface px-5 py-4 shadow-[0_18px_40px_rgba(72,75,106,0.08)]">
                             <Loader2 size={18} className="animate-spin text-primary" />
                             <div className="text-sm font-medium text-on-surface">
                                 Preparing a guided legal response...
@@ -610,7 +694,7 @@ export const LegalChat = ({
                                             await loadChatSessions();
                                         } else {
                                             setSessionId(data.session_id);
-                                            setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponse(data) }]);
+                                            setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
                                             setStatus(data.status);
                                             setConfidence(data.confidence);
                                             setLegalOutput(data.legal_output);
@@ -861,10 +945,12 @@ export const LegalChat = ({
                         </div>
                     </motion.div>
                 )}
+                </div>
             </div>
 
-            <div className="p-8 bg-surface border-t border-outline-variant/10">
-                <div className="max-w-4xl mx-auto relative">
+            <div className="border-t border-outline-variant/10 bg-surface/92 px-8 py-5 backdrop-blur-sm">
+                <div className="mx-auto max-w-6xl">
+                    <div className="relative overflow-hidden rounded-[30px] border border-outline-variant/15 bg-surface-container-lowest p-3 shadow-[0_18px_40px_rgba(72,75,106,0.08)]">
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
@@ -876,15 +962,16 @@ export const LegalChat = ({
                         }}
                         placeholder="Describe your legal issue (e.g., 'My salary is unpaid for 3 months')..."
                         disabled={isLoading}
-                        className="w-full bg-surface-container-low border-2 border-transparent rounded-2xl p-6 pr-16 text-on-surface placeholder:text-on-surface-variant focus:ring-4 focus:ring-primary/10 focus:border-primary/20 transition-all resize-none h-28 shadow-inner disabled:opacity-70"
+                        className="h-24 w-full resize-none rounded-[24px] border border-transparent bg-surface-container-low px-6 py-5 pr-20 text-on-surface placeholder:text-on-surface-variant focus:border-primary/20 focus:ring-4 focus:ring-primary/10 transition-all shadow-inner disabled:opacity-70"
                     />
                     <button
                         onClick={handleSend}
                         disabled={isLoading || !input.trim()}
-                        className="absolute right-5 bottom-5 p-4 bg-primary text-on-primary rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all shadow-xl shadow-primary/30"
+                        className="absolute bottom-6 right-6 rounded-2xl bg-primary p-4 text-on-primary shadow-xl shadow-primary/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                     >
                         <Send size={22} />
                     </button>
+                    </div>
                 </div>
             </div>
         </div>

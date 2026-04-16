@@ -259,9 +259,9 @@ export const Sidebar = ({
 
         <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
           {activeModule && (
-            <div className="mb-3 rounded-lg border border-outline-variant/20 bg-surface-container p-3">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Active Workspace</p>
-              <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+            <div className="mb-4 rounded-2xl border border-[color:var(--app-sidebar-panel-border)] bg-[var(--app-sidebar-panel-bg)] p-4 shadow-[0_10px_24px_rgba(14,18,42,0.08)] backdrop-blur-md">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--app-sidebar-panel-muted)]">Active Workspace</p>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--app-sidebar-panel-text)]">
                 <activeModule.icon size={16} />
                 <span>{activeModule.label}</span>
               </div>
@@ -269,60 +269,60 @@ export const Sidebar = ({
           )}
 
           {activeTab === 'chat' ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container p-3">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[color:var(--app-sidebar-panel-border)] bg-[var(--app-sidebar-panel-bg)] p-4 shadow-[0_10px_24px_rgba(14,18,42,0.08)] backdrop-blur-md">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Chat History</p>
-                <span className="text-[10px] text-on-surface-variant/80">{chatHistory.length}</span>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--app-sidebar-panel-muted)]">Chat History</p>
+                <span className="text-[10px] text-[var(--app-sidebar-panel-muted)]">{chatHistory.length}</span>
               </div>
-              <div className="space-y-1 overflow-y-auto pr-1 no-scrollbar">
+              <div className="space-y-2 overflow-y-auto pr-1 no-scrollbar">
                 {chatHistory.map((item) => (
                   <button
                     key={item.session_id}
                     onClick={() => onSelectChatHistory(item.session_id)}
-                    className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                    className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
                       activeChatSessionId === item.session_id
-                        ? 'border-primary/35 bg-primary/10 text-primary'
-                        : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
+                        ? 'border-[color:var(--app-sidebar-panel-active-border)] bg-[var(--app-sidebar-panel-active-bg)] text-[var(--app-sidebar-panel-active-text)]'
+                        : 'border-transparent text-[var(--app-sidebar-panel-text)] hover:border-[color:var(--app-sidebar-panel-border)] hover:bg-[var(--app-sidebar-panel-hover-bg)]'
                     }`}
                   >
                     <div className="truncate text-xs font-semibold">{item.title || 'Untitled Chat'}</div>
-                    <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
+                    <div className="mt-1 truncate text-[10px] text-[var(--app-sidebar-panel-muted)]">
                       {item.preview || `${item.message_count} messages`}
                     </div>
-                    <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.last_message_at)}</div>
+                    <div className="mt-2 text-[9px] font-medium text-[var(--app-sidebar-panel-muted)]">{formatHistoryTime(item.last_message_at)}</div>
                   </button>
                 ))}
                 {chatHistory.length === 0 && (
-                  <p className="px-2 py-2 text-[11px] text-on-surface-variant">No chat sessions yet.</p>
+                  <p className="px-2 py-2 text-[11px] text-[var(--app-sidebar-panel-muted)]">No chat sessions yet.</p>
                 )}
               </div>
             </div>
           ) : activeTab === 'generator' ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container p-3">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[color:var(--app-sidebar-panel-border)] bg-[var(--app-sidebar-panel-bg)] p-4 shadow-[0_10px_24px_rgba(14,18,42,0.08)] backdrop-blur-md">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Document History</p>
-                <span className="text-[10px] text-on-surface-variant/80">{generatorHistory.length}</span>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--app-sidebar-panel-muted)]">Document History</p>
+                <span className="text-[10px] text-[var(--app-sidebar-panel-muted)]">{generatorHistory.length}</span>
               </div>
-              <div className="space-y-1 overflow-y-auto pr-1 no-scrollbar">
+              <div className="space-y-2 overflow-y-auto pr-1 no-scrollbar">
                 {generatorHistory.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => onSelectGeneratorHistory(item.id)}
-                    className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                    className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
                       activeGeneratorHistoryId === item.id
-                        ? 'border-primary/35 bg-primary/10 text-primary'
-                        : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
+                        ? 'border-[color:var(--app-sidebar-panel-active-border)] bg-[var(--app-sidebar-panel-active-bg)] text-[var(--app-sidebar-panel-active-text)]'
+                        : 'border-transparent text-[var(--app-sidebar-panel-text)] hover:border-[color:var(--app-sidebar-panel-border)] hover:bg-[var(--app-sidebar-panel-hover-bg)]'
                     }`}
                   >
                     <div className="truncate text-xs font-semibold">{item.title || 'Generated Notice'}</div>
-                    <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
+                    <div className="mt-1 truncate text-[10px] text-[var(--app-sidebar-panel-muted)]">
                       {item.preview || 'Open saved draft'}
                     </div>
-                    <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.created_at)}</div>
+                    <div className="mt-2 text-[9px] font-medium text-[var(--app-sidebar-panel-muted)]">{formatHistoryTime(item.created_at)}</div>
                   </button>
                 ))}
                 {generatorHistory.length === 0 && (
-                  <p className="px-2 py-2 text-[11px] text-on-surface-variant">No generated notices yet.</p>
+                  <p className="px-2 py-2 text-[11px] text-[var(--app-sidebar-panel-muted)]">No generated notices yet.</p>
                 )}
               </div>
             </div>
@@ -360,7 +360,7 @@ export const Sidebar = ({
                 !(activeTab === 'settings' && activeSettingsSection === 'password') ? 'group-hover:rotate-12' : ''
               }`}
             />
-            <span className="font-label text-xs uppercase tracking-widest">Reset Password</span>
+            <span className="font-label text-[11px] uppercase tracking-[0.12em] whitespace-nowrap">Reset Password</span>
           </button>
         </div>
       </aside>
