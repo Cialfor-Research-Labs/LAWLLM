@@ -156,7 +156,7 @@ function normalizeBrokenListMarkers(notice: string): string {
   const text = String(notice || '');
   if (!text) return text;
 
-  const markerOnlyRe = /^(\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
+  const markerOnlyRe = /^(\s*(?:[-*â€¢]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
   const srcLines = text.split('\n');
   const out: string[] = [];
   let i = 0;
@@ -187,7 +187,7 @@ function normalizeBrokenListMarkers(notice: string): string {
 
   let normalized = out.join('\n');
   normalized = normalized.replace(
-    /(^|\n)(\s*(?:[-*•]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
+    /(^|\n)(\s*(?:[-*â€¢]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
     '$1$2 ',
   );
   return normalized;
@@ -648,13 +648,13 @@ export const DocumentGenerator = ({
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  className="absolute z-30 top-full mt-1 w-full bg-white border border-outline-variant/20 rounded-xl shadow-ambient overflow-hidden"
+                  className="absolute z-30 top-full mt-1 w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-ambient overflow-hidden"
                 >
                   <button
                     onClick={() => { setNoticeType('auto'); setShowTypeDropdown(false); }}
                     className={`w-full text-left px-4 py-3 text-sm hover:bg-surface-container-low transition ${noticeType === 'auto' ? 'text-primary font-semibold bg-primary/5' : 'text-on-surface'}`}
                   >
-                    ✨ Auto-detect from claim
+                    âœ¨ Auto-detect from claim
                   </button>
                   {noticeTypes.map((t) => (
                     <button
@@ -787,7 +787,7 @@ export const DocumentGenerator = ({
           {/* Deadline */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
-              Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">— optional</span>
+              Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional</span>
             </label>
             <input
               type="number"
@@ -803,12 +803,12 @@ export const DocumentGenerator = ({
           {/* Custom Relief */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
-              Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">— optional, one per line</span>
+              Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional, one per line</span>
             </label>
             <textarea
               value={customRelief}
               onChange={(e) => setCustomRelief(e.target.value)}
-              placeholder="e.g.&#10;Pay outstanding salary of ₹3,00,000&#10;Issue experience certificate"
+              placeholder="e.g.&#10;Pay outstanding salary of â‚¹3,00,000&#10;Issue experience certificate"
               rows={3}
               className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition resize-none"
             />
@@ -891,7 +891,7 @@ export const DocumentGenerator = ({
                 <div>
                   <h3 className="text-xl font-headline text-primary">Generating Legal Notice</h3>
                   <p className="text-sm text-on-surface-variant mt-2">
-                    Pass 1: Drafting → Pass 2: Refining legal language...
+                    Pass 1: Drafting â†’ Pass 2: Refining legal language...
                   </p>
                 </div>
               </div>
@@ -966,7 +966,7 @@ export const DocumentGenerator = ({
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 20 }}
                           transition={{ duration: 0.18 }}
-                          className="absolute right-0 top-12 z-30 min-w-44 rounded-2xl border border-outline-variant/20 bg-white p-2 shadow-ambient"
+                          className="absolute right-0 top-12 z-30 min-w-44 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-2 shadow-ambient"
                         >
                           <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
                             Download As
@@ -999,7 +999,7 @@ export const DocumentGenerator = ({
                   className="max-w-3xl mx-auto"
                 >
                   {/* Notice Preview Card */}
-                  <div className="bg-white rounded-2xl border border-outline-variant/15 shadow-ambient overflow-hidden">
+                  <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/15 shadow-ambient overflow-hidden">
                     <div className="bg-primary/[.03] px-8 py-4 border-b border-outline-variant/10">
                       <div className="flex items-center gap-3">
                         <FileText size={18} className="text-primary" />
@@ -1017,7 +1017,7 @@ export const DocumentGenerator = ({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="mt-6 bg-white rounded-2xl border border-outline-variant/15 p-6"
+                      className="mt-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/15 p-6"
                     >
                       <div className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70 mb-3">
                         Authorities Relied Upon

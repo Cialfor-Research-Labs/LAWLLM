@@ -165,7 +165,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
         {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
         {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div>}
 
-        <div className="rounded-2xl border border-outline-variant/15 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-outline-variant/10 font-semibold text-sm text-on-surface">
             Users ({users.length})
           </div>
@@ -268,7 +268,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
           </div>
         </div>
 
-        <div className="rounded-2xl border border-outline-variant/15 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-outline-variant/10 font-semibold text-sm text-on-surface">
             Request Audit ({requests.length})
           </div>

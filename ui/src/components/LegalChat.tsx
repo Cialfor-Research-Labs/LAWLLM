@@ -169,7 +169,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
     
     if (!out) {
         const lines = [
-            `**Status**: ⚠️ ${data.status.replace('_', ' ').toUpperCase()}`,
+            `**Status**: âš ï¸ ${data.status.replace('_', ' ').toUpperCase()}`,
             '',
             'I need a bit more detail before I can provide a legal assessment. Please describe the specific incident or legal problem you are facing.',
         ];
@@ -184,7 +184,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
     }
 
     const lines = [
-        `**Status**: ${data.is_complete ? '✅ Case Complete' : '📝 Interviewing...'}`,
+        `**Status**: ${data.is_complete ? 'âœ… Case Complete' : 'ðŸ“ Interviewing...'}`,
         '',
         `> ${out.summary}`,
         '',
@@ -196,7 +196,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 
     if (out.evidence_checklist && out.evidence_checklist.length > 0) {
         lines.push('');
-        lines.push('**📁 Evidence & Proof Checklist**');
+        lines.push('**ðŸ“ Evidence & Proof Checklist**');
         out.evidence_checklist.forEach((item) => lines.push(`- [ ] ${item}`));
     }
     
@@ -209,7 +209,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
     if (data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
-        lines.push('💼 **Legal Notice Ready**: You can view the full draft in the "Document Generator" tab.');
+        lines.push('ðŸ’¼ **Legal Notice Ready**: You can view the full draft in the "Document Generator" tab.');
     }
     
     return lines.join('\n').trim();
@@ -456,13 +456,13 @@ export const LegalChat = ({
                     <div>
                         <h2 className="text-2xl font-headline font-bold text-primary">Vidhi AI: Intelligent Interviewer</h2>
                         <p className="text-sm text-on-surface-variant">
-                            Unified Legal Case Engine · Factual Extraction · FIRAC Analysis
+                            Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end mr-4">
                             <span className="text-[10px] font-bold uppercase text-on-surface-variant">
-                                {status === "clarification_required" ? "⚠️ Signal Low" : status === "complete" ? "✅ Factual Certainty" : "🔍 Analyzing Situation"}
+                                {status === "clarification_required" ? "âš ï¸ Signal Low" : status === "complete" ? "âœ… Factual Certainty" : "ðŸ” Analyzing Situation"}
                             </span>
                             <div className="w-32 h-1.5 bg-surface-container rounded-full mt-1 overflow-hidden shadow-inner">
                                 <motion.div 
@@ -545,7 +545,7 @@ export const LegalChat = ({
                                 <h4 className="text-xs font-black uppercase text-amber-800/60">Resolved Timeline</h4>
                                 <div className="space-y-3">
                                     {caseModel.events.map((evt) => (
-                                        <div key={evt.sequence} className="flex gap-3 text-xs bg-white/50 p-3 rounded-lg border border-amber-200/50">
+                                        <div key={evt.sequence} className="flex gap-3 text-xs bg-surface-container-low p-3 rounded-lg border border-amber-200/50">
                                             <span className="font-bold text-amber-700">#{evt.sequence}</span>
                                             <div>
                                                 <span className="font-bold text-primary">{evt.actor_id}</span> {evt.action}
@@ -560,7 +560,7 @@ export const LegalChat = ({
                                 <h4 className="text-xs font-black uppercase text-amber-800/60">Parties Involved</h4>
                                 <div className="grid grid-cols-2 gap-2">
                                     {caseModel.parties.map((p) => (
-                                        <div key={p.id} className="p-3 bg-white/50 rounded-lg border border-amber-200/50 text-xs">
+                                        <div key={p.id} className="p-3 bg-surface-container-low rounded-lg border border-amber-200/50 text-xs">
                                             <div className="font-bold text-primary">{p.id}</div>
                                             <div className="font-medium text-on-surface">{p.role}</div>
                                             <div className="text-[10px] text-on-surface-variant line-clamp-1">{p.description}</div>
@@ -573,9 +573,9 @@ export const LegalChat = ({
                                         <h4 className="text-xs font-black uppercase text-amber-800/60 mt-4">Financials</h4>
                                         <div className="space-y-2">
                                             {caseModel.financials.map((f, i) => (
-                                                <div key={i} className="flex justify-between items-center p-2 bg-white/80 rounded border border-amber-200/50 text-xs text-amber-900">
+                                                <div key={i} className="flex justify-between items-center p-2 bg-surface-container-high rounded border border-amber-200/50 text-xs text-amber-900">
                                                     <span>{f.context}</span>
-                                                    <span className="font-bold">₹{f.amount.toLocaleString()}</span>
+                                                    <span className="font-bold">â‚¹{f.amount.toLocaleString()}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -654,7 +654,7 @@ export const LegalChat = ({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {behavioralPrimitives.map((b, idx) => (
-                                        <div key={idx} className="px-3 py-1.5 bg-white border border-outline-variant/30 rounded-lg text-[10px] font-bold text-primary flex items-center gap-2 shadow-sm">
+                                        <div key={idx} className="px-3 py-1.5 bg-surface-container-lowest border border-outline-variant/30 rounded-lg text-[10px] font-bold text-primary flex items-center gap-2 shadow-sm">
                                             {b.name.replace(/_/g, ' ')}
                                             <div className="w-px h-3 bg-outline-variant" />
                                             <span className="text-on-surface-variant font-medium">Events {b.supporting_events.join(',')}</span>
@@ -673,7 +673,7 @@ export const LegalChat = ({
                                 </div>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {interpretations.map((item, idx) => (
-                                        <div key={idx} className="p-4 bg-white rounded-xl border border-outline-variant/30 relative overflow-hidden group">
+                                        <div key={idx} className="p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/30 relative overflow-hidden group">
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="text-xs font-black uppercase text-primary tracking-tighter">
                                                     {item.label.replace(/_/g, ' ')}
@@ -814,7 +814,7 @@ export const LegalChat = ({
                                     <h4 className="text-sm font-bold text-on-surface mb-2">Legal Options</h4>
                                     <div className="flex flex-wrap gap-2">
                                         {legalOutput.legal_options.map(opt => (
-                                            <span key={opt} className="px-3 py-1 bg-white border border-outline-variant/30 rounded-lg text-xs font-medium">
+                                            <span key={opt} className="px-3 py-1 bg-surface-container-lowest border border-outline-variant/30 rounded-lg text-xs font-medium">
                                                 {opt}
                                             </span>
                                         ))}
@@ -824,15 +824,15 @@ export const LegalChat = ({
                                     <h4 className="text-sm font-bold text-on-surface mb-2">Applicable Laws</h4>
                                     <div className="space-y-2">
                                         {legalOutput.applicable_laws.map(law => (
-                                            <div key={law} className="text-xs text-on-surface-variant bg-white/50 p-2 rounded-lg border border-outline-variant/10">
-                                                ⚖️ {law}
+                                            <div key={law} className="text-xs text-on-surface-variant bg-surface-container-low p-2 rounded-lg border border-outline-variant/10">
+                                                âš–ï¸ {law}
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="bg-white rounded-xl p-4 border border-outline-variant/20 shadow-inner">
+                            <div className="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant/20 shadow-inner">
                                 <h4 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2">
                                     <TrendingUp size={16} className="text-primary" />
                                     Next Action Steps

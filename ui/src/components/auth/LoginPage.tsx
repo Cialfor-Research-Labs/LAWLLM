@@ -72,7 +72,7 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-container-low p-6">
-      <div className="w-full max-w-md rounded-2xl border border-outline-variant/20 bg-white p-8 shadow-lg">
+      <div className="w-full max-w-md rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-8 shadow-lg">
         <h1 className="text-2xl font-headline font-bold text-primary">Vidhi AI Login</h1>
         <p className="mt-1 text-sm text-on-surface-variant">Single-admin access-controlled workspace.</p>
 

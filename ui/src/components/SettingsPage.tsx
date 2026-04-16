@@ -173,7 +173,7 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
         </div>
 
         {activeSection === 'details' ? (
-          <section className="rounded-2xl border border-outline-variant/15 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-on-surface">Profile Details</h3>
             <p className="text-xs text-on-surface-variant mt-1">Email is fixed and cannot be changed.</p>
 
@@ -258,7 +258,7 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
             </form>
           </section>
         ) : (
-          <section className="rounded-2xl border border-outline-variant/15 bg-white p-6 shadow-sm">
+          <section className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-on-surface">Change Password</h3>
             <p className="text-xs text-on-surface-variant mt-1">Use at least 8 characters.</p>
 
