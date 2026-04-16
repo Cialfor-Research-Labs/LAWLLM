@@ -197,7 +197,7 @@ export const Sidebar = ({
                   </button>
 
                   {isLibraryMenuOpen && (
-                    <div className="absolute left-full top-0 z-50 ml-2 w-56 rounded-xl border border-outline-variant/25 bg-surface-container p-2 shadow-2xl">
+                    <div className="absolute left-full top-0 z-50 ml-2 w-56 rounded-xl border border-outline-variant/25 bg-surface-container-lowest p-2 shadow-2xl">
                       {libraryOptions.map((option) => (
                         <button
                           key={option.id}
