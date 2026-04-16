@@ -53,7 +53,7 @@ const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'analyzer', 'predi
 
 function getInitialActiveTab(): string {
   const stored = (localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || '').trim().toLowerCase();
-  return ALLOWED_TABS.has(stored) ? stored : 'library';
+  return ALLOWED_TABS.has(stored) ? stored : 'generator';
 }
 
 function getInitialActiveChatSessionId(): string | null {
@@ -124,7 +124,7 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser?.role !== 'admin' && activeTab === 'admin') {
-      setActiveTab('library');
+      setActiveTab('generator');
     }
   }, [currentUser, activeTab]);
 
@@ -150,7 +150,7 @@ export default function App() {
     localStorage.setItem('vidhi_auth_token', token);
     setAuthToken(token);
     setCurrentUser(user);
-    setActiveTab('library');
+    setActiveTab('generator');
     setActiveChatSessionId(null);
     setActiveGeneratorHistoryId(null);
     setAuthView('login');
@@ -170,7 +170,7 @@ export default function App() {
     localStorage.removeItem('vidhi_auth_token');
     setAuthToken(null);
     setCurrentUser(null);
-    setActiveTab('library');
+    setActiveTab('generator');
     setChatHistory([]);
     setGeneratorHistory([]);
     setActiveChatSessionId(null);
