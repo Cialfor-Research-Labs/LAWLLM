@@ -82,39 +82,39 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --app-color-primary: #e4e5f1;
-  --app-color-primary-container: #9394a5;
-  --app-color-on-primary: #484b6a;
-  --app-color-on-primary-container: #fafafa;
+  --app-color-primary: #ff4e00;
+  --app-color-primary-container: #cc3e00;
+  --app-color-on-primary: #ffffff;
+  --app-color-on-primary-container: #ffffff;
 
-  --app-color-secondary: #d2d3db;
-  --app-color-secondary-container: rgba(228, 229, 241, 0.12);
-  --app-color-on-secondary: #1f2238;
-  --app-color-on-secondary-container: #fafafa;
+  --app-color-secondary: #ff8a50;
+  --app-color-secondary-container: rgba(255, 80, 20, 0.15);
+  --app-color-on-secondary: #ffffff;
+  --app-color-on-secondary-container: #ffdad6;
 
-  --app-color-surface: #1f2238;
-  --app-color-on-surface: #fafafa;
-  --app-color-surface-variant: rgba(228, 229, 241, 0.08);
-  --app-color-on-surface-variant: rgba(228, 229, 241, 0.7);
+  --app-color-surface: #0a0502;
+  --app-color-on-surface: #e0d8d0;
+  --app-color-surface-variant: rgba(255, 255, 255, 0.03);
+  --app-color-on-surface-variant: rgba(224, 216, 208, 0.5);
 
-  --app-color-surface-container-lowest: #181b2e;
-  --app-color-surface-container-low: rgba(228, 229, 241, 0.04);
-  --app-color-surface-container: rgba(228, 229, 241, 0.07);
-  --app-color-surface-container-high: rgba(228, 229, 241, 0.1);
-  --app-color-surface-container-highest: rgba(228, 229, 241, 0.15);
+  --app-color-surface-container-lowest: #050301;
+  --app-color-surface-container-low: rgba(255, 80, 20, 0.05);
+  --app-color-surface-container: rgba(255, 80, 20, 0.08);
+  --app-color-surface-container-high: rgba(255, 80, 20, 0.12);
+  --app-color-surface-container-highest: rgba(255, 80, 20, 0.15);
 
-  --app-color-outline: rgba(228, 229, 241, 0.28);
-  --app-color-outline-variant: rgba(228, 229, 241, 0.14);
+  --app-color-outline: rgba(255, 200, 150, 0.3);
+  --app-color-outline-variant: rgba(255, 200, 150, 0.15);
 
-  --app-color-error: #fda29b;
-  --app-color-on-error: #2b0b08;
-  --app-color-error-container: #7a271a;
-  --app-color-on-error-container: #fee4e2;
+  --app-color-error: #ffb4ab;
+  --app-color-on-error: #690005;
+  --app-color-error-container: #93000a;
+  --app-color-on-error-container: #ffdad6;
 
-  --app-atmosphere-1: rgba(147, 148, 165, 0.14);
-  --app-atmosphere-2: rgba(72, 75, 106, 0.44);
-  --app-atmosphere-3: rgba(31, 34, 56, 1);
-  --app-atmosphere-glow: rgba(228, 229, 241, 0.1);
+  --app-atmosphere-1: #3a1510;
+  --app-atmosphere-2: #1a0a2e;
+  --app-atmosphere-3: #0a0502;
+  --app-atmosphere-glow: rgba(255, 78, 0, 0.15);
   --app-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
   --app-ambient-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 12px 40px rgba(0, 0, 0, 0.4);
   --app-input-shadow: inset 0 0 20px rgba(0, 0, 0, 0.18);
