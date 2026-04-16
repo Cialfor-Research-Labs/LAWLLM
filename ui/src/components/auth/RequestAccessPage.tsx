@@ -114,7 +114,7 @@ export const RequestAccessPage = ({ apiBase, onBackToLogin }: RequestAccessPageP
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-50"
           >
             {loading ? 'Submitting...' : 'Submit Access Request'}
           </button>

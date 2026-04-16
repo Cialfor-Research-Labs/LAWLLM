@@ -6,43 +6,125 @@
   --font-label: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "Courier New", Courier, monospace;
 
-  --color-primary: #ff4e00;
-  --color-primary-container: #cc3e00;
-  --color-on-primary: #ffffff;
-  --color-on-primary-container: #ffffff;
+  --color-primary: var(--app-color-primary);
+  --color-primary-container: var(--app-color-primary-container);
+  --color-on-primary: var(--app-color-on-primary);
+  --color-on-primary-container: var(--app-color-on-primary-container);
 
-  --color-secondary: #ff8a50;
-  --color-secondary-container: rgba(255, 80, 20, 0.15);
-  --color-on-secondary: #ffffff;
-  --color-on-secondary-container: #ffdad6;
+  --color-secondary: var(--app-color-secondary);
+  --color-secondary-container: var(--app-color-secondary-container);
+  --color-on-secondary: var(--app-color-on-secondary);
+  --color-on-secondary-container: var(--app-color-on-secondary-container);
 
-  --color-surface: #0a0502;
-  --color-on-surface: #e0d8d0;
-  --color-surface-variant: rgba(255, 255, 255, 0.03);
-  --color-on-surface-variant: rgba(224, 216, 208, 0.5);
+  --color-surface: var(--app-color-surface);
+  --color-on-surface: var(--app-color-on-surface);
+  --color-surface-variant: var(--app-color-surface-variant);
+  --color-on-surface-variant: var(--app-color-on-surface-variant);
 
-  --color-surface-container-lowest: #050301;
-  --color-surface-container-low: rgba(255, 80, 20, 0.05);
-  --color-surface-container: rgba(255, 80, 20, 0.08);
-  --color-surface-container-high: rgba(255, 80, 20, 0.12);
-  --color-surface-container-highest: rgba(255, 80, 20, 0.15);
+  --color-surface-container-lowest: var(--app-color-surface-container-lowest);
+  --color-surface-container-low: var(--app-color-surface-container-low);
+  --color-surface-container: var(--app-color-surface-container);
+  --color-surface-container-high: var(--app-color-surface-container-high);
+  --color-surface-container-highest: var(--app-color-surface-container-highest);
 
-  --color-outline: rgba(255, 200, 150, 0.3);
-  --color-outline-variant: rgba(255, 200, 150, 0.15);
+  --color-outline: var(--app-color-outline);
+  --color-outline-variant: var(--app-color-outline-variant);
 
-  --color-error: #ffb4ab;
-  --color-on-error: #690005;
-  --color-error-container: #93000a;
-  --color-on-error-container: #ffdad6;
+  --color-error: var(--app-color-error);
+  --color-on-error: var(--app-color-on-error);
+  --color-error-container: var(--app-color-error-container);
+  --color-on-error-container: var(--app-color-on-error-container);
 
   --radius-lg: 12px;
   --radius-xl: 20px;
   --radius-full: 24px;
 }
 
+:root {
+  color-scheme: light;
+  --app-color-primary: #484b6a;
+  --app-color-primary-container: #9394a5;
+  --app-color-on-primary: #fafafa;
+  --app-color-on-primary-container: #fafafa;
+
+  --app-color-secondary: #9394a5;
+  --app-color-secondary-container: #e4e5f1;
+  --app-color-on-secondary: #fafafa;
+  --app-color-on-secondary-container: #484b6a;
+
+  --app-color-surface: #fafafa;
+  --app-color-on-surface: #484b6a;
+  --app-color-surface-variant: rgba(228, 229, 241, 0.78);
+  --app-color-on-surface-variant: #9394a5;
+
+  --app-color-surface-container-lowest: #fafafa;
+  --app-color-surface-container-low: rgba(228, 229, 241, 0.45);
+  --app-color-surface-container: rgba(228, 229, 241, 0.78);
+  --app-color-surface-container-high: rgba(210, 211, 219, 0.92);
+  --app-color-surface-container-highest: #d2d3db;
+
+  --app-color-outline: rgba(147, 148, 165, 0.45);
+  --app-color-outline-variant: rgba(147, 148, 165, 0.2);
+
+  --app-color-error: #b42318;
+  --app-color-on-error: #fafafa;
+  --app-color-error-container: #fef3f2;
+  --app-color-on-error-container: #b42318;
+
+  --app-atmosphere-1: rgba(228, 229, 241, 0.95);
+  --app-atmosphere-2: rgba(210, 211, 219, 0.78);
+  --app-atmosphere-3: rgba(250, 250, 250, 0.98);
+  --app-atmosphere-glow: rgba(147, 148, 165, 0.22);
+  --app-panel-shadow: 0 18px 40px rgba(72, 75, 106, 0.08);
+  --app-ambient-shadow: 0 6px 24px rgba(72, 75, 106, 0.08), 0 18px 36px rgba(72, 75, 106, 0.12);
+  --app-input-shadow: inset 0 0 0 1px rgba(147, 148, 165, 0.06);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-color-primary: #e4e5f1;
+  --app-color-primary-container: #9394a5;
+  --app-color-on-primary: #484b6a;
+  --app-color-on-primary-container: #fafafa;
+
+  --app-color-secondary: #d2d3db;
+  --app-color-secondary-container: rgba(228, 229, 241, 0.12);
+  --app-color-on-secondary: #1f2238;
+  --app-color-on-secondary-container: #fafafa;
+
+  --app-color-surface: #1f2238;
+  --app-color-on-surface: #fafafa;
+  --app-color-surface-variant: rgba(228, 229, 241, 0.08);
+  --app-color-on-surface-variant: rgba(228, 229, 241, 0.7);
+
+  --app-color-surface-container-lowest: #181b2e;
+  --app-color-surface-container-low: rgba(228, 229, 241, 0.04);
+  --app-color-surface-container: rgba(228, 229, 241, 0.07);
+  --app-color-surface-container-high: rgba(228, 229, 241, 0.1);
+  --app-color-surface-container-highest: rgba(228, 229, 241, 0.15);
+
+  --app-color-outline: rgba(228, 229, 241, 0.28);
+  --app-color-outline-variant: rgba(228, 229, 241, 0.14);
+
+  --app-color-error: #fda29b;
+  --app-color-on-error: #2b0b08;
+  --app-color-error-container: #7a271a;
+  --app-color-on-error-container: #fee4e2;
+
+  --app-atmosphere-1: rgba(147, 148, 165, 0.14);
+  --app-atmosphere-2: rgba(72, 75, 106, 0.44);
+  --app-atmosphere-3: rgba(31, 34, 56, 1);
+  --app-atmosphere-glow: rgba(228, 229, 241, 0.1);
+  --app-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  --app-ambient-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 12px 40px rgba(0, 0, 0, 0.4);
+  --app-input-shadow: inset 0 0 20px rgba(0, 0, 0, 0.18);
+}
+
 @layer base {
+  html,
   body {
     @apply bg-surface text-on-surface font-body antialiased;
+    transition: background-color 220ms ease, color 220ms ease;
   }
 
   h1,
@@ -77,13 +159,14 @@
   .atmosphere {
     @apply fixed inset-0 -z-10;
     background:
-      radial-gradient(circle at 70% 20%, #3a1510 0%, transparent 50%),
-      radial-gradient(circle at 20% 80%, #1a0a2e 0%, transparent 50%),
-      radial-gradient(circle at 50% 50%, #0a0502 0%, transparent 100%);
+      radial-gradient(circle at 72% 18%, var(--app-atmosphere-1) 0%, transparent 48%),
+      radial-gradient(circle at 18% 82%, var(--app-atmosphere-2) 0%, transparent 54%),
+      radial-gradient(circle at 50% 50%, var(--app-atmosphere-3) 0%, transparent 100%);
   }
 
   .atmosphere-glow {
-    @apply fixed top-[10%] left-[10%] h-[400px] w-[400px] bg-primary blur-[120px] opacity-15 -z-10;
+    @apply fixed top-[8%] left-[8%] h-[420px] w-[420px] blur-[120px] -z-10;
+    background: var(--app-atmosphere-glow);
   }
 
   .brass-divider {
@@ -98,15 +181,17 @@
 
   .machined-input {
     @apply w-full border-none border-b border-outline-variant bg-surface-variant p-4 font-body text-on-surface transition-all focus:border-primary focus:outline-none;
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--app-input-shadow);
   }
 
   .parchment-glass {
     @apply rounded-xl border border-outline-variant bg-surface-container shadow-2xl backdrop-blur-[20px];
+    box-shadow: var(--app-panel-shadow);
   }
 
   .glass-panel {
     @apply bg-surface/80 backdrop-blur-xl;
+    box-shadow: var(--app-panel-shadow);
   }
 }
 
@@ -120,7 +205,7 @@
 }
 
 .shadow-ambient {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--app-ambient-shadow);
 }
 
 .markdown-body strong,

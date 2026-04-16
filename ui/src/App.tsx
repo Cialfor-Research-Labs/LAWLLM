@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sidebar, Header } from './components/Layout';
+import { Sidebar, Header, ThemeToggle, type ThemeMode } from './components/Layout';
 import { DocumentAnalyzer } from './components/DocumentAnalyzer';
 import { LegalChat } from './components/LegalChat';
 import { DocumentGenerator } from './components/DocumentGenerator';
@@ -50,6 +50,7 @@ interface GeneratorHistoryItem {
 const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
 const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
+const THEME_STORAGE_KEY = 'vidhi_theme_mode';
 const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
 
 function loadGeneratorHistoryFromStorage(): GeneratorHistoryItem[] {
@@ -85,6 +86,11 @@ function getInitialActiveChatSessionId(): string | null {
   }
 }
 
+function getInitialThemeMode(): ThemeMode {
+  const stored = (localStorage.getItem(THEME_STORAGE_KEY) || '').trim().toLowerCase();
+  return stored === 'dark' ? 'dark' : 'light';
+}
+
 function getApiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configured) {
@@ -116,6 +122,7 @@ export default function App() {
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
   const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getInitialThemeMode());
 
   useEffect(() => {
     if (!authToken) {
@@ -195,6 +202,11 @@ export default function App() {
       // no-op if sessionStorage is unavailable
     }
   }, [activeChatSessionId]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+  }, [themeMode]);
 
   const onLoginSuccess = (token: string, user: AuthUser) => {
     localStorage.setItem('vidhi_auth_token', token);
@@ -279,9 +291,16 @@ export default function App() {
     setActiveTab('settings');
   };
 
+  const toggleTheme = () => {
+    setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-container-low">
+        <div className="fixed right-4 top-4 z-50">
+          <ThemeToggle themeMode={themeMode} onToggleTheme={toggleTheme} />
+        </div>
         <div className="flex items-center gap-3 text-on-surface-variant">
           <Loader2 size={20} className="animate-spin" />
           Checking session...
@@ -292,17 +311,36 @@ export default function App() {
 
   if (!authToken || !currentUser) {
     if (authView === 'request') {
-      return <RequestAccessPage apiBase={apiBase} onBackToLogin={goToLogin} />;
+      return (
+        <>
+          <div className="fixed right-4 top-4 z-50">
+            <ThemeToggle themeMode={themeMode} onToggleTheme={toggleTheme} />
+          </div>
+          <RequestAccessPage apiBase={apiBase} onBackToLogin={goToLogin} />
+        </>
+      );
     }
     if (authView === 'set_password' && setupToken) {
-      return <SetPasswordPage apiBase={apiBase} token={setupToken} onBackToLogin={goToLogin} />;
+      return (
+        <>
+          <div className="fixed right-4 top-4 z-50">
+            <ThemeToggle themeMode={themeMode} onToggleTheme={toggleTheme} />
+          </div>
+          <SetPasswordPage apiBase={apiBase} token={setupToken} onBackToLogin={goToLogin} />
+        </>
+      );
     }
     return (
-      <LoginPage
-        apiBase={apiBase}
-        onLoginSuccess={onLoginSuccess}
-        onShowRequestAccess={() => setAuthView('request')}
-      />
+      <>
+        <div className="fixed right-4 top-4 z-50">
+          <ThemeToggle themeMode={themeMode} onToggleTheme={toggleTheme} />
+        </div>
+        <LoginPage
+          apiBase={apiBase}
+          onLoginSuccess={onLoginSuccess}
+          onShowRequestAccess={() => setAuthView('request')}
+        />
+      </>
     );
   }
 
@@ -326,7 +364,12 @@ export default function App() {
       />
       
       <main className="relative z-10 ml-64 flex h-screen flex-1 flex-col">
-        <Header currentUserName={currentUser.name} onLogout={onLogout} />
+        <Header
+          currentUserName={currentUser.name}
+          onLogout={onLogout}
+          themeMode={themeMode}
+          onToggleTheme={toggleTheme}
+        />
         
         <AnimatePresence mode="wait">
           {activeTab === 'analyzer' ? (

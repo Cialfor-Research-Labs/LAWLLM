@@ -13,7 +13,11 @@ import {
   KeyRound,
   Bell,
   LogOut,
+  Moon,
+  Sun,
 } from 'lucide-react';
+
+export type ThemeMode = 'light' | 'dark';
 
 interface NavItem {
   id: string;
@@ -50,7 +54,36 @@ interface SidebarProps {
 interface HeaderProps {
   currentUserName: string;
   onLogout: () => void;
+  themeMode: ThemeMode;
+  onToggleTheme: () => void;
 }
+
+interface ThemeToggleProps {
+  themeMode: ThemeMode;
+  onToggleTheme: () => void;
+  compact?: boolean;
+}
+
+export const ThemeToggle = ({ themeMode, onToggleTheme, compact = false }: ThemeToggleProps) => {
+  const isLight = themeMode === 'light';
+  const Icon = isLight ? Moon : Sun;
+  const label = isLight ? 'Dark Mode' : 'Light Mode';
+
+  return (
+    <button
+      type="button"
+      onClick={onToggleTheme}
+      className={`inline-flex items-center rounded-xl border border-outline-variant/30 bg-surface-container-low text-on-surface transition hover:border-primary/30 hover:text-primary ${
+        compact ? 'gap-2 px-3 py-2 text-xs font-semibold' : 'gap-2.5 px-4 py-2.5 text-sm font-semibold'
+      }`}
+      aria-label={`Switch to ${label}`}
+      title={`Switch to ${label}`}
+    >
+      <Icon size={compact ? 14 : 16} />
+      <span className={compact ? 'hidden sm:inline' : ''}>{label}</span>
+    </button>
+  );
+};
 
 export const Sidebar = ({
   activeTab,
@@ -145,7 +178,7 @@ export const Sidebar = ({
           </div>
 
           <button
-            className="mb-8 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-container py-3 font-label text-xs font-bold uppercase tracking-widest text-on-primary shadow-xl shadow-black/30 transition-all hover:brightness-110 active:scale-95"
+            className="mb-8 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-container py-3 font-label text-xs font-bold uppercase tracking-widest text-on-primary shadow-ambient transition-all hover:brightness-110 active:scale-95"
             onClick={onStartNewSession}
           >
             <Plus className="h-4 w-4" />
@@ -335,8 +368,8 @@ export const Sidebar = ({
   );
 };
 
-export const Header = ({ currentUserName, onLogout }: HeaderProps) => (
-  <header className="glass-panel sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/15 px-8 py-4 shadow-2xl shadow-black/30">
+export const Header = ({ currentUserName, onLogout, themeMode, onToggleTheme }: HeaderProps) => (
+  <header className="glass-panel sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/15 px-8 py-4 shadow-ambient">
     <div className="flex items-center">
       <span className="text-2xl font-headline italic text-primary">Vidhi AI</span>
     </div>
@@ -352,6 +385,7 @@ export const Header = ({ currentUserName, onLogout }: HeaderProps) => (
       </nav>
 
       <div className="flex items-center space-x-4">
+        <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
         <button className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/60 hover:text-primary">
           <Bell size={20} />
         </button>

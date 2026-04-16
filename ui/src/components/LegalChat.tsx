@@ -495,7 +495,7 @@ export const LegalChat = ({
                             <div className={`flex max-w-[85%] space-x-4 ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                                 <div
                                     className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                        msg.role === 'user' ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-white'
+                                        msg.role === 'user' ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-on-primary'
                                     }`}
                                 >
                                     {msg.role === 'user' ? <User size={18} /> : <Sparkles size={18} />}
@@ -503,7 +503,7 @@ export const LegalChat = ({
                                 <div
                                     className={`rounded-2xl border px-6 py-5 shadow-sm ${
                                         msg.role === 'user'
-                                            ? 'bg-primary text-white border-primary/20'
+                                            ? 'bg-primary text-on-primary border-primary/20'
                                             : 'bg-surface-container-high text-on-surface border-outline-variant/20'
                                     }`}
                                 >
@@ -623,7 +623,7 @@ export const LegalChat = ({
                                         setIsLoading(false);
                                     }
                                 }}
-                                className="flex-1 bg-primary text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20"
+                                className="flex-1 bg-primary text-on-primary py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20"
                             >
                                 Confirm & Proceed
                             </button>
@@ -851,7 +851,7 @@ export const LegalChat = ({
                                 {legalOutput.notice_draft && (
                                     <button
                                         onClick={sendToGenerator}
-                                        className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-lg text-xs font-bold hover:opacity-90 transition shadow-lg shadow-primary/20"
+                                        className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-on-primary py-3 rounded-lg text-xs font-bold hover:opacity-90 transition shadow-lg shadow-primary/20"
                                     >
                                         <FileText size={16} />
                                         Sync with Document Generator
@@ -881,7 +881,7 @@ export const LegalChat = ({
                     <button
                         onClick={handleSend}
                         disabled={isLoading || !input.trim()}
-                        className="absolute right-5 bottom-5 p-4 bg-primary text-white rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all shadow-xl shadow-primary/30"
+                        className="absolute right-5 bottom-5 p-4 bg-primary text-on-primary rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all shadow-xl shadow-primary/30"
                     >
                         <Send size={22} />
                     </button>

@@ -229,7 +229,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
                       <td className="px-4 py-3 space-y-2">
                         <button
                           onClick={() => saveAccess(u)}
-                          className="w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                          className="w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90"
                         >
                           Save
                         </button>

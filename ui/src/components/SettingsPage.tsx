@@ -249,7 +249,7 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
                 <button
                   type="submit"
                   disabled={profileLoading}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
                 >
                   {profileLoading && <Loader2 size={14} className="animate-spin" />}
                   Save Details
@@ -309,7 +309,7 @@ export const SettingsPage = ({ authToken, currentUser, onUserUpdated, activeSect
                 <button
                   type="submit"
                   disabled={passwordLoading}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
                 >
                   {passwordLoading && <Loader2 size={14} className="animate-spin" />}
                   Change Password

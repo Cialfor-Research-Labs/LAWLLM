@@ -820,7 +820,7 @@ export const DocumentGenerator = ({
           <button
             onClick={handleGenerate}
             disabled={!isFormValid || isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-primary text-white py-4 rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition shadow-xl shadow-primary/20"
+            className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-4 rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition shadow-xl shadow-primary/20"
           >
             {isLoading ? (
               <>
@@ -948,7 +948,7 @@ export const DocumentGenerator = ({
                   <button
                     onClick={() => setShowDownloadChooser((prev) => !prev)}
                     aria-label="Open download options"
-                    className="inline-flex items-center justify-center rounded-xl bg-primary text-white w-10 h-10 hover:opacity-90 transition shadow-lg shadow-primary/20"
+                    className="inline-flex items-center justify-center rounded-xl bg-primary text-on-primary w-10 h-10 hover:opacity-90 transition shadow-lg shadow-primary/20"
                   >
                     <Download size={16} />
                   </button>

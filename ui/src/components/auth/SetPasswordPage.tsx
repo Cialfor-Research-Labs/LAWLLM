@@ -80,7 +80,7 @@ export const SetPasswordPage = ({ apiBase, token, onBackToLogin }: SetPasswordPa
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-50"
           >
             {loading ? 'Saving...' : 'Set Password'}
           </button>
@@ -93,4 +93,3 @@ export const SetPasswordPage = ({ apiBase, token, onBackToLogin }: SetPasswordPa
     </div>
   );
 };
-
