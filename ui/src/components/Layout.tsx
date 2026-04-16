@@ -66,8 +66,6 @@ export const Sidebar = ({
   onSelectGeneratorHistory,
   onSelectSettingsSection,
 }: SidebarProps) => {
-  type HistoryView = 'workspace' | 'chat' | 'generator';
-  const [historyView, setHistoryView] = useState<HistoryView>('workspace');
   const [isLibraryMenuOpen, setIsLibraryMenuOpen] = useState(false);
   const libraryMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -119,16 +117,6 @@ export const Sidebar = ({
   };
 
   useEffect(() => {
-    if (activeTab === 'chat') {
-      setHistoryView('chat');
-    } else if (activeTab === 'generator') {
-      setHistoryView('generator');
-    } else if (activeTab === 'library') {
-      setHistoryView('workspace');
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
     if (!isLibraryMenuOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -142,16 +130,7 @@ export const Sidebar = ({
     };
   }, [isLibraryMenuOpen]);
 
-  const showWorkspaceHistory = historyView === 'workspace';
-  const showChatHistory = showWorkspaceHistory || historyView === 'chat';
-  const showGeneratorHistory = showWorkspaceHistory || historyView === 'generator';
-
-  const historyCount =
-    historyView === 'workspace'
-      ? chatHistory.length + generatorHistory.length
-      : historyView === 'chat'
-        ? chatHistory.length
-        : generatorHistory.length;
+  const historyCount = chatHistory.length + generatorHistory.length;
 
   return (
     <>
@@ -197,24 +176,89 @@ export const Sidebar = ({
                   </button>
 
                   {isLibraryMenuOpen && (
-                    <div className="absolute left-full top-0 z-50 ml-2 w-56 rounded-xl border border-outline-variant/25 bg-surface-container-lowest p-2 shadow-2xl">
-                      {libraryOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          onClick={() => {
-                            setActiveTab(option.id);
-                            setIsLibraryMenuOpen(false);
-                          }}
-                          className={`mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide transition-colors last:mb-0 ${
-                            activeTab === option.id
-                              ? 'bg-primary/15 text-primary'
-                              : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-on-surface'
-                          }`}
-                        >
-                          <option.icon className="h-4 w-4" />
-                          <span>{option.label}</span>
-                        </button>
-                      ))}
+                    <div className="absolute left-full top-0 z-50 ml-2 w-80 rounded-xl border border-outline-variant/25 bg-surface-container-lowest p-2 shadow-2xl">
+                      <div className="mb-2 flex items-center justify-between px-2 pt-1">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Library</p>
+                        <span className="text-[10px] text-on-surface-variant/80">{historyCount}</span>
+                      </div>
+
+                      <div className="space-y-1 pb-2">
+                        {libraryOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            onClick={() => {
+                              setActiveTab(option.id);
+                              setIsLibraryMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide transition-colors ${
+                              activeTab === option.id
+                                ? 'bg-primary/15 text-primary'
+                                : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-on-surface'
+                            }`}
+                          >
+                            <option.icon className="h-4 w-4" />
+                            <span>{option.label}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="h-px bg-outline-variant/20" />
+
+                      <div className="max-h-72 space-y-3 overflow-y-auto pt-2 pr-1 no-scrollbar">
+                        <div className="space-y-1">
+                          <p className="px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Chat History</p>
+                          {chatHistory.slice(0, 8).map((item) => (
+                            <button
+                              key={item.session_id}
+                              onClick={() => {
+                                onSelectChatHistory(item.session_id);
+                                setIsLibraryMenuOpen(false);
+                              }}
+                              className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                                activeChatSessionId === item.session_id
+                                  ? 'border-primary/35 bg-primary/10 text-primary'
+                                  : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
+                              }`}
+                            >
+                              <div className="truncate text-xs font-semibold">{item.title || 'Untitled Chat'}</div>
+                              <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
+                                {item.preview || `${item.message_count} messages`}
+                              </div>
+                              <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.last_message_at)}</div>
+                            </button>
+                          ))}
+                          {chatHistory.length === 0 && (
+                            <p className="px-2 py-1 text-[11px] text-on-surface-variant">No chat sessions yet.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Document History</p>
+                          {generatorHistory.slice(0, 8).map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                onSelectGeneratorHistory(item.id);
+                                setIsLibraryMenuOpen(false);
+                              }}
+                              className={`w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                                activeGeneratorHistoryId === item.id
+                                  ? 'border-primary/35 bg-primary/10 text-primary'
+                                  : 'border-transparent text-on-surface-variant hover:border-outline-variant/30 hover:bg-surface-container-high/40 hover:text-on-surface'
+                              }`}
+                            >
+                              <div className="truncate text-xs font-semibold">{item.title || 'Generated Notice'}</div>
+                              <div className="mt-0.5 truncate text-[10px] text-on-surface-variant/80">
+                                {item.preview || 'Open saved draft'}
+                              </div>
+                              <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.created_at)}</div>
+                            </button>
+                          ))}
+                          {generatorHistory.length === 0 && (
+                            <p className="px-2 py-1 text-[11px] text-on-surface-variant">No generated notices yet.</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

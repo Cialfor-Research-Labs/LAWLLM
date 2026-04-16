@@ -49,7 +49,27 @@ interface GeneratorHistoryItem {
 
 const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
 const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
+const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
+
+function loadGeneratorHistoryFromStorage(): GeneratorHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(GENERATOR_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Array<Partial<GeneratorHistoryItem>> | unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => Boolean(item && item.id))
+      .map((item) => ({
+        id: String(item.id),
+        title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Generated Notice',
+        created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+        preview: typeof item.preview === 'string' ? item.preview : undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
 
 function getInitialActiveTab(): string {
   const stored = (localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) || '').trim().toLowerCase();
@@ -121,6 +141,36 @@ export default function App() {
       })
       .finally(() => setAuthLoading(false));
   }, [authToken, apiBase]);
+
+  useEffect(() => {
+    if (!authToken || !currentUser) {
+      setChatHistory([]);
+      setGeneratorHistory([]);
+      return;
+    }
+
+    setGeneratorHistory(loadGeneratorHistoryFromStorage());
+
+    const controller = new AbortController();
+    fetch(`${apiBase}/chat/sessions?limit=50`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Failed to load chat history (${res.status})`);
+        return res.json();
+      })
+      .then((data) => {
+        const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+        setChatHistory(sessions as ChatHistoryItem[]);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setChatHistory([]);
+      });
+
+    return () => controller.abort();
+  }, [authToken, currentUser, apiBase]);
 
   useEffect(() => {
     if (currentUser?.role !== 'admin' && activeTab === 'admin') {
