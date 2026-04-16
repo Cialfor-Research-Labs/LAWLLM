@@ -12,3 +12,4 @@ bitsandbytes
 scipy
 boto3
 botocore[crt]
+psycopg[binary]
