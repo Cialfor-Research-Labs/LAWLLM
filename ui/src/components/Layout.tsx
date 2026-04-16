@@ -181,7 +181,6 @@ export const Sidebar = ({
                 <div key={item.id} ref={libraryMenuRef} className="relative">
                   <button
                     onClick={() => {
-                      setActiveTab('library');
                       setIsLibraryMenuOpen((prev) => !prev);
                     }}
                     className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
