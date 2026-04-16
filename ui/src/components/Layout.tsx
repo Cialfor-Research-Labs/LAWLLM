@@ -1,5 +1,4 @@
-import React from 'react';
-import { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   MessageSquare,
   FileText,
@@ -65,6 +64,9 @@ export const Sidebar = ({
   onSelectGeneratorHistory,
   onSelectSettingsSection,
 }: SidebarProps) => {
+  type HistoryView = 'workspace' | 'chat' | 'generator';
+  const [historyView, setHistoryView] = useState<HistoryView>('workspace');
+
   const moduleItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
       { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
@@ -94,8 +96,24 @@ export const Sidebar = ({
     });
   };
 
-  const showChatHistory = activeTab === 'chat';
-  const showGeneratorHistory = activeTab === 'generator';
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      setHistoryView('chat');
+    } else if (activeTab === 'generator') {
+      setHistoryView('generator');
+    }
+  }, [activeTab]);
+
+  const showWorkspaceHistory = historyView === 'workspace';
+  const showChatHistory = showWorkspaceHistory || historyView === 'chat';
+  const showGeneratorHistory = showWorkspaceHistory || historyView === 'generator';
+
+  const historyCount =
+    historyView === 'workspace'
+      ? chatHistory.length + generatorHistory.length
+      : historyView === 'chat'
+        ? chatHistory.length
+        : generatorHistory.length;
 
   return (
     <>
@@ -152,20 +170,50 @@ export const Sidebar = ({
             </div>
           )}
 
-          {(showChatHistory || showGeneratorHistory) ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
-                  {showChatHistory ? 'Chat History' : 'Generator History'}
-                </p>
-                <span className="text-[10px] text-on-surface-variant/80">
-                  {showChatHistory ? chatHistory.length : generatorHistory.length}
-                </span>
-              </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Library</p>
+              <span className="text-[10px] text-on-surface-variant/80">{historyCount}</span>
+            </div>
 
-              <div className="space-y-1 overflow-y-auto pr-1 no-scrollbar">
-                {showChatHistory &&
-                  chatHistory.map((item) => (
+            <div className="mb-3 grid grid-cols-3 gap-1 rounded-md bg-surface-container-low p-1">
+              <button
+                onClick={() => setHistoryView('workspace')}
+                className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                  historyView === 'workspace'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Workspace
+              </button>
+              <button
+                onClick={() => setHistoryView('chat')}
+                className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                  historyView === 'chat'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Chat
+              </button>
+              <button
+                onClick={() => setHistoryView('generator')}
+                className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+                  historyView === 'generator'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                Generator
+              </button>
+            </div>
+
+            <div className="space-y-3 overflow-y-auto pr-1 no-scrollbar">
+              {showChatHistory && (
+                <div className="space-y-1">
+                  <p className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Chat History</p>
+                  {chatHistory.map((item) => (
                     <button
                       key={item.session_id}
                       onClick={() => onSelectChatHistory(item.session_id)}
@@ -182,9 +230,16 @@ export const Sidebar = ({
                       <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.last_message_at)}</div>
                     </button>
                   ))}
+                  {chatHistory.length === 0 && (
+                    <p className="px-2 py-2 text-[11px] text-on-surface-variant">No chat sessions yet.</p>
+                  )}
+                </div>
+              )}
 
-                {showGeneratorHistory &&
-                  generatorHistory.map((item) => (
+              {showGeneratorHistory && (
+                <div className="space-y-1">
+                  <p className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant/80">Generator History</p>
+                  {generatorHistory.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => onSelectGeneratorHistory(item.id)}
@@ -201,18 +256,13 @@ export const Sidebar = ({
                       <div className="mt-1 text-[9px] text-on-surface-variant/70">{formatHistoryTime(item.created_at)}</div>
                     </button>
                   ))}
-
-                {showChatHistory && chatHistory.length === 0 && (
-                  <p className="px-2 py-3 text-[11px] text-on-surface-variant">No chat sessions yet.</p>
-                )}
-                {showGeneratorHistory && generatorHistory.length === 0 && (
-                  <p className="px-2 py-3 text-[11px] text-on-surface-variant">No generated notices yet.</p>
-                )}
-              </div>
+                  {generatorHistory.length === 0 && (
+                    <p className="px-2 py-2 text-[11px] text-on-surface-variant">No generated notices yet.</p>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex-1" />
-          )}
+          </div>
         </div>
 
         <div className="mt-auto space-y-1 border-t border-outline-variant/15 p-6">
