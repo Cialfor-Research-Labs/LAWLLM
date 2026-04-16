@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Library as LibraryIcon,
+  ChevronDown,
   MessageSquare,
   FileText,
   BarChart3,
@@ -67,12 +68,19 @@ export const Sidebar = ({
 }: SidebarProps) => {
   type HistoryView = 'workspace' | 'chat' | 'generator';
   const [historyView, setHistoryView] = useState<HistoryView>('workspace');
+  const [isLibraryMenuOpen, setIsLibraryMenuOpen] = useState(false);
+  const libraryMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const libraryOptions: NavItem[] = [
+    { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
+    { id: 'generator', label: 'Document Generator', icon: FileText },
+    { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
+    { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
+  ];
 
   const moduleItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
       { id: 'library', label: 'Library', icon: LibraryIcon },
-      { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
-      { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
     ];
     if (isAdmin) {
       items.push({ id: 'admin', label: 'Admin Access', icon: ShieldCheck });
@@ -80,16 +88,24 @@ export const Sidebar = ({
     return items;
   }, [isAdmin]);
 
+  const activeModuleByTab: Record<string, NavItem> = {
+    library: { id: 'library', label: 'Library', icon: LibraryIcon },
+    chat: { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
+    generator: { id: 'generator', label: 'Document Generator', icon: FileText },
+    analyzer: { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
+    predictor: { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
+    admin: { id: 'admin', label: 'Admin Access', icon: ShieldCheck },
+  };
+
   const activeModule =
     moduleItems.find((item) => item.id === activeTab) ||
-    (activeTab === 'chat'
-      ? { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare }
-      : activeTab === 'generator'
-        ? { id: 'generator', label: 'Document Generator', icon: FileText }
-        : undefined);
+    activeModuleByTab[activeTab];
 
   const selectModule = (id: string) => {
     setActiveTab(id);
+    if (id !== 'library') {
+      setIsLibraryMenuOpen(false);
+    }
   };
 
   const formatHistoryTime = (iso: string) => {
@@ -111,6 +127,20 @@ export const Sidebar = ({
       setHistoryView('workspace');
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!isLibraryMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (libraryMenuRef.current && !libraryMenuRef.current.contains(target)) {
+        setIsLibraryMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isLibraryMenuOpen]);
 
   const showWorkspaceHistory = historyView === 'workspace';
   const showChatHistory = showWorkspaceHistory || historyView === 'chat';
@@ -147,22 +177,66 @@ export const Sidebar = ({
 
           <nav className="space-y-1">
             {moduleItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => selectModule(item.id)}
-                className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
-                  activeTab === item.id
-                    ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
-                    : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
-                }`}
-              >
-                <item.icon
-                  className={`h-5 w-5 transition-transform duration-500 ${
-                    activeTab !== item.id ? 'group-hover:rotate-12' : ''
+              item.id === 'library' ? (
+                <div key={item.id} ref={libraryMenuRef} className="relative">
+                  <button
+                    onClick={() => {
+                      setActiveTab('library');
+                      setIsLibraryMenuOpen((prev) => !prev);
+                    }}
+                    className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
+                      activeTab === 'library' || libraryOptions.some((opt) => opt.id === activeTab)
+                        ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
+                        : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span className="font-label text-xs uppercase tracking-widest">{item.label}</span>
+                    <ChevronDown
+                      className={`ml-auto h-4 w-4 transition-transform ${isLibraryMenuOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {isLibraryMenuOpen && (
+                    <div className="absolute left-full top-0 z-50 ml-2 w-56 rounded-xl border border-outline-variant/25 bg-surface-container p-2 shadow-2xl">
+                      {libraryOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setActiveTab(option.id);
+                            setIsLibraryMenuOpen(false);
+                          }}
+                          className={`mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide transition-colors last:mb-0 ${
+                            activeTab === option.id
+                              ? 'bg-primary/15 text-primary'
+                              : 'text-on-surface-variant hover:bg-surface-container-high/40 hover:text-on-surface'
+                          }`}
+                        >
+                          <option.icon className="h-4 w-4" />
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  key={item.id}
+                  onClick={() => selectModule(item.id)}
+                  className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
+                    activeTab === item.id
+                      ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
                   }`}
-                />
-                <span className="font-label text-xs uppercase tracking-widest">{item.label}</span>
-              </button>
+                >
+                  <item.icon
+                    className={`h-5 w-5 transition-transform duration-500 ${
+                      activeTab !== item.id ? 'group-hover:rotate-12' : ''
+                    }`}
+                  />
+                  <span className="font-label text-xs uppercase tracking-widest">{item.label}</span>
+                </button>
+              )
             ))}
           </nav>
         </div>
