@@ -165,15 +165,15 @@ export const Sidebar = ({
 
   return (
     <>
-      <aside className="fixed left-0 top-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-outline-variant/15 bg-surface-container-low">
+      <aside className="fixed left-0 top-0 z-50 flex h-screen w-64 shrink-0 flex-col border-r border-[color:var(--app-sidebar-border)] bg-[var(--app-sidebar-bg)]">
         <div className="p-6">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container shadow-lg">
               <Gavel className="h-6 w-6 text-on-primary-container" />
             </div>
             <div>
-              <h1 className="text-xl leading-none font-headline italic text-primary">Vidhi AI</h1>
-              <p className="mt-1 font-label text-[10px] uppercase tracking-widest text-on-surface-variant">Jurisprudential Engine</p>
+              <h1 className="text-xl leading-none font-headline italic text-[var(--app-sidebar-brand)]">Vidhi AI</h1>
+              <p className="mt-1 font-label text-[10px] uppercase tracking-widest text-[var(--app-sidebar-muted)]">Jurisprudential Engine</p>
             </div>
           </div>
 
@@ -195,8 +195,8 @@ export const Sidebar = ({
                     }}
                     className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
                       activeTab === 'library' || libraryOptions.some((opt) => opt.id === activeTab)
-                        ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
-                        : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+                        ? 'border-l-4 border-primary bg-[var(--app-sidebar-active-bg)] text-[var(--app-sidebar-active-text)]'
+                        : 'text-[var(--app-sidebar-muted)] hover:bg-[var(--app-sidebar-hover-bg)] hover:text-[var(--app-sidebar-fg)]'
                     }`}
                   >
                     <item.icon className="h-5 w-5" />
@@ -241,8 +241,8 @@ export const Sidebar = ({
                   onClick={() => selectModule(item.id)}
                   className={`group relative flex w-full items-center gap-4 px-6 py-3 transition-all ${
                     activeTab === item.id
-                      ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+                      ? 'border-l-4 border-primary bg-[var(--app-sidebar-active-bg)] text-[var(--app-sidebar-active-text)]'
+                      : 'text-[var(--app-sidebar-muted)] hover:bg-[var(--app-sidebar-hover-bg)] hover:text-[var(--app-sidebar-fg)]'
                   }`}
                 >
                   <item.icon
@@ -331,13 +331,13 @@ export const Sidebar = ({
           )}
         </div>
 
-        <div className="mt-auto space-y-1 border-t border-outline-variant/15 p-6">
+        <div className="mt-auto space-y-1 border-t border-[color:var(--app-sidebar-border)] p-6">
           <button
             onClick={() => onSelectSettingsSection('details')}
             className={`group flex w-full items-center gap-4 px-6 py-3 transition-all ${
               activeTab === 'settings' && activeSettingsSection === 'details'
-                ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
-                : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+                ? 'border-l-4 border-primary bg-[var(--app-sidebar-active-bg)] text-[var(--app-sidebar-active-text)]'
+                : 'text-[var(--app-sidebar-muted)] hover:bg-[var(--app-sidebar-hover-bg)] hover:text-[var(--app-sidebar-fg)]'
             }`}
           >
             <Settings
@@ -351,8 +351,8 @@ export const Sidebar = ({
             onClick={() => onSelectSettingsSection('password')}
             className={`group flex w-full items-center gap-4 px-6 py-3 transition-all ${
               activeTab === 'settings' && activeSettingsSection === 'password'
-                ? 'border-l-4 border-primary bg-gradient-to-r from-primary/10 to-transparent text-primary'
-                : 'text-on-surface-variant hover:bg-surface-container-highest/30 hover:text-on-surface'
+                ? 'border-l-4 border-primary bg-[var(--app-sidebar-active-bg)] text-[var(--app-sidebar-active-text)]'
+                : 'text-[var(--app-sidebar-muted)] hover:bg-[var(--app-sidebar-hover-bg)] hover:text-[var(--app-sidebar-fg)]'
             }`}
           >
             <KeyRound

@@ -78,6 +78,14 @@
   --app-panel-shadow: 0 18px 40px rgba(72, 75, 106, 0.08);
   --app-ambient-shadow: 0 6px 24px rgba(72, 75, 106, 0.08), 0 18px 36px rgba(72, 75, 106, 0.12);
   --app-input-shadow: inset 0 0 0 1px rgba(147, 148, 165, 0.06);
+  --app-sidebar-bg: #484b6a;
+  --app-sidebar-border: rgba(228, 229, 241, 0.16);
+  --app-sidebar-fg: #fafafa;
+  --app-sidebar-muted: #d2d3db;
+  --app-sidebar-brand: #fafafa;
+  --app-sidebar-hover-bg: rgba(250, 250, 250, 0.08);
+  --app-sidebar-active-bg: rgba(250, 250, 250, 0.12);
+  --app-sidebar-active-text: #fafafa;
 }
 
 :root[data-theme="dark"] {
@@ -118,6 +126,14 @@
   --app-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
   --app-ambient-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 12px 40px rgba(0, 0, 0, 0.4);
   --app-input-shadow: inset 0 0 20px rgba(0, 0, 0, 0.18);
+  --app-sidebar-bg: rgba(255, 80, 20, 0.05);
+  --app-sidebar-border: rgba(255, 200, 150, 0.15);
+  --app-sidebar-fg: #e0d8d0;
+  --app-sidebar-muted: rgba(224, 216, 208, 0.5);
+  --app-sidebar-brand: #ff4e00;
+  --app-sidebar-hover-bg: rgba(255, 255, 255, 0.04);
+  --app-sidebar-active-bg: rgba(255, 78, 0, 0.1);
+  --app-sidebar-active-text: #ff4e00;
 }
 
 @layer base {
