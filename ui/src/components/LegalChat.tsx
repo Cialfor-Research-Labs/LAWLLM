@@ -187,11 +187,21 @@ const NOTICE_TYPE_HINTS: Array<{ id: string; keywords: string[] }> = [
 ];
 
 const NOTICE_TYPE_DEADLINES: Record<string, number> = {
+    unpaid_salary: 15,
+    cheque_bounce: 15,
+    tenant_deposit_refund: 15,
+    breach_of_contract: 15,
+    consumer_complaint: 15,
+    recovery_of_money: 15,
     defamation: 7,
+    rent_arrears: 15,
+    maintenance_nonpayment: 15,
     ip_infringement: 7,
     cyber_fraud: 7,
     workplace_harassment: 7,
     data_privacy_breach: 10,
+    builder_delay: 15,
+    title_ownership_dispute: 15,
     wrongful_termination: 30,
     eviction: 30,
 };
@@ -226,6 +236,52 @@ function firstSentence(value: string | undefined | null): string {
     return (match ? match[0] : squashed).trim();
 }
 
+function sentenceParts(value: string | undefined | null): string[] {
+    return squashWhitespace(value)
+        .split(/(?<=[.!?])\s+/)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 12);
+}
+
+function messageText(messages: Message[], role?: Message['role']): string {
+    return messages
+        .filter((message) => !role || message.role === role)
+        .map((message) => squashWhitespace(message.content))
+        .filter(Boolean)
+        .join(' ');
+}
+
+function titleCasePhrase(value: string): string {
+    return value.replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function extractAddressForLabel(text: string, label: string): string {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+        new RegExp(`${escaped}\\s+address\\s*(?:is|:|-)?\\s*([^.;\\n]+)`, 'i'),
+        new RegExp(`${escaped}\\s*(?:is|at|from)\\s+([^.;\\n]+(?:india|delhi|mumbai|bengaluru|bangalore|chennai|kolkata|hyderabad|pune|noida|gurugram|gurgaon|ahmedabad|surat|lucknow|jaipur|thane|indore|bhopal))`, 'i'),
+    ];
+
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        const value = squashWhitespace(match?.[1]);
+        if (value) {
+            return value;
+        }
+    }
+
+    return '';
+}
+
+function inferPartyLabel(text: string, candidates: Array<{ pattern: RegExp; value: string }>): string {
+    for (const candidate of candidates) {
+        if (candidate.pattern.test(text)) {
+            return candidate.value;
+        }
+    }
+    return '';
+}
+
 function scorePartyMatch(party: Party, hints: string[], fallbackIndexBoost: number): number {
     const haystack = `${party.id} ${party.name || ''} ${party.role} ${party.description || ''}`.toLowerCase();
     return hints.reduce((score, hint) => score + (haystack.includes(hint) ? 1 : 0), fallbackIndexBoost);
@@ -255,6 +311,84 @@ function partyDisplayName(party: Party | null): string {
     return squashWhitespace(party.name) || humanizeToken(party.id);
 }
 
+function inferSenderName(text: string, party: Party | null, noticeType: string): string {
+    const fromParty = partyDisplayName(party);
+    if (fromParty) {
+        return fromParty;
+    }
+
+    const explicit = inferPartyLabel(text, [
+        { pattern: /\bmy company\b|\bour company\b|\bthe company\b|\ba small company\b/i, value: 'The Company' },
+        { pattern: /\bmy client\b|\bthe client\b/i, value: 'Client' },
+        { pattern: /\bemployee\b/i, value: 'Employee' },
+        { pattern: /\btenant\b/i, value: 'Tenant' },
+        { pattern: /\bconsumer\b|\bcustomer\b/i, value: 'Consumer' },
+        { pattern: /\bhome ?buyer\b|\ballottee\b/i, value: 'Homebuyer' },
+        { pattern: /\bowner\b|\bproperty owner\b/i, value: 'Property Owner' },
+    ]);
+
+    if (explicit) {
+        return explicit;
+    }
+
+    if (noticeType === 'cyber_fraud') {
+        return 'Affected Customer / Company';
+    }
+
+    return '';
+}
+
+function inferReceiverName(text: string, party: Party | null, noticeType: string): string {
+    const fromParty = partyDisplayName(party);
+    if (fromParty) {
+        return fromParty;
+    }
+
+    const explicit = inferPartyLabel(text, [
+        { pattern: /\bvendor\b/i, value: 'Vendor / Concerned Counterparty' },
+        { pattern: /\bemployer\b|\bcompany\b/i, value: 'Employer / Company' },
+        { pattern: /\blandlord\b/i, value: 'Landlord' },
+        { pattern: /\btenant\b/i, value: 'Tenant' },
+        { pattern: /\bbuilder\b|\bdeveloper\b/i, value: 'Builder / Developer' },
+        { pattern: /\bseller\b|\bservice provider\b/i, value: 'Seller / Service Provider' },
+        { pattern: /\bbank\b/i, value: 'Concerned Bank / Account Holder' },
+    ]);
+
+    if (noticeType === 'cyber_fraud') {
+        if (/\bbank\b/i.test(text)) {
+            return explicit || 'Concerned Bank / Fraudulent Account Holder';
+        }
+        return 'Fraudulent Account Holder / Unknown Fraudster(s)';
+    }
+
+    return explicit;
+}
+
+function inferRelationshipFromNarrative(text: string, sender: Party | null, receiver: Party | null, noticeType: string): string {
+    const fromParties = deriveRelationship(sender, receiver);
+    if (fromParties) {
+        return fromParties;
+    }
+
+    const explicit = inferPartyLabel(text, [
+        { pattern: /\bvendor\b|\bsupplier\b/i, value: 'Business / vendor payment relationship' },
+        { pattern: /\bemployer\b|\bemployee\b/i, value: 'Employee / employer relationship' },
+        { pattern: /\blandlord\b|\btenant\b/i, value: 'Landlord / tenant relationship' },
+        { pattern: /\bconsumer\b|\bcustomer\b|\bseller\b|\bservice provider\b/i, value: 'Consumer / seller relationship' },
+        { pattern: /\bbuilder\b|\bhome ?buyer\b|\ballottee\b/i, value: 'Builder / homebuyer relationship' },
+    ]);
+
+    if (explicit) {
+        return explicit;
+    }
+
+    if (noticeType === 'cyber_fraud') {
+        return 'Digital payment / cyber fraud dispute';
+    }
+
+    return '';
+}
+
 function deriveRelationship(sender: Party | null, receiver: Party | null): string {
     const senderRole = humanizeToken(sender?.role);
     const receiverRole = humanizeToken(receiver?.role);
@@ -264,7 +398,7 @@ function deriveRelationship(sender: Party | null, receiver: Party | null): strin
     return senderRole || receiverRole;
 }
 
-function deriveFacts(caseModel: CaseModel | null, fallbackText: string): string[] {
+function deriveFacts(caseModel: CaseModel | null, fallbackText: string, messages: Message[], legalOutput: LegalOutput | null): string[] {
     const facts = new Set<string>();
     const partyNames = new Map<string, string>();
 
@@ -284,6 +418,28 @@ function deriveFacts(caseModel: CaseModel | null, fallbackText: string): string[
                 facts.add(fact);
             }
         });
+
+    if (facts.size < 5) {
+        messageText(messages, 'user')
+            .split(/\n+/)
+            .map((line) => line.replace(/^[-*\d.)\s]+/, '').trim())
+            .flatMap((line) => sentenceParts(line))
+            .forEach((sentence) => {
+                if (facts.size < 6) {
+                    facts.add(sentence);
+                }
+            });
+    }
+
+    if (facts.size < 6) {
+        [legalOutput?.summary, legalOutput?.analysis, fallbackText]
+            .flatMap((value) => sentenceParts(value))
+            .forEach((sentence) => {
+                if (facts.size < 6) {
+                    facts.add(sentence);
+                }
+            });
+    }
 
     if (!facts.size && fallbackText) {
         facts.add(firstSentence(fallbackText));
@@ -306,11 +462,12 @@ function deriveClaim(legalOutput: LegalOutput | null, secondaryIssues: string[],
     return firstSentence(lastUserMessage?.content) || '';
 }
 
-function suggestNoticeType(legalOutput: LegalOutput | null, caseModel: CaseModel | null, claim: string): string {
+function suggestNoticeType(legalOutput: LegalOutput | null, caseModel: CaseModel | null, claim: string, messages: Message[]): string {
     const combined = [
         claim,
         legalOutput?.summary,
         legalOutput?.analysis,
+        messageText(messages, 'user'),
         ...(legalOutput?.applicable_laws || []),
         ...(caseModel?.meta?.claims || []),
         ...(caseModel?.events || []).map((event) => event.description),
@@ -341,17 +498,22 @@ function buildGeneratorPrefill(
     messages: Message[],
     sessionId: string | null,
 ): GeneratorPrefillPayload {
+    const userNarrative = messageText(messages, 'user');
     const { sender, receiver } = pickPrimaryParties(caseModel?.parties || []);
     const claim = deriveClaim(legalOutput, secondaryIssues, messages);
-    const facts = deriveFacts(caseModel, legalOutput?.summary || claim);
-    const noticeType = suggestNoticeType(legalOutput, caseModel, claim);
+    const noticeType = suggestNoticeType(legalOutput, caseModel, claim, messages);
+    const facts = deriveFacts(caseModel, legalOutput?.summary || claim, messages, legalOutput);
+    const senderName = inferSenderName(userNarrative, sender, noticeType);
+    const receiverName = inferReceiverName(userNarrative, receiver, noticeType);
+    const senderAddress = extractAddressForLabel(userNarrative, senderName || 'sender');
+    const receiverAddress = extractAddressForLabel(userNarrative, receiverName || 'receiver');
 
     return {
-        senderName: partyDisplayName(sender),
-        receiverName: partyDisplayName(receiver),
-        senderAddress: '',
-        receiverAddress: '',
-        relationship: deriveRelationship(sender, receiver),
+        senderName,
+        receiverName,
+        senderAddress,
+        receiverAddress,
+        relationship: inferRelationshipFromNarrative(userNarrative, sender, receiver, noticeType),
         facts: facts.length ? facts : [''],
         claim,
         noticeType,
