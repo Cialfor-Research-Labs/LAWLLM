@@ -1,5 +1,5 @@
 """
-Vidhi AI: Complete 5-Domain Legal Interview & Reasoning Engine
+Legal AI: Complete 5-Domain Legal Interview & Reasoning Engine
 
 This module defines the core intelligence for:
 1. Wage Dispute

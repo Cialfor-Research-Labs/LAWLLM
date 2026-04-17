@@ -35,11 +35,11 @@ async function main() {
   const info = await transporter.sendMail({
     from: smtpFrom,
     to: toEmail,
-    subject: 'Vidhi AI Access: Set your password',
+    subject: 'Legal AI Access: Set your password',
     text: `Hello ${name},\n\nYour access has been approved. Set your password using this link:\n${setupUrl}\n\nIf you did not request this, ignore this email.\n`,
     html: `
       <p>Hello ${name},</p>
-      <p>Your Vidhi AI access has been approved.</p>
+      <p>Your Legal AI access has been approved.</p>
       <p>Set your password using this link:</p>
       <p><a href="${setupUrl}">${setupUrl}</a></p>
       <p>If you did not request this, you can ignore this email.</p>
@@ -53,4 +53,3 @@ main().catch((err) => {
   console.error(err?.message || String(err));
   process.exit(1);
 });
-

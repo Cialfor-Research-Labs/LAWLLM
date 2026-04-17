@@ -175,7 +175,7 @@ export const Sidebar = ({
               <Gavel className="h-6 w-6 text-on-primary-container" />
             </div>
             <div>
-              <h1 className="text-xl leading-none font-headline italic text-[var(--app-sidebar-brand)]">Vidhi AI</h1>
+              <h1 className="text-xl leading-none font-headline italic text-[var(--app-sidebar-brand)]">Legal AI</h1>
               <p className="mt-1 font-label text-[10px] uppercase tracking-widest text-[var(--app-sidebar-muted)]">Jurisprudential Engine</p>
             </div>
           </div>
@@ -374,7 +374,7 @@ export const Sidebar = ({
 export const Header = ({ currentUserName, onLogout, themeMode, onToggleTheme }: HeaderProps) => (
   <header className="glass-panel sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/15 px-8 py-4 shadow-ambient">
     <div className="flex items-center">
-      <span className="text-2xl font-headline italic text-primary">Vidhi AI</span>
+      <span className="text-2xl font-headline italic text-primary">Legal AI</span>
     </div>
 
     <div className="flex items-center space-x-8">

@@ -1,4 +1,4 @@
-=== Vidhi AI: Property Dispute Test Results ===
+=== Legal AI: Property Dispute Test Results ===
 
 CASE 1: My builder delayed possession by 1 year and is now asking extra money.
 RESPONSE:

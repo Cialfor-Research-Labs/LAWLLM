@@ -147,7 +147,7 @@ const markdownComponents: Components = {
 };
 
 const DEFAULT_GREETING =
-    'Hello. I am Vidhi AI. Describe your legal situation, and I will identify the core issues, ask necessary follow-up questions, and provide a full FIRAC legal assessment.';
+    'Hello. I am Legal AI. Describe your legal situation, and I will identify the core issues, ask necessary follow-up questions, and provide a full FIRAC legal assessment.';
 
 interface LegalChatProps {
     authToken: string;
@@ -1038,7 +1038,7 @@ export const LegalChat = ({
             <div className="border-b border-outline-variant/10 bg-surface/90 px-8 py-6 backdrop-blur-sm">
                 <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
                     <div className="max-w-3xl">
-                        <h2 className="text-3xl font-headline font-bold text-primary">Vidhi AI: Intelligent Interviewer</h2>
+                        <h2 className="text-3xl font-headline font-bold text-primary">Legal AI: Intelligent Interviewer</h2>
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>

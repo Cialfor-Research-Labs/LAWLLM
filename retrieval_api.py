@@ -67,7 +67,7 @@ from phase65_engine import (
 )
 
 
-app = FastAPI(title="Vidhi AI API", version="2.5")
+app = FastAPI(title="Legal AI API", version="2.5")
 
 app.add_middleware(
     CORSMiddleware,
@@ -2503,7 +2503,7 @@ def get_static_greeting(text: str) -> Optional[str]:
         "sure",
     }
     if clean in greetings:
-        return f"{text.strip()}! I am your Vidhi AI assistant. How can I help you today?"
+        return f"{text.strip()}! I am your Legal AI assistant. How can I help you today?"
     if clean in acknowledgements:
         return "Understood. If you want, I can explain the last answer, help with a new legal question, or draft the next step."
     if any(h in clean for h in ["good morning", "good afternoon", "good evening"]):

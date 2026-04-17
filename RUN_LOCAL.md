@@ -16,14 +16,14 @@ Follow these steps to run the platform on your Mac while connecting to your remo
 
 You must run the following components in two separate terminal tabs/windows:
 
-#### **Tab 1: Start the Vidhi AI Backend (Local Port 8000)**
+#### **Tab 1: Start the Legal AI Backend (Local Port 8000)**
 This is your **FastAPI** logic. It is already configured to talk to your **AWS Qwen Server** at `13.203.229.0:8000`.
 ```bash
 source venv/bin/activate
 uvicorn retrieval_api:app --host 0.0.0.0 --port 8000
 ```
 
-#### **Tab 2: Start the Vidhi AI Frontend (Local Port 3000)**
+#### **Tab 2: Start the Legal AI Frontend (Local Port 3000)**
 This is your **React** UI.
 ```bash
 cd ui
