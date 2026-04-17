@@ -1001,10 +1001,16 @@ export const LegalChat = ({
         }
     };
 
-    const canPrefillDocumentGenerator =
-        !isLoading &&
-        messages.some((message) => message.role === 'user') &&
-        (Boolean(legalOutput) || status === 'complete');
+    const hasMeaningfulConversation =
+        messages.some(
+            (message) =>
+                message.role === 'user' &&
+                squashWhitespace(message.content) &&
+                squashWhitespace(message.content) !== DEFAULT_GREETING,
+        ) &&
+        extractMeaningfulTranscriptLines(messages).length > 0;
+
+    const canPrefillDocumentGenerator = !isLoading && hasMeaningfulConversation;
 
     const sendToGenerator = () => {
         if (!canPrefillDocumentGenerator) return;
