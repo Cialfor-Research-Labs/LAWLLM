@@ -104,7 +104,7 @@ export const Sidebar = ({
 
   const libraryOptions: NavItem[] = [
     { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
-    { id: 'generator', label: 'Document Generator', icon: FileText },
+    { id: 'generator', label: 'Legal Notice Generator', icon: FileText },
     { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
     { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
   ];
@@ -122,7 +122,7 @@ export const Sidebar = ({
   const activeModuleByTab: Record<string, NavItem> = {
     library: { id: 'library', label: 'Library', icon: LibraryIcon },
     chat: { id: 'chat', label: 'AI Legal Chat', icon: MessageSquare },
-    generator: { id: 'generator', label: 'Document Generator', icon: FileText },
+    generator: { id: 'generator', label: 'Legal Notice Generator', icon: FileText },
     analyzer: { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
     predictor: { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
     admin: { id: 'admin', label: 'Admin Access', icon: ShieldCheck },

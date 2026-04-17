@@ -715,7 +715,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
     if (data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
-        lines.push('**Document Generator Prefill Ready**: You can transfer these facts into the "Document Generator" tab, review them, and generate the notice there.');
+        lines.push('**Legal Notice Generator Prefill Ready**: You can transfer these facts into the "Legal Notice Generator" tab, review them, and generate the notice there.');
     }
     
     return lines.join('\n').trim();
@@ -766,7 +766,7 @@ function formatInterviewResponseClean(data: InterviewChatResponse) {
     if (data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
-        lines.push('**Document Generator Prefill Ready**: You can transfer these facts into the "Document Generator" tab, review them, and generate the notice there.');
+        lines.push('**Legal Notice Generator Prefill Ready**: You can transfer these facts into the "Legal Notice Generator" tab, review them, and generate the notice there.');
     }
 
     return lines.join('\n').trim();
@@ -1463,7 +1463,7 @@ export const LegalChat = ({
                                         className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-on-primary py-3 rounded-lg text-xs font-bold hover:opacity-90 transition shadow-lg shadow-primary/20"
                                     >
                                         <FileText size={16} />
-                                        Fill in Document Generator
+                                        Fill in Legal Notice Generator
                                     </button>
                                 )}
                             </div>
@@ -1480,10 +1480,10 @@ export const LegalChat = ({
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <div className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
-                                    Document Generator Prefill
+                                    Legal Notice Generator Prefill
                                 </div>
                                 <p className="mt-1 text-sm text-on-surface-variant">
-                                    Use this chat to prefill the document form, then review and generate the notice there.
+                                    Use this chat to prefill the legal notice form, then review and generate the notice there.
                                 </p>
                             </div>
                             <button
@@ -1491,7 +1491,7 @@ export const LegalChat = ({
                                 className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition hover:opacity-90"
                             >
                                 <FileText size={16} />
-                                Fill in Document Generator
+                                Fill in Legal Notice Generator
                             </button>
                         </div>
                     </motion.div>

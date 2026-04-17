@@ -661,7 +661,7 @@ export const DocumentGenerator = ({
       {/* LEFT: Input Form */}
       <div className="w-[480px] flex flex-col border-r border-outline-variant/10 bg-surface">
         <div className="px-6 py-5 border-b border-outline-variant/10">
-          <h2 className="text-2xl font-headline font-bold text-primary">Document Generator</h2>
+          <h2 className="text-2xl font-headline font-bold text-primary">Legal Notice Generator</h2>
           <p className="text-sm text-on-surface-variant mt-1">
             Generate professional legal notices with AI-powered legal reasoning
           </p>
