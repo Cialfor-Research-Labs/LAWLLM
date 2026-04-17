@@ -694,8 +694,13 @@ export const LegalChat = ({
         }
     };
 
+    const canPrefillDocumentGenerator =
+        !isLoading &&
+        messages.some((message) => message.role === 'user') &&
+        (Boolean(legalOutput) || status === 'complete');
+
     const sendToGenerator = () => {
-        if (!legalOutput) return;
+        if (!canPrefillDocumentGenerator) return;
         onPrefillDocumentGenerator?.(
             buildGeneratorPrefill(
                 legalOutput,
@@ -1139,7 +1144,7 @@ export const LegalChat = ({
                                     ))}
                                 </div>
                                 
-                                {legalOutput && (
+                                {canPrefillDocumentGenerator && (
                                     <button
                                         onClick={sendToGenerator}
                                         className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-on-primary py-3 rounded-lg text-xs font-bold hover:opacity-90 transition shadow-lg shadow-primary/20"
@@ -1149,6 +1154,32 @@ export const LegalChat = ({
                                     </button>
                                 )}
                             </div>
+                        </div>
+                    </motion.div>
+                )}
+
+                {!legalOutput && canPrefillDocumentGenerator && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-8 rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-sm"
+                    >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <div className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
+                                    Document Generator Prefill
+                                </div>
+                                <p className="mt-1 text-sm text-on-surface-variant">
+                                    Use this chat to prefill the document form, then review and generate the notice there.
+                                </p>
+                            </div>
+                            <button
+                                onClick={sendToGenerator}
+                                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition hover:opacity-90"
+                            >
+                                <FileText size={16} />
+                                Fill in Document Generator
+                            </button>
                         </div>
                     </motion.div>
                 )}
