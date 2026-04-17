@@ -208,6 +208,18 @@ const NOTICE_TYPE_DEADLINES: Record<string, number> = {
 
 const SENDER_ROLE_HINTS = ['claimant', 'complainant', 'victim', 'client', 'plaintiff', 'petitioner', 'sender', 'consumer', 'buyer', 'employee', 'tenant', 'owner'];
 const RECEIVER_ROLE_HINTS = ['respondent', 'receiver', 'opposite', 'defendant', 'accused', 'vendor', 'seller', 'landlord', 'employer', 'builder', 'fraudster', 'scammer', 'service provider', 'bank', 'company'];
+const TRANSCRIPT_NOISE_PATTERNS = [
+    /^status:/i,
+    /^follow-up question:?/i,
+    /^next strategic steps$/i,
+    /^evidence (?:&|and) proof checklist$/i,
+    /^document generator prefill ready:/i,
+    /^legal notice ready:/i,
+    /^case complete$/i,
+    /^interviewing$/i,
+    /^i need a bit more detail/i,
+    /^you can transfer these facts/i,
+];
 
 function squashWhitespace(value: string | undefined | null): string {
     return String(value || '')
@@ -253,6 +265,94 @@ function messageText(messages: Message[], role?: Message['role']): string {
 
 function titleCasePhrase(value: string): string {
     return value.replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function stripListPrefix(value: string): string {
+    return value
+        .replace(/^\s*[-*]\s+/, '')
+        .replace(/^\s*\d+[.)]\s+/, '')
+        .replace(/^\s*\[\s*[x ]\s*\]\s+/, '')
+        .trim();
+}
+
+function cleanTranscriptLine(value: string | undefined | null): string {
+    return squashWhitespace(stripListPrefix(String(value || '')))
+        .replace(/^subject:\s*/i, '')
+        .replace(/^to,\s*/i, '')
+        .replace(/^from,\s*/i, '');
+}
+
+function isUsefulTranscriptLine(value: string): boolean {
+    const line = cleanTranscriptLine(value);
+    if (!line || line.length < 10) {
+        return false;
+    }
+    if (line === DEFAULT_GREETING) {
+        return false;
+    }
+    return !TRANSCRIPT_NOISE_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function normalizeFactLine(value: string, senderName: string, receiverName: string): string {
+    let line = cleanTranscriptLine(value);
+    if (!line) {
+        return '';
+    }
+
+    const senderLabel = senderName || 'the sender';
+    const receiverLabel = receiverName || 'the recipient';
+
+    line = line
+        .replace(/\bmy company\b/gi, senderLabel)
+        .replace(/\bour company\b/gi, senderLabel)
+        .replace(/\bmy client\b/gi, senderLabel)
+        .replace(/\bwe\b/gi, senderLabel)
+        .replace(/\bours?\b/gi, senderLabel)
+        .replace(/\bthe vendor\b/gi, receiverLabel)
+        .replace(/\bvendor denied\b/gi, `${receiverLabel} denied`)
+        .replace(/\bvendor\b/gi, receiverName && receiverName !== 'Vendor / Concerned Counterparty' ? receiverName : 'the vendor')
+        .replace(/\bfraudsters\b/gi, receiverLabel)
+        .replace(/\bthe company\b/gi, senderName || 'the company');
+
+    line = line.replace(/\s+/g, ' ').trim();
+    if (!/[.!?]$/.test(line)) {
+        line = `${line}.`;
+    }
+    return titleCasePhrase(line.charAt(0)) + line.slice(1);
+}
+
+function dedupeLines(lines: string[], limit: number): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    lines.forEach((line) => {
+        const cleaned = cleanTranscriptLine(line);
+        const key = cleaned.toLowerCase();
+        if (!cleaned || seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        if (out.length < limit) {
+            out.push(cleaned);
+        }
+    });
+    return out;
+}
+
+function extractMeaningfulTranscriptLines(messages: Message[]): string[] {
+    const lines = messages.flatMap((message) => {
+        const raw = String(message.content || '')
+            .split('\n')
+            .map((line) => cleanTranscriptLine(line))
+            .filter(isUsefulTranscriptLine);
+
+        if (message.role === 'assistant') {
+            return raw.filter((line) => !/^error:/i.test(line));
+        }
+
+        return raw;
+    });
+
+    return dedupeLines(lines, 30);
 }
 
 function extractAddressForLabel(text: string, label: string): string {
@@ -398,7 +498,14 @@ function deriveRelationship(sender: Party | null, receiver: Party | null): strin
     return senderRole || receiverRole;
 }
 
-function deriveFacts(caseModel: CaseModel | null, fallbackText: string, messages: Message[], legalOutput: LegalOutput | null): string[] {
+function deriveFacts(
+    caseModel: CaseModel | null,
+    fallbackText: string,
+    messages: Message[],
+    legalOutput: LegalOutput | null,
+    senderName: string,
+    receiverName: string,
+): string[] {
     const facts = new Set<string>();
     const partyNames = new Map<string, string>();
 
@@ -413,17 +520,16 @@ function deriveFacts(caseModel: CaseModel | null, fallbackText: string, messages
             const actor = partyNames.get(event.actor_id) || humanizeToken(event.actor_id);
             const target = partyNames.get(event.target_id || '') || humanizeToken(event.target_id);
             const fallback = [actor, humanizeToken(event.action), target].filter(Boolean).join(' ');
-            const fact = description || fallback;
+            const fact = normalizeFactLine(description || fallback, senderName, receiverName);
             if (fact) {
                 facts.add(fact);
             }
         });
 
     if (facts.size < 5) {
-        messageText(messages, 'user')
-            .split(/\n+/)
-            .map((line) => line.replace(/^[-*\d.)\s]+/, '').trim())
+        extractMeaningfulTranscriptLines(messages)
             .flatMap((line) => sentenceParts(line))
+            .map((line) => normalizeFactLine(line, senderName, receiverName))
             .forEach((sentence) => {
                 if (facts.size < 6) {
                     facts.add(sentence);
@@ -434,6 +540,7 @@ function deriveFacts(caseModel: CaseModel | null, fallbackText: string, messages
     if (facts.size < 6) {
         [legalOutput?.summary, legalOutput?.analysis, fallbackText]
             .flatMap((value) => sentenceParts(value))
+            .map((line) => normalizeFactLine(line, senderName, receiverName))
             .forEach((sentence) => {
                 if (facts.size < 6) {
                     facts.add(sentence);
@@ -442,7 +549,7 @@ function deriveFacts(caseModel: CaseModel | null, fallbackText: string, messages
     }
 
     if (!facts.size && fallbackText) {
-        facts.add(firstSentence(fallbackText));
+        facts.add(normalizeFactLine(firstSentence(fallbackText), senderName, receiverName));
     }
 
     return Array.from(facts).filter(Boolean).slice(0, 6);
@@ -455,11 +562,17 @@ function deriveClaim(legalOutput: LegalOutput | null, secondaryIssues: string[],
 
     const summarySentence = firstSentence(legalOutput?.summary);
     if (summarySentence) {
-        return summarySentence;
+        return cleanTranscriptLine(summarySentence);
+    }
+
+    const transcriptLine = extractMeaningfulTranscriptLines(messages)
+        .find((line) => /recover|refund|breach|fraud|termination|salary|harassment|deposit|rent|defamation|consumer|notice/i.test(line));
+    if (transcriptLine) {
+        return cleanTranscriptLine(firstSentence(transcriptLine));
     }
 
     const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
-    return firstSentence(lastUserMessage?.content) || '';
+    return cleanTranscriptLine(firstSentence(lastUserMessage?.content)) || '';
 }
 
 function suggestNoticeType(legalOutput: LegalOutput | null, caseModel: CaseModel | null, claim: string, messages: Message[]): string {
@@ -491,6 +604,38 @@ function suggestNoticeType(legalOutput: LegalOutput | null, caseModel: CaseModel
     return bestScore > 0 ? bestId : 'auto';
 }
 
+function deriveCustomRelief(legalOutput: LegalOutput | null, messages: Message[], noticeType: string): string {
+    const relief = new Set<string>();
+
+    (legalOutput?.legal_options || []).forEach((item) => {
+        const cleaned = cleanTranscriptLine(item);
+        if (cleaned) {
+            relief.add(cleaned);
+        }
+    });
+
+    (legalOutput?.next_steps || []).forEach((item) => {
+        const cleaned = cleanTranscriptLine(item);
+        if (cleaned && /recover|refund|pay|reverse|preserve|investigat|identify|cease|compensat|comply|return|settle/i.test(cleaned)) {
+            relief.add(cleaned);
+        }
+    });
+
+    extractMeaningfulTranscriptLines(messages).forEach((line) => {
+        if (/recover|refund|reverse|identify|trace|preserve|return|compensat|pay/i.test(line)) {
+            relief.add(cleanTranscriptLine(line));
+        }
+    });
+
+    if (!relief.size && noticeType === 'cyber_fraud') {
+        relief.add('Immediate reversal or refund of the fraudulently transferred amount');
+        relief.add('Preservation of transaction logs, account records, and related digital evidence');
+        relief.add('Disclosure of the beneficiary account details and steps taken to identify the fraudsters');
+    }
+
+    return Array.from(relief).slice(0, 5).join('\n');
+}
+
 function buildGeneratorPrefill(
     legalOutput: LegalOutput | null,
     caseModel: CaseModel | null,
@@ -502,9 +647,9 @@ function buildGeneratorPrefill(
     const { sender, receiver } = pickPrimaryParties(caseModel?.parties || []);
     const claim = deriveClaim(legalOutput, secondaryIssues, messages);
     const noticeType = suggestNoticeType(legalOutput, caseModel, claim, messages);
-    const facts = deriveFacts(caseModel, legalOutput?.summary || claim, messages, legalOutput);
     const senderName = inferSenderName(userNarrative, sender, noticeType);
     const receiverName = inferReceiverName(userNarrative, receiver, noticeType);
+    const facts = deriveFacts(caseModel, legalOutput?.summary || claim, messages, legalOutput, senderName, receiverName);
     const senderAddress = extractAddressForLabel(userNarrative, senderName || 'sender');
     const receiverAddress = extractAddressForLabel(userNarrative, receiverName || 'receiver');
 
@@ -519,7 +664,7 @@ function buildGeneratorPrefill(
         noticeType,
         tone: 'firm',
         deadline: NOTICE_TYPE_DEADLINES[noticeType] ?? '',
-        customRelief: (legalOutput?.legal_options || []).slice(0, 4).join('\n'),
+        customRelief: deriveCustomRelief(legalOutput, messages, noticeType),
         sourceSessionId: sessionId || undefined,
         sourceSummary: squashWhitespace(legalOutput?.summary),
     };
