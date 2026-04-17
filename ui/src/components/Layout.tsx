@@ -108,6 +108,9 @@ export const Sidebar = ({
     { id: 'analyzer', label: 'Document Analyzer', icon: BarChart3 },
     { id: 'predictor', label: 'Win Predictor', icon: TrendingUp },
   ];
+  const popupLibraryOptions = libraryOptions.filter(
+    (option) => option.id !== 'analyzer' && option.id !== 'predictor'
+  );
 
   const moduleItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
@@ -213,7 +216,7 @@ export const Sidebar = ({
                       </div>
 
                       <div className="space-y-1 pb-2">
-                        {libraryOptions.map((option) => (
+                        {popupLibraryOptions.map((option) => (
                           <button
                             key={option.id}
                             onClick={() => {
