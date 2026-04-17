@@ -63,6 +63,12 @@ interface GeneratorHistoryItem {
   result: NoticeResponse;
 }
 
+interface ApiErrorDetailItem {
+  loc?: Array<string | number>;
+  msg?: string;
+  type?: string;
+}
+
 interface DocumentGeneratorProps {
   authToken: string;
   currentUserName?: string;
@@ -127,6 +133,34 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const GENERATOR_HISTORY_LIMIT = 40;
 const DOWNLOAD_DATE_FORMATTER = () => new Date().toISOString().slice(0, 10);
+
+function formatApiError(payload: unknown, fallbackStatus: number): string {
+  const detail = (payload as { detail?: unknown } | null)?.detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        const entry = item as ApiErrorDetailItem;
+        const field = Array.isArray(entry.loc) ? String(entry.loc[entry.loc.length - 1] || '').replace(/_/g, ' ') : '';
+        const msg = String(entry.msg || '').trim();
+        if (field && msg) {
+          return `${field}: ${msg}`;
+        }
+        return msg;
+      })
+      .filter(Boolean);
+
+    if (messages.length > 0) {
+      return messages.join(' | ');
+    }
+  }
+
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail.trim();
+  }
+
+  return `Server responded with ${fallbackStatus}`;
+}
 
 function escapeHtml(input: string): string {
   return String(input)
@@ -438,16 +472,24 @@ export const DocumentGenerator = ({
   const updateFact = (index: number, value: string) =>
     setFacts((prev) => prev.map((f, i) => (i === index ? value : f)));
 
-  const isFormValid =
-    senderName.trim() &&
-    receiverName.trim() &&
-    senderAddress.trim() &&
-    receiverAddress.trim() &&
-    claim.trim() &&
-    facts.some((f) => f.trim());
+  const validateForm = (): string | null => {
+    if (senderName.trim().length < 2) return 'Sender name must be at least 2 characters.';
+    if (receiverName.trim().length < 2) return 'Receiver name must be at least 2 characters.';
+    if (senderAddress.trim().length < 5) return 'Sender address must be at least 5 characters.';
+    if (receiverAddress.trim().length < 5) return 'Receiver address must be at least 5 characters.';
+    if (claim.trim().length < 2) return 'Claim / Issue must be at least 2 characters.';
+    if (!facts.some((f) => f.trim())) return 'Please add at least one fact of the case.';
+    return null;
+  };
+
+  const validationError = validateForm();
+  const isFormValid = validationError == null;
 
   const handleGenerate = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid) {
+      setError(validationError || 'Please complete the required fields.');
+      return;
+    }
     if (!advocateAddress || !advocateMobile) {
       setError('Please complete Advocate Address and Advocate Mobile in Settings > Details before generating a notice.');
       return;
@@ -486,7 +528,10 @@ export const DocumentGenerator = ({
         body: JSON.stringify(body),
       });
 
-      if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(formatApiError(payload, response.status));
+      }
       const data: NoticeResponse = await response.json();
       const normalized: NoticeResponse = {
         ...data,
@@ -671,6 +716,7 @@ export const DocumentGenerator = ({
                 value={senderName}
                 onChange={(e) => setSenderName(e.target.value)}
                 placeholder="e.g. Rajesh Kumar"
+                minLength={2}
                 className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
               />
             </div>
@@ -680,6 +726,7 @@ export const DocumentGenerator = ({
                 value={receiverName}
                 onChange={(e) => setReceiverName(e.target.value)}
                 placeholder="e.g. ABC Pvt Ltd"
+                minLength={2}
                 className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
               />
             </div>
@@ -691,6 +738,7 @@ export const DocumentGenerator = ({
                 value={senderAddress}
                 onChange={(e) => setSenderAddress(e.target.value)}
                 placeholder="e.g. Kaushik, Delhi, India"
+                minLength={5}
                 className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
               />
             </div>
@@ -700,6 +748,7 @@ export const DocumentGenerator = ({
                 value={receiverAddress}
                 onChange={(e) => setReceiverAddress(e.target.value)}
                 placeholder="e.g. BMS Pvt Ltd, Bengaluru, Karnataka"
+                minLength={5}
                 className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
               />
             </div>
@@ -723,6 +772,7 @@ export const DocumentGenerator = ({
               value={claim}
               onChange={(e) => setClaim(e.target.value)}
               placeholder="e.g. unpaid salary for 3 months"
+              minLength={2}
               className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
             />
           </div>
