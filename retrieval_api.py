@@ -489,6 +489,17 @@ class _AuthCursor:
         return list(self._cursor.fetchall())
 
 
+class _AuthCursorResult:
+    def __init__(self, rowcount: int = 0) -> None:
+        self.rowcount = rowcount
+
+    def fetchone(self) -> Optional[AuthRow]:
+        return None
+
+    def fetchall(self) -> List[AuthRow]:
+        return []
+
+
 class _AuthConnection:
     def __init__(self, conn: Any) -> None:
         self._conn = conn
@@ -504,7 +515,11 @@ class _AuthConnection:
         return _AuthCursor(self._conn.execute(_translate_auth_sql(query), params))
 
     def executemany(self, query: str, params_seq: Sequence[Sequence[Any]]) -> _AuthCursor:
-        return _AuthCursor(self._conn.executemany(_translate_auth_sql(query), params_seq))
+        translated = _translate_auth_sql(query)
+        with self._conn.cursor() as cur:
+            cur.executemany(translated, params_seq)
+            rowcount = int(cur.rowcount or 0)
+        return _AuthCursor(_AuthCursorResult(rowcount))
 
     def commit(self) -> None:
         self._conn.commit()
