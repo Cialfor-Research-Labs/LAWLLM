@@ -12,6 +12,7 @@ import {
   FileText, 
   TrendingUp 
 } from 'lucide-react';
+import type { GeneratorPrefillPayload } from '../types/generatorPrefill';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -154,6 +155,7 @@ interface LegalChatProps {
     newSessionRequest?: number | null;
     onChatSessionsChange?: (sessions: ChatSessionSummary[]) => void;
     onActiveSessionChange?: (sessionId: string | null) => void;
+    onPrefillDocumentGenerator?: (payload: GeneratorPrefillPayload) => void;
 }
 
 function getApiBase(): string {
@@ -162,6 +164,203 @@ function getApiBase(): string {
     return configured.replace(/\/$/, '');
   }
   return '/api';
+}
+
+const NOTICE_TYPE_HINTS: Array<{ id: string; keywords: string[] }> = [
+    { id: 'unpaid_salary', keywords: ['salary', 'wages', 'payroll', 'unpaid salary', 'wage'] },
+    { id: 'cheque_bounce', keywords: ['cheque', 'dishonour', 'dishonor', 'bounce'] },
+    { id: 'wrongful_termination', keywords: ['termination', 'terminated', 'dismissed', 'fired', 'wrongful termination'] },
+    { id: 'tenant_deposit_refund', keywords: ['security deposit', 'deposit refund', 'tenant deposit', 'landlord'] },
+    { id: 'breach_of_contract', keywords: ['breach of contract', 'agreement', 'contract', 'breach'] },
+    { id: 'consumer_complaint', keywords: ['consumer', 'defective product', 'deficiency in service', 'refund', 'warranty'] },
+    { id: 'recovery_of_money', keywords: ['recovery of money', 'debt', 'loan', 'repay', 'outstanding amount'] },
+    { id: 'defamation', keywords: ['defamation', 'libel', 'slander', 'reputation'] },
+    { id: 'eviction', keywords: ['eviction', 'vacate', 'premises'] },
+    { id: 'rent_arrears', keywords: ['rent arrears', 'unpaid rent', 'rent due', 'rent default'] },
+    { id: 'maintenance_nonpayment', keywords: ['maintenance', 'alimony', 'spousal support'] },
+    { id: 'ip_infringement', keywords: ['trademark', 'copyright', 'infringement', 'counterfeit', 'brand misuse'] },
+    { id: 'cyber_fraud', keywords: ['cyber fraud', 'online scam', 'spoofed email', 'phishing', 'fraudulent account', 'unauthorized transaction', 'digital payment fraud'] },
+    { id: 'data_privacy_breach', keywords: ['data breach', 'privacy breach', 'personal data', 'unauthorized access'] },
+    { id: 'workplace_harassment', keywords: ['workplace harassment', 'sexual harassment', 'hostile workplace', 'harassment'] },
+    { id: 'builder_delay', keywords: ['builder delay', 'delayed possession', 'rera', 'project delay'] },
+    { id: 'title_ownership_dispute', keywords: ['title dispute', 'ownership dispute', 'property title', 'mutation dispute'] },
+];
+
+const NOTICE_TYPE_DEADLINES: Record<string, number> = {
+    defamation: 7,
+    ip_infringement: 7,
+    cyber_fraud: 7,
+    workplace_harassment: 7,
+    data_privacy_breach: 10,
+    wrongful_termination: 30,
+    eviction: 30,
+};
+
+const SENDER_ROLE_HINTS = ['claimant', 'complainant', 'victim', 'client', 'plaintiff', 'petitioner', 'sender', 'consumer', 'buyer', 'employee', 'tenant', 'owner'];
+const RECEIVER_ROLE_HINTS = ['respondent', 'receiver', 'opposite', 'defendant', 'accused', 'vendor', 'seller', 'landlord', 'employer', 'builder', 'fraudster', 'scammer', 'service provider', 'bank', 'company'];
+
+function squashWhitespace(value: string | undefined | null): string {
+    return String(value || '')
+        .replace(/\*\*/g, '')
+        .replace(/[`>#]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function humanizeToken(value: string | undefined | null): string {
+    const squashed = squashWhitespace(value);
+    if (!squashed) {
+        return '';
+    }
+    return squashed
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function firstSentence(value: string | undefined | null): string {
+    const squashed = squashWhitespace(value);
+    if (!squashed) {
+        return '';
+    }
+    const match = squashed.match(/.*?[.!?](?:\s|$)/);
+    return (match ? match[0] : squashed).trim();
+}
+
+function scorePartyMatch(party: Party, hints: string[], fallbackIndexBoost: number): number {
+    const haystack = `${party.id} ${party.name || ''} ${party.role} ${party.description || ''}`.toLowerCase();
+    return hints.reduce((score, hint) => score + (haystack.includes(hint) ? 1 : 0), fallbackIndexBoost);
+}
+
+function pickPrimaryParties(parties: Party[]): { sender: Party | null; receiver: Party | null } {
+    if (!parties.length) {
+        return { sender: null, receiver: null };
+    }
+
+    const sender = [...parties]
+        .sort((left, right) => scorePartyMatch(right, SENDER_ROLE_HINTS, parties.indexOf(right) === 0 ? 0.25 : 0) - scorePartyMatch(left, SENDER_ROLE_HINTS, parties.indexOf(left) === 0 ? 0.25 : 0))[0] || null;
+
+    const receiver = parties
+        .filter((party) => party !== sender)
+        .sort((left, right) => scorePartyMatch(right, RECEIVER_ROLE_HINTS, parties.indexOf(right) === 1 ? 0.25 : 0) - scorePartyMatch(left, RECEIVER_ROLE_HINTS, parties.indexOf(left) === 1 ? 0.25 : 0))[0]
+        || parties.find((party) => party !== sender)
+        || null;
+
+    return { sender, receiver };
+}
+
+function partyDisplayName(party: Party | null): string {
+    if (!party) {
+        return '';
+    }
+    return squashWhitespace(party.name) || humanizeToken(party.id);
+}
+
+function deriveRelationship(sender: Party | null, receiver: Party | null): string {
+    const senderRole = humanizeToken(sender?.role);
+    const receiverRole = humanizeToken(receiver?.role);
+    if (senderRole && receiverRole && senderRole !== receiverRole) {
+        return `${senderRole} / ${receiverRole}`;
+    }
+    return senderRole || receiverRole;
+}
+
+function deriveFacts(caseModel: CaseModel | null, fallbackText: string): string[] {
+    const facts = new Set<string>();
+    const partyNames = new Map<string, string>();
+
+    caseModel?.parties.forEach((party) => {
+        partyNames.set(party.id, partyDisplayName(party));
+    });
+
+    [...(caseModel?.events || [])]
+        .sort((left, right) => left.sequence - right.sequence)
+        .forEach((event) => {
+            const description = squashWhitespace(event.description);
+            const actor = partyNames.get(event.actor_id) || humanizeToken(event.actor_id);
+            const target = partyNames.get(event.target_id || '') || humanizeToken(event.target_id);
+            const fallback = [actor, humanizeToken(event.action), target].filter(Boolean).join(' ');
+            const fact = description || fallback;
+            if (fact) {
+                facts.add(fact);
+            }
+        });
+
+    if (!facts.size && fallbackText) {
+        facts.add(firstSentence(fallbackText));
+    }
+
+    return Array.from(facts).filter(Boolean).slice(0, 6);
+}
+
+function deriveClaim(legalOutput: LegalOutput | null, secondaryIssues: string[], messages: Message[]): string {
+    if (secondaryIssues.length > 0) {
+        return secondaryIssues.map((issue) => humanizeToken(issue)).join(', ');
+    }
+
+    const summarySentence = firstSentence(legalOutput?.summary);
+    if (summarySentence) {
+        return summarySentence;
+    }
+
+    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+    return firstSentence(lastUserMessage?.content) || '';
+}
+
+function suggestNoticeType(legalOutput: LegalOutput | null, caseModel: CaseModel | null, claim: string): string {
+    const combined = [
+        claim,
+        legalOutput?.summary,
+        legalOutput?.analysis,
+        ...(legalOutput?.applicable_laws || []),
+        ...(caseModel?.meta?.claims || []),
+        ...(caseModel?.events || []).map((event) => event.description),
+    ]
+        .map((value) => squashWhitespace(value))
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+    let bestId = 'auto';
+    let bestScore = 0;
+
+    NOTICE_TYPE_HINTS.forEach(({ id, keywords }) => {
+        const score = keywords.reduce((total, keyword) => total + (combined.includes(keyword) ? 1 : 0), 0);
+        if (score > bestScore) {
+            bestScore = score;
+            bestId = id;
+        }
+    });
+
+    return bestScore > 0 ? bestId : 'auto';
+}
+
+function buildGeneratorPrefill(
+    legalOutput: LegalOutput | null,
+    caseModel: CaseModel | null,
+    secondaryIssues: string[],
+    messages: Message[],
+    sessionId: string | null,
+): GeneratorPrefillPayload {
+    const { sender, receiver } = pickPrimaryParties(caseModel?.parties || []);
+    const claim = deriveClaim(legalOutput, secondaryIssues, messages);
+    const facts = deriveFacts(caseModel, legalOutput?.summary || claim);
+    const noticeType = suggestNoticeType(legalOutput, caseModel, claim);
+
+    return {
+        senderName: partyDisplayName(sender),
+        receiverName: partyDisplayName(receiver),
+        senderAddress: '',
+        receiverAddress: '',
+        relationship: deriveRelationship(sender, receiver),
+        facts: facts.length ? facts : [''],
+        claim,
+        noticeType,
+        tone: 'firm',
+        deadline: NOTICE_TYPE_DEADLINES[noticeType] ?? '',
+        customRelief: (legalOutput?.legal_options || []).slice(0, 4).join('\n'),
+        sourceSessionId: sessionId || undefined,
+        sourceSummary: squashWhitespace(legalOutput?.summary),
+    };
 }
 
 function formatInterviewResponse(data: InterviewChatResponse) {
@@ -209,7 +408,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
     if (data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
-        lines.push('ðŸ’¼ **Legal Notice Ready**: You can view the full draft in the "Document Generator" tab.');
+        lines.push('**Document Generator Prefill Ready**: You can transfer these facts into the "Document Generator" tab, review them, and generate the notice there.');
     }
     
     return lines.join('\n').trim();
@@ -260,7 +459,7 @@ function formatInterviewResponseClean(data: InterviewChatResponse) {
     if (data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
-        lines.push('**Legal Notice Ready**: You can view the full draft in the "Document Generator" tab.');
+        lines.push('**Document Generator Prefill Ready**: You can transfer these facts into the "Document Generator" tab, review them, and generate the notice there.');
     }
 
     return lines.join('\n').trim();
@@ -273,6 +472,7 @@ export const LegalChat = ({
     newSessionRequest,
     onChatSessionsChange,
     onActiveSessionChange,
+    onPrefillDocumentGenerator,
 }: LegalChatProps) => {
     const apiBase = useMemo(() => getApiBase(), []);
     const authHeaders = useMemo(
@@ -495,9 +695,16 @@ export const LegalChat = ({
     };
 
     const sendToGenerator = () => {
-        if (!legalOutput?.notice_draft) return;
-        localStorage.setItem('pending_legal_notice', legalOutput.notice_draft);
-        alert('Legal Notice draft sent to Document Generator tab!');
+        if (!legalOutput) return;
+        onPrefillDocumentGenerator?.(
+            buildGeneratorPrefill(
+                legalOutput,
+                caseModel,
+                secondaryIssues,
+                messages,
+                sessionId,
+            ),
+        );
     };
 
     const progressLabel =
@@ -932,13 +1139,13 @@ export const LegalChat = ({
                                     ))}
                                 </div>
                                 
-                                {legalOutput.notice_draft && (
+                                {legalOutput && (
                                     <button
                                         onClick={sendToGenerator}
                                         className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-on-primary py-3 rounded-lg text-xs font-bold hover:opacity-90 transition shadow-lg shadow-primary/20"
                                     >
                                         <FileText size={16} />
-                                        Sync with Document Generator
+                                        Fill in Document Generator
                                     </button>
                                 )}
                             </div>

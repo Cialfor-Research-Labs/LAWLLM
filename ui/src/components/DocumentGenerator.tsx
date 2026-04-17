@@ -18,6 +18,7 @@ import {
   Shield,
   Zap,
 } from 'lucide-react';
+import type { GeneratorPrefillRequest } from '../types/generatorPrefill';
 
 // ---- Types ----
 
@@ -70,6 +71,7 @@ interface DocumentGeneratorProps {
   currentUserAdvocateMobile?: string;
   openHistoryRequest?: { id: string; nonce: number } | null;
   newSessionRequest?: number | null;
+  prefillRequest?: GeneratorPrefillRequest | null;
   onHistoryChange?: (items: Array<{ id: string; title: string; created_at: string; preview?: string }>) => void;
   onActiveHistoryChange?: (id: string | null) => void;
 }
@@ -252,6 +254,7 @@ export const DocumentGenerator = ({
   currentUserAdvocateMobile = '',
   openHistoryRequest,
   newSessionRequest,
+  prefillRequest,
   onHistoryChange,
   onActiveHistoryChange,
 }: DocumentGeneratorProps) => {
@@ -320,43 +323,6 @@ export const DocumentGenerator = ({
       });
   }, [apiBase, authToken]);
 
-  // Sync with AI Legal Chat
-  useEffect(() => {
-    const handleSync = () => {
-      const pendingDraft = localStorage.getItem('pending_legal_notice');
-      if (pendingDraft) {
-        // Construct a mock successful response from the synced data
-        const syncedResult: NoticeResponse = {
-            ok: true,
-            notice: pendingDraft,
-            laws_used: [], // Optional: could parse from draft if needed
-            notice_type: 'synced',
-            notice_type_label: 'Imported from Chat',
-            confidence: 1.0,
-            confidence_label: 'high',
-            meta: { synced: true }
-        };
-        setResult({
-          ...syncedResult,
-          notice: applyAdvocateIdentityToNotice(
-            syncedResult.notice,
-            advocateName,
-            advocateAddress,
-            advocateMobile,
-            advocateEmail,
-            advocateContact,
-          ),
-        });
-        localStorage.removeItem('pending_legal_notice'); // Consume the draft
-      }
-    };
-
-    // Check on mount and periodically or via event (custom event)
-    handleSync();
-    const interval = setInterval(handleSync, 2000); 
-    return () => clearInterval(interval);
-  }, [advocateAddress, advocateContact, advocateEmail, advocateMobile, advocateName]);
-
   const toHistorySummary = (items: GeneratorHistoryItem[]) =>
     items.map((item) => ({
       id: item.id,
@@ -383,6 +349,26 @@ export const DocumentGenerator = ({
     });
     setError('');
     setActiveHistoryId(item.id);
+  };
+
+  const applyPrefill = (request: GeneratorPrefillRequest['payload']) => {
+    setSenderName(request.senderName || '');
+    setReceiverName(request.receiverName || '');
+    setSenderAddress(request.senderAddress || '');
+    setReceiverAddress(request.receiverAddress || '');
+    setRelationship(request.relationship || '');
+    setFacts(request.facts?.length ? request.facts : ['']);
+    setClaim(request.claim || '');
+    setNoticeType(request.noticeType || 'auto');
+    setTone(request.tone || 'firm');
+    setDeadline(request.deadline ?? '');
+    setCustomRelief(request.customRelief || '');
+    setResult(null);
+    setError('');
+    setCopied(false);
+    setShowTypeDropdown(false);
+    setShowDownloadChooser(false);
+    setActiveHistoryId(null);
   };
 
   useEffect(() => {
@@ -613,6 +599,13 @@ export const DocumentGenerator = ({
     }
     handleReset();
   }, [newSessionRequest]);
+
+  useEffect(() => {
+    if (!prefillRequest?.payload) {
+      return;
+    }
+    applyPrefill(prefillRequest.payload);
+  }, [prefillRequest]);
 
   const selectedTypeLabel = noticeType === 'auto'
     ? 'Auto-detect'

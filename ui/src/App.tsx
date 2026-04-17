@@ -16,6 +16,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { RequestAccessPage } from './components/auth/RequestAccessPage';
 import { SetPasswordPage } from './components/auth/SetPasswordPage';
 import { AdminAccessPage } from './components/AdminAccessPage';
+import type { GeneratorPrefillPayload, GeneratorPrefillRequest } from './types/generatorPrefill';
 
 interface AuthUser {
   id: number;
@@ -122,6 +123,7 @@ export default function App() {
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
   const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
+  const [generatorPrefillRequest, setGeneratorPrefillRequest] = useState<GeneratorPrefillRequest | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getInitialThemeMode());
 
   useEffect(() => {
@@ -215,6 +217,7 @@ export default function App() {
     setActiveTab('library');
     setActiveChatSessionId(null);
     setActiveGeneratorHistoryId(null);
+    setGeneratorPrefillRequest(null);
     setAuthView('login');
   };
 
@@ -241,6 +244,7 @@ export default function App() {
     setGeneratorOpenRequest(null);
     setChatNewSessionRequest(null);
     setGeneratorNewSessionRequest(null);
+    setGeneratorPrefillRequest(null);
     setAuthView('login');
   };
 
@@ -264,6 +268,7 @@ export default function App() {
       setActiveGeneratorHistoryId(null);
       setGeneratorOpenRequest(null);
       setGeneratorNewSessionRequest(Date.now());
+      setGeneratorPrefillRequest(null);
       return;
     }
     if (activeTab === 'chat') {
@@ -283,7 +288,20 @@ export default function App() {
     if (!id) return;
     setActiveTab('generator');
     setActiveGeneratorHistoryId(id);
+    setGeneratorPrefillRequest(null);
     setGeneratorOpenRequest({ id, nonce: Date.now() });
+  };
+
+  const prefillDocumentGeneratorFromChat = (payload: GeneratorPrefillPayload) => {
+    const nonce = Date.now();
+    setActiveTab('generator');
+    setActiveGeneratorHistoryId(null);
+    setGeneratorOpenRequest(null);
+    setGeneratorNewSessionRequest(nonce);
+    setGeneratorPrefillRequest({
+      payload,
+      nonce,
+    });
   };
 
   const openSettingsSection = (section: 'details' | 'password') => {
@@ -396,6 +414,7 @@ export default function App() {
                 newSessionRequest={chatNewSessionRequest}
                 onChatSessionsChange={setChatHistory}
                 onActiveSessionChange={setActiveChatSessionId}
+                onPrefillDocumentGenerator={prefillDocumentGeneratorFromChat}
               />
             </motion.div>
           ) : activeTab === 'generator' ? (
@@ -414,6 +433,7 @@ export default function App() {
                 currentUserAdvocateMobile={currentUser.advocate_mobile}
                 openHistoryRequest={generatorOpenRequest}
                 newSessionRequest={generatorNewSessionRequest}
+                prefillRequest={generatorPrefillRequest}
                 onHistoryChange={setGeneratorHistory}
                 onActiveHistoryChange={setActiveGeneratorHistoryId}
               />
