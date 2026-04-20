@@ -23,6 +23,12 @@ interface LoginResponse {
   user?: AuthUser;
 }
 
+interface ApiMessageResponse {
+  ok: boolean;
+  message?: string;
+  detail?: string;
+}
+
 interface LoginPageProps {
   apiBase: string;
   onLoginSuccess: (token: string, user: AuthUser) => void;
@@ -33,6 +39,7 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
 
@@ -70,6 +77,34 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
     }
   };
 
+  const handleForgotPassword = async () => {
+    const cleanEmail = email.trim();
+    setError('');
+    setInfo('');
+    if (!cleanEmail) {
+      setError('Enter your email address first to receive a password setup link.');
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data: ApiMessageResponse = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || `Unable to process forgot password (${res.status})`);
+      }
+      setInfo(data.message || 'Password setup link sent to your email address.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unexpected forgot password error.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-container-low p-6">
       <div className="w-full max-w-md rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-8 shadow-lg">
@@ -100,6 +135,16 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
               className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
               placeholder="Enter your password"
             />
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={forgotPasswordLoading}
+                className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+              >
+                {forgotPasswordLoading ? 'Sending link...' : 'Forgot password?'}
+              </button>
+            </div>
           </div>
 
           <button

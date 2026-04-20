@@ -299,6 +299,10 @@ class LoginRequest(BaseModel):
     password: str = Field("", min_length=0)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., min_length=5)
+
+
 class SetPasswordRequest(BaseModel):
     token: str = Field(..., min_length=8)
     new_password: str = Field(..., min_length=8)
@@ -3606,6 +3610,55 @@ def auth_set_password(payload: SetPasswordRequest) -> RequestAccessResponse:
     return RequestAccessResponse(ok=True, message="Password set successfully. You can now log in.")
 
 
+def _issue_password_setup_link(user_row: AuthRow, created_by_admin_id: Optional[int] = None) -> PasswordSetupLinkResponse:
+    user_id = int(user_row["id"])
+    now = _utc_now_iso()
+    with _db_conn() as conn:
+        conn.execute(
+            """
+            UPDATE password_setup_tokens
+            SET used = TRUE, used_at = ?
+            WHERE user_id = ? AND used = FALSE
+            """,
+            (now, user_id),
+        )
+
+        raw_token = secrets.token_urlsafe(48)
+        expires_at = _utc_iso_after_hours(PASSWORD_SETUP_TOKEN_TTL_HOURS)
+        setup_url = f"{FRONTEND_BASE_URL}/?setup_token={raw_token}"
+        _send_setup_link_email(str(user_row["email"]), str(user_row["name"]), setup_url)
+        conn.execute(
+            """
+            INSERT INTO password_setup_tokens
+            (user_id, token_hash, expires_at, used, created_by_admin_id, created_at)
+            VALUES (?, ?, ?, FALSE, ?, ?)
+            """,
+            (user_id, _hash_token(raw_token), expires_at, created_by_admin_id, now),
+        )
+        conn.commit()
+
+    return PasswordSetupLinkResponse(ok=True, setup_url=setup_url, expires_at=expires_at)
+
+
+@app.post("/auth/forgot-password", response_model=RequestAccessResponse)
+def auth_forgot_password(payload: ForgotPasswordRequest) -> RequestAccessResponse:
+    email = payload.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    with _db_conn() as conn:
+        user_row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+
+    if not user_row:
+        raise HTTPException(status_code=404, detail="No account found for this email address.")
+
+    if user_row["role"] == "user" and (user_row["status"] != "granted" or int(user_row["access_granted"]) != 1):
+        raise HTTPException(status_code=400, detail="This account does not currently have product access.")
+
+    _issue_password_setup_link(user_row)
+    return RequestAccessResponse(ok=True, message="Password setup link sent to your email address.")
+
+
 @app.get("/admin/access-requests", response_model=AdminAccessListResponse)
 def admin_access_requests(authorization: Optional[str] = Header(default=None)) -> AdminAccessListResponse:
     _require_admin_user(authorization)
@@ -3823,7 +3876,6 @@ def admin_generate_password_setup_link(
     authorization: Optional[str] = Header(default=None),
 ) -> PasswordSetupLinkResponse:
     admin_row = _require_admin_user(authorization)
-    now = _utc_now_iso()
 
     with _db_conn() as conn:
         user_row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -3833,31 +3885,7 @@ def admin_generate_password_setup_link(
             raise HTTPException(status_code=400, detail="Cannot generate setup link for admin account.")
         if user_row["status"] != "granted" or int(user_row["access_granted"]) != 1:
             raise HTTPException(status_code=400, detail="Grant product access before generating a setup link.")
-
-        conn.execute(
-            """
-            UPDATE password_setup_tokens
-            SET used = TRUE, used_at = ?
-            WHERE user_id = ? AND used = FALSE
-            """,
-            (now, user_id),
-        )
-
-        raw_token = secrets.token_urlsafe(48)
-        expires_at = _utc_iso_after_hours(PASSWORD_SETUP_TOKEN_TTL_HOURS)
-        setup_url = f"{FRONTEND_BASE_URL}/?setup_token={raw_token}"
-        _send_setup_link_email(str(user_row["email"]), str(user_row["name"]), setup_url)
-        conn.execute(
-            """
-            INSERT INTO password_setup_tokens
-            (user_id, token_hash, expires_at, used, created_by_admin_id, created_at)
-            VALUES (?, ?, ?, FALSE, ?, ?)
-            """,
-            (user_id, _hash_token(raw_token), expires_at, int(admin_row["id"]), now),
-        )
-        conn.commit()
-
-    return PasswordSetupLinkResponse(ok=True, setup_url=setup_url, expires_at=expires_at)
+    return _issue_password_setup_link(user_row, created_by_admin_id=int(admin_row["id"]))
 
 
 @app.get("/chat/sessions", response_model=ChatSessionListResponse)
