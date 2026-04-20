@@ -925,9 +925,9 @@ export const LegalChat = ({
         resetConversation();
     }, [newSessionRequest]);
 
-    const handleSend = async () => {
-        if (!input.trim() || isLoading) return;
-        const userMessage = input.trim();
+    const handleSend = async (overrideMessage?: string) => {
+        const userMessage = (overrideMessage ?? input).trim();
+        if (!userMessage || isLoading) return;
         setInput('');
         setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
         setIsLoading(true);
@@ -1011,6 +1011,14 @@ export const LegalChat = ({
         extractMeaningfulTranscriptLines(messages).length > 0;
 
     const canPrefillDocumentGenerator = !isLoading && hasMeaningfulConversation;
+    const showQuickStartChips = !hasMeaningfulConversation && !isLoading;
+    const quickStartChips = [
+        'Salary not paid',
+        'Landlord dispute',
+        'Contract breach',
+        'Workplace harassment',
+        'Consumer complaint',
+    ];
 
     const sendToGenerator = () => {
         if (!canPrefillDocumentGenerator) return;
@@ -1027,18 +1035,25 @@ export const LegalChat = ({
 
     const progressLabel =
         status === 'clarification_required'
-            ? 'Signal Low'
+            ? 'Clarifying missing facts - Step 2 of 4'
             : status === 'complete'
-                ? 'Factual Certainty'
-                : 'Analyzing Situation';
+                ? 'FIRAC analysis ready - Step 4 of 4'
+                : 'Gathering facts - Step 2 of 4';
+    const progressValue =
+        status === 'complete'
+            ? 100
+            : status === 'clarification_required'
+                ? Math.max(45, Math.round(confidence * 100))
+                : Math.max(28, Math.round(confidence * 100));
     const systemModeLabel = status.replace('_', ' ');
 
     return (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-gradient-to-b from-surface to-surface-container-low">
-            <div className="border-b border-outline-variant/10 bg-surface/90 px-8 py-6 backdrop-blur-sm">
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
                     <div className="max-w-3xl">
-                        <h2 className="text-3xl font-headline font-bold text-primary">Legal AI: Intelligent Interviewer</h2>
+                        <p className="section-kicker">Intelligent interviewer</p>
+                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We will structure the legal facts.</h2>
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
@@ -1068,20 +1083,26 @@ export const LegalChat = ({
                         </div>
                     </div>
                     <div className="flex min-w-[260px] items-center gap-3">
-                        <div className="flex flex-1 flex-col items-end rounded-2xl border border-outline-variant/15 bg-surface-container-low px-4 py-3 shadow-sm">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
+                        <div className="app-shell-panel flex flex-1 flex-col bg-surface-container-low px-5 py-4">
+                            <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-medium text-on-surface">
                                 {progressLabel}
                             </span>
-                            <div className="mt-2 h-2 w-40 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
+                            <span className="status-pill">{Math.round(confidence * 100)}%</span>
+                            </div>
+                            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
                                 <motion.div
                                     className={`h-full ${confidence < 0.4 ? 'bg-amber-500' : confidence < 0.7 ? 'bg-primary' : 'bg-emerald-500'}`}
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${confidence * 100}%` }}
+                                    animate={{ width: `${progressValue}%` }}
                                     transition={{ duration: 0.5 }}
                                 />
                             </div>
+                            <p className="mt-2 text-[12px] text-on-surface-variant">
+                                We keep asking focused follow-ups only until the facts are strong enough for a confident summary.
+                            </p>
                         </div>
-                        <div className="hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 shadow-sm sm:flex sm:flex-col">
+                        <div className="hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 shadow-sm">
                             <span className="text-[9px] font-black uppercase tracking-[0.12em] text-on-surface-variant/70 leading-none">System Mode</span>
                             <span className={`mt-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-normal ${status === 'complete' ? 'text-emerald-600' : status === 'clarification_required' ? 'text-amber-600' : 'text-primary'}`}>
                                 {systemModeLabel}
@@ -1123,12 +1144,42 @@ export const LegalChat = ({
                     ))}
                 </AnimatePresence>
 
+                {showQuickStartChips && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="app-shell-panel bg-surface-container-low p-5"
+                    >
+                        <div className="flex flex-col gap-3">
+                            <div>
+                                <p className="section-kicker">Quick start</p>
+                                <h3 className="mt-1 text-lg font-semibold text-on-surface">Pick a common issue to begin faster</h3>
+                                <p className="mt-1 text-sm leading-7 text-on-surface-variant">
+                                    You can tap one of these prompts or type your own situation below.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {quickStartChips.map((chip) => (
+                                    <button
+                                        key={chip}
+                                        type="button"
+                                        onClick={() => void handleSend(chip)}
+                                        className="secondary-button px-4 py-2 text-sm"
+                                    >
+                                        {chip}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
                 {isLoading && (
                     <div className="flex justify-start">
                         <div className="chat-assistant-bubble flex items-center gap-4 rounded-[24px] border px-5 py-4">
                             <Loader2 size={18} className="animate-spin text-primary" />
                             <div className="text-sm font-medium text-on-surface">
-                                Preparing a guided legal response...
+                                Analyzing the facts and preparing the next legal question...
                             </div>
                         </div>
                     </div>
@@ -1499,9 +1550,9 @@ export const LegalChat = ({
                 </div>
             </div>
 
-            <div className="border-t border-outline-variant/10 bg-surface/92 px-8 py-5 backdrop-blur-sm">
+            <div className="border-t border-outline-variant/70 bg-surface-variant px-4 py-5 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto max-w-6xl">
-                    <div className="relative overflow-hidden rounded-[30px] border border-outline-variant/15 bg-surface-container-lowest p-3 shadow-[0_18px_40px_rgba(72,75,106,0.08)]">
+                    <div className="app-shell-panel relative overflow-hidden p-3">
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
@@ -1513,12 +1564,13 @@ export const LegalChat = ({
                         }}
                         placeholder="Describe your legal issue (e.g., 'My salary is unpaid for 3 months')..."
                         disabled={isLoading}
-                        className="h-24 w-full resize-none rounded-[24px] border border-transparent bg-surface-container-low px-6 py-5 pr-20 text-on-surface placeholder:text-on-surface-variant focus:border-primary/20 focus:ring-4 focus:ring-primary/10 transition-all shadow-inner disabled:opacity-70"
+                        className="text-field h-24 resize-none pr-20 disabled:opacity-70"
                     />
                     <button
+                        type="button"
                         onClick={handleSend}
                         disabled={isLoading || !input.trim()}
-                        className="absolute bottom-6 right-6 rounded-2xl bg-primary p-4 text-on-primary shadow-xl shadow-primary/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        className="primary-button absolute bottom-6 right-6 h-14 w-14 rounded-2xl px-0 py-0 disabled:scale-100"
                     >
                         <Send size={22} />
                     </button>

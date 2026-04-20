@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --font-headline: "Georgia", serif;
-  --font-body: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-label: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-mono: "Courier New", Courier, monospace;
+  --font-headline: "DM Sans", "Inter", "Segoe UI", sans-serif;
+  --font-body: "DM Sans", "Inter", "Segoe UI", sans-serif;
+  --font-label: "DM Sans", "Inter", "Segoe UI", sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
 
   --color-primary: var(--app-color-primary);
   --color-primary-container: var(--app-color-primary-container);
@@ -35,136 +35,160 @@
   --color-error-container: var(--app-color-error-container);
   --color-on-error-container: var(--app-color-on-error-container);
 
-  --radius-lg: 12px;
+  --radius-lg: 14px;
   --radius-xl: 20px;
-  --radius-full: 24px;
+  --radius-full: 999px;
 }
 
 :root {
   color-scheme: light;
-  --app-color-primary: #484b6a;
-  --app-color-primary-container: #9394a5;
-  --app-color-on-primary: #fafafa;
-  --app-color-on-primary-container: #fafafa;
 
-  --app-color-secondary: #9394a5;
-  --app-color-secondary-container: #e4e5f1;
-  --app-color-on-secondary: #fafafa;
-  --app-color-on-secondary-container: #484b6a;
+  --app-color-primary: #1d9e75;
+  --app-color-primary-container: #d9f2e8;
+  --app-color-on-primary: #ffffff;
+  --app-color-on-primary-container: #0f4f3b;
 
-  --app-color-surface: #fafafa;
-  --app-color-on-surface: #484b6a;
-  --app-color-surface-variant: rgba(228, 229, 241, 0.78);
-  --app-color-on-surface-variant: #9394a5;
+  --app-color-secondary: #26215c;
+  --app-color-secondary-container: #ede9fb;
+  --app-color-on-secondary: #ffffff;
+  --app-color-on-secondary-container: #26215c;
 
-  --app-color-surface-container-lowest: #fafafa;
-  --app-color-surface-container-low: rgba(228, 229, 241, 0.45);
-  --app-color-surface-container: rgba(228, 229, 241, 0.78);
-  --app-color-surface-container-high: rgba(210, 211, 219, 0.92);
-  --app-color-surface-container-highest: #d2d3db;
+  --app-color-surface: #f8f9fb;
+  --app-color-on-surface: #1f2937;
+  --app-color-surface-variant: rgba(255, 255, 255, 0.84);
+  --app-color-on-surface-variant: #6b7280;
 
-  --app-color-outline: rgba(147, 148, 165, 0.45);
-  --app-color-outline-variant: rgba(147, 148, 165, 0.2);
+  --app-color-surface-container-lowest: #ffffff;
+  --app-color-surface-container-low: #f4f7f8;
+  --app-color-surface-container: #edf3f2;
+  --app-color-surface-container-high: #e4ece9;
+  --app-color-surface-container-highest: #d7e3de;
 
-  --app-color-error: #b42318;
-  --app-color-on-error: #fafafa;
-  --app-color-error-container: #fef3f2;
-  --app-color-on-error-container: #b42318;
+  --app-color-outline: rgba(107, 114, 128, 0.24);
+  --app-color-outline-variant: rgba(107, 114, 128, 0.14);
 
-  --app-atmosphere-1: rgba(228, 229, 241, 0.95);
-  --app-atmosphere-2: rgba(210, 211, 219, 0.78);
-  --app-atmosphere-3: rgba(250, 250, 250, 0.98);
-  --app-atmosphere-glow: rgba(147, 148, 165, 0.22);
-  --app-panel-shadow: 0 18px 40px rgba(72, 75, 106, 0.08);
-  --app-ambient-shadow: 0 6px 24px rgba(72, 75, 106, 0.08), 0 18px 36px rgba(72, 75, 106, 0.12);
-  --app-input-shadow: inset 0 0 0 1px rgba(147, 148, 165, 0.06);
-  --app-sidebar-bg: #484b6a;
-  --app-sidebar-border: rgba(228, 229, 241, 0.16);
-  --app-sidebar-fg: #fafafa;
-  --app-sidebar-muted: #d2d3db;
-  --app-sidebar-brand: #fafafa;
-  --app-sidebar-hover-bg: rgba(250, 250, 250, 0.08);
-  --app-sidebar-active-bg: rgba(250, 250, 250, 0.12);
-  --app-sidebar-active-text: #fafafa;
-  --app-sidebar-panel-bg: rgba(250, 250, 250, 0.16);
-  --app-sidebar-panel-border: rgba(250, 250, 250, 0.14);
-  --app-sidebar-panel-text: #fafafa;
-  --app-sidebar-panel-muted: rgba(228, 229, 241, 0.72);
-  --app-sidebar-panel-active-bg: rgba(250, 250, 250, 0.12);
-  --app-sidebar-panel-active-border: rgba(250, 250, 250, 0.28);
-  --app-sidebar-panel-active-text: #fafafa;
-  --app-sidebar-panel-hover-bg: rgba(250, 250, 250, 0.08);
+  --app-color-error: #e74c3c;
+  --app-color-on-error: #ffffff;
+  --app-color-error-container: #fff1ef;
+  --app-color-on-error-container: #a93326;
 
-  --app-chat-assistant-bubble-bg: rgba(255, 255, 255, 0.92);
-  --app-chat-assistant-bubble-border: rgba(147, 148, 165, 0.18);
-  --app-chat-assistant-bubble-shadow: 0 18px 40px rgba(72, 75, 106, 0.08);
+  --app-atmosphere-1: rgba(225, 245, 238, 0.95);
+  --app-atmosphere-2: rgba(237, 233, 251, 0.9);
+  --app-atmosphere-3: rgba(248, 249, 251, 0.98);
+  --app-atmosphere-glow: rgba(29, 158, 117, 0.12);
+  --app-panel-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+  --app-ambient-shadow: 0 10px 30px rgba(15, 23, 42, 0.06), 0 24px 60px rgba(15, 23, 42, 0.08);
+  --app-input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+  --app-sidebar-bg: rgba(255, 255, 255, 0.92);
+  --app-sidebar-border: rgba(29, 158, 117, 0.12);
+  --app-sidebar-fg: #1f2937;
+  --app-sidebar-muted: #6b7280;
+  --app-sidebar-brand: #26215c;
+  --app-sidebar-hover-bg: rgba(225, 245, 238, 0.55);
+  --app-sidebar-active-bg: #e1f5ee;
+  --app-sidebar-active-text: #1d9e75;
+  --app-sidebar-panel-bg: rgba(248, 249, 251, 0.84);
+  --app-sidebar-panel-border: rgba(107, 114, 128, 0.12);
+  --app-sidebar-panel-text: #1f2937;
+  --app-sidebar-panel-muted: #6b7280;
+  --app-sidebar-panel-active-bg: rgba(225, 245, 238, 0.72);
+  --app-sidebar-panel-active-border: rgba(29, 158, 117, 0.22);
+  --app-sidebar-panel-active-text: #0f7660;
+  --app-sidebar-panel-hover-bg: rgba(244, 247, 248, 0.92);
+
+  --app-chat-assistant-bubble-bg: rgba(255, 255, 255, 0.94);
+  --app-chat-assistant-bubble-border: rgba(29, 158, 117, 0.18);
+  --app-chat-assistant-bubble-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --app-color-primary: #ff4e00;
-  --app-color-primary-container: #cc3e00;
-  --app-color-on-primary: #ffffff;
-  --app-color-on-primary-container: #ffffff;
 
-  --app-color-secondary: #ff8a50;
-  --app-color-secondary-container: rgba(255, 80, 20, 0.15);
-  --app-color-on-secondary: #ffffff;
-  --app-color-on-secondary-container: #ffdad6;
+  --app-color-primary: #5dcaa5;
+  --app-color-primary-container: #21463d;
+  --app-color-on-primary: #082018;
+  --app-color-on-primary-container: #e8f5f0;
 
-  --app-color-surface: #0a0502;
-  --app-color-on-surface: #e0d8d0;
-  --app-color-surface-variant: rgba(255, 255, 255, 0.03);
-  --app-color-on-surface-variant: rgba(224, 216, 208, 0.5);
+  --app-color-secondary: #d7e6ff;
+  --app-color-secondary-container: rgba(93, 202, 165, 0.14);
+  --app-color-on-secondary: #10263d;
+  --app-color-on-secondary-container: #dff8ef;
 
-  --app-color-surface-container-lowest: #050301;
-  --app-color-surface-container-low: rgba(255, 80, 20, 0.05);
-  --app-color-surface-container: rgba(255, 80, 20, 0.08);
-  --app-color-surface-container-high: rgba(255, 80, 20, 0.12);
-  --app-color-surface-container-highest: rgba(255, 80, 20, 0.15);
+  --app-color-surface: #0f2720;
+  --app-color-on-surface: #e8f5f0;
+  --app-color-surface-variant: rgba(26, 46, 40, 0.88);
+  --app-color-on-surface-variant: #7bb5a5;
 
-  --app-color-outline: rgba(255, 200, 150, 0.3);
-  --app-color-outline-variant: rgba(255, 200, 150, 0.15);
+  --app-color-surface-container-lowest: #142922;
+  --app-color-surface-container-low: #1a2e28;
+  --app-color-surface-container: #223832;
+  --app-color-surface-container-high: #29423b;
+  --app-color-surface-container-highest: #325049;
+
+  --app-color-outline: rgba(123, 181, 165, 0.28);
+  --app-color-outline-variant: rgba(123, 181, 165, 0.16);
 
   --app-color-error: #ffb4ab;
   --app-color-on-error: #690005;
-  --app-color-error-container: #93000a;
-  --app-color-on-error-container: #ffdad6;
+  --app-color-error-container: #7c1d16;
+  --app-color-on-error-container: #ffe8e5;
 
-  --app-atmosphere-1: #3a1510;
-  --app-atmosphere-2: #1a0a2e;
-  --app-atmosphere-3: #0a0502;
-  --app-atmosphere-glow: rgba(255, 78, 0, 0.15);
-  --app-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-  --app-ambient-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 12px 40px rgba(0, 0, 0, 0.4);
-  --app-input-shadow: inset 0 0 20px rgba(0, 0, 0, 0.18);
-  --app-sidebar-bg: rgba(255, 80, 20, 0.05);
-  --app-sidebar-border: rgba(255, 200, 150, 0.15);
-  --app-sidebar-fg: #e0d8d0;
-  --app-sidebar-muted: rgba(224, 216, 208, 0.5);
-  --app-sidebar-brand: #ff4e00;
-  --app-sidebar-hover-bg: rgba(255, 255, 255, 0.04);
-  --app-sidebar-active-bg: rgba(255, 78, 0, 0.1);
-  --app-sidebar-active-text: #ff4e00;
-  --app-sidebar-panel-bg: rgba(255, 80, 20, 0.08);
-  --app-sidebar-panel-border: rgba(255, 200, 150, 0.15);
-  --app-sidebar-panel-text: #e0d8d0;
-  --app-sidebar-panel-muted: rgba(224, 216, 208, 0.62);
-  --app-sidebar-panel-active-bg: rgba(255, 78, 0, 0.1);
-  --app-sidebar-panel-active-border: rgba(255, 78, 0, 0.35);
-  --app-sidebar-panel-active-text: #ff4e00;
-  --app-sidebar-panel-hover-bg: rgba(255, 255, 255, 0.04);
+  --app-atmosphere-1: rgba(17, 29, 26, 0.95);
+  --app-atmosphere-2: rgba(21, 58, 50, 0.9);
+  --app-atmosphere-3: rgba(15, 39, 32, 0.98);
+  --app-atmosphere-glow: rgba(93, 202, 165, 0.12);
+  --app-panel-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+  --app-ambient-shadow: 0 12px 36px rgba(0, 0, 0, 0.2), 0 24px 60px rgba(0, 0, 0, 0.28);
+  --app-input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 
-  --app-chat-assistant-bubble-bg: rgba(255, 80, 20, 0.12);
-  --app-chat-assistant-bubble-border: rgba(255, 200, 150, 0.18);
-  --app-chat-assistant-bubble-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  --app-sidebar-bg: rgba(17, 29, 26, 0.94);
+  --app-sidebar-border: rgba(123, 181, 165, 0.12);
+  --app-sidebar-fg: #e8f5f0;
+  --app-sidebar-muted: #7bb5a5;
+  --app-sidebar-brand: #e8f5f0;
+  --app-sidebar-hover-bg: rgba(93, 202, 165, 0.08);
+  --app-sidebar-active-bg: rgba(93, 202, 165, 0.14);
+  --app-sidebar-active-text: #5dcaa5;
+  --app-sidebar-panel-bg: rgba(26, 46, 40, 0.84);
+  --app-sidebar-panel-border: rgba(123, 181, 165, 0.12);
+  --app-sidebar-panel-text: #e8f5f0;
+  --app-sidebar-panel-muted: #7bb5a5;
+  --app-sidebar-panel-active-bg: rgba(93, 202, 165, 0.12);
+  --app-sidebar-panel-active-border: rgba(93, 202, 165, 0.24);
+  --app-sidebar-panel-active-text: #5dcaa5;
+  --app-sidebar-panel-hover-bg: rgba(93, 202, 165, 0.08);
+
+  --app-chat-assistant-bubble-bg: rgba(26, 46, 40, 0.96);
+  --app-chat-assistant-bubble-border: rgba(93, 202, 165, 0.2);
+  --app-chat-assistant-bubble-shadow: 0 20px 42px rgba(0, 0, 0, 0.22);
 }
 
 @layer base {
   html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  html,
   body {
     @apply bg-surface text-on-surface font-body antialiased;
     transition: background-color 220ms ease, color 220ms ease;
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 12% 14%, rgba(225, 245, 238, 0.65), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(237, 233, 251, 0.55), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 28%);
+  }
+
+  :root[data-theme="dark"] body {
+    background-image:
+      radial-gradient(circle at 12% 14%, rgba(29, 158, 117, 0.12), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(93, 202, 165, 0.08), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28%);
   }
 
   h1,
@@ -183,8 +207,10 @@
     @apply font-body;
   }
 
-  label {
-    @apply font-label;
+  input,
+  textarea,
+  select {
+    outline: none;
   }
 
   code,
@@ -205,37 +231,69 @@
   }
 
   .atmosphere-glow {
-    @apply fixed top-[8%] left-[8%] h-[420px] w-[420px] blur-[120px] -z-10;
+    @apply fixed left-[8%] top-[6%] -z-10 h-[420px] w-[420px] blur-[120px];
     background: var(--app-atmosphere-glow);
   }
 
-  .brass-divider {
-    @apply relative my-8 h-[1px];
-    background: linear-gradient(90deg, transparent, var(--color-outline-variant), transparent);
+  .glass-panel {
+    @apply border border-outline-variant/60 bg-surface-variant backdrop-blur-xl;
+    box-shadow: var(--app-panel-shadow);
   }
 
-  .brass-divider::after {
-    content: "";
-    @apply absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-outline-variant bg-primary;
+  .app-shell-panel {
+    @apply rounded-[24px] border border-outline-variant/70 bg-surface-container-lowest;
+    box-shadow: var(--app-panel-shadow);
   }
 
-  .machined-input {
-    @apply w-full border-none border-b border-outline-variant bg-surface-variant p-4 font-body text-on-surface transition-all focus:border-primary focus:outline-none;
+  .field-label {
+    @apply mb-2 block text-[12px] font-medium text-on-surface-variant;
+    letter-spacing: 0.01em;
+  }
+
+  .field-required {
+    @apply ml-1 text-primary;
+  }
+
+  .text-field {
+    @apply w-full rounded-2xl border border-outline-variant/80 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition;
     box-shadow: var(--app-input-shadow);
   }
 
-  .parchment-glass {
-    @apply rounded-xl border border-outline-variant bg-surface-container shadow-2xl backdrop-blur-[20px];
-    box-shadow: var(--app-panel-shadow);
+  .text-field:focus {
+    @apply border-primary ring-4 ring-primary/10;
   }
 
-  .glass-panel {
-    @apply bg-surface/80 backdrop-blur-xl;
-    box-shadow: var(--app-panel-shadow);
+  .primary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50;
+    box-shadow: 0 16px 32px color-mix(in oklab, var(--app-color-primary) 22%, transparent);
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .neutral-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-outline-variant/80 bg-surface-container-lowest px-4 py-3 text-sm font-semibold text-on-surface transition hover:border-primary/20 hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .section-kicker {
+    @apply text-[11px] font-semibold text-primary;
+    letter-spacing: 0.08em;
+  }
+
+  .status-pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-outline-variant/80 bg-surface-container-low px-3 py-1.5 text-[11px] font-medium text-on-surface-variant;
+  }
+
+  .two-line-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .chat-assistant-bubble {
-    @apply text-on-surface;
+    @apply border-l-[3px] text-on-surface;
     background: var(--app-chat-assistant-bubble-bg);
     border-color: var(--app-chat-assistant-bubble-border);
     box-shadow: var(--app-chat-assistant-bubble-shadow);
@@ -257,15 +315,15 @@
 
 .markdown-body strong,
 .markdown-body b {
-  font-weight: 800;
+  font-weight: 700;
 }
 
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-surface;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {

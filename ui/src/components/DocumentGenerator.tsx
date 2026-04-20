@@ -13,10 +13,10 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronDown,
-  Sparkles,
   Scale,
   Shield,
   Zap,
+  ArrowRight,
 } from 'lucide-react';
 import type { GeneratorPrefillRequest } from '../types/generatorPrefill';
 
@@ -129,6 +129,28 @@ const CONFIDENCE_COLORS: Record<string, string> = {
   low: 'text-orange-700 bg-orange-50 border-orange-200',
   very_low: 'text-rose-700 bg-rose-50 border-rose-200',
 };
+
+function FieldLabel({
+  children,
+  required = false,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <label className="field-label">
+      {children}
+      {required ? <span className="field-required">*</span> : null}
+    </label>
+  );
+}
+
+function getNoticeTypeIcon(id: string) {
+  if (/salary|termination|harassment/.test(id)) return Shield;
+  if (/builder|tenant|property|eviction|title/.test(id)) return Scale;
+  if (/consumer|contract|money|cheque|maintenance/.test(id)) return FileText;
+  return FileText;
+}
 
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const GENERATOR_HISTORY_LIMIT = 40;
@@ -655,29 +677,34 @@ export const DocumentGenerator = ({
   const selectedTypeLabel = noticeType === 'auto'
     ? 'Auto-detect'
     : noticeTypes.find((t) => t.id === noticeType)?.label || noticeType;
+  const previewFacts = facts.map((fact) => fact.trim()).filter(Boolean);
 
   return (
-    <div className="flex-1 flex h-full bg-surface-container-low overflow-hidden">
-      {/* LEFT: Input Form */}
-      <div className="w-[480px] flex flex-col border-r border-outline-variant/10 bg-surface">
-        <div className="px-6 py-5 border-b border-outline-variant/10">
-          <h2 className="text-2xl font-headline font-bold text-primary">Legal Notice Generator</h2>
-          <p className="text-sm text-on-surface-variant mt-1">
-            Generate professional legal notices with AI-powered legal reasoning
+    <div className="flex flex-1 flex-col overflow-hidden px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="grid h-full min-h-0 gap-6 xl:grid-cols-[minmax(420px,520px)_minmax(0,1fr)]">
+      <div className="app-shell-panel flex min-h-0 flex-col overflow-hidden">
+        <div className="border-b border-outline-variant/70 px-6 py-5">
+          <p className="section-kicker">Notice generator</p>
+          <h2 className="mt-1 text-2xl font-semibold text-secondary">Create a legal notice</h2>
+          <p className="mt-2 text-sm leading-7 text-on-surface-variant">
+            The generation flow is unchanged. The form is simply organized into clearer sections so it is easier to review before drafting.
           </p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5 no-scrollbar">
+          <div className="app-shell-panel bg-surface-container-low px-5 py-5">
           {/* Notice Type */}
           <div className="relative">
-            <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
-              Notice Type
-            </label>
+            <FieldLabel>Notice type</FieldLabel>
             <button
+              type="button"
               onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface hover:border-primary/30 transition"
+              className="text-field flex items-center justify-between text-left"
             >
-              <span>{selectedTypeLabel}</span>
+              <span className="flex items-center gap-3">
+                <FileText size={16} className="text-primary" />
+                <span>{selectedTypeLabel}</span>
+              </span>
               <ChevronDown size={16} className={`transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
             </button>
             <AnimatePresence>
@@ -686,20 +713,23 @@ export const DocumentGenerator = ({
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  className="absolute z-30 top-full mt-1 w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-ambient overflow-hidden"
+                  className="app-shell-panel absolute top-full z-30 mt-2 w-full overflow-hidden p-2"
                 >
                   <button
+                    type="button"
                     onClick={() => { setNoticeType('auto'); setShowTypeDropdown(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm hover:bg-surface-container-low transition ${noticeType === 'auto' ? 'text-primary font-semibold bg-primary/5' : 'text-on-surface'}`}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition ${noticeType === 'auto' ? 'bg-primary/10 font-medium text-primary' : 'text-on-surface hover:bg-surface-container-low'}`}
                   >
                     âœ¨ Auto-detect from claim
                   </button>
                   {noticeTypes.map((t) => (
                     <button
                       key={t.id}
+                      type="button"
                       onClick={() => { setNoticeType(t.id); setShowTypeDropdown(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-surface-container-low transition ${noticeType === t.id ? 'text-primary font-semibold bg-primary/5' : 'text-on-surface'}`}
+                      className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition ${noticeType === t.id ? 'bg-primary/10 font-medium text-primary' : 'text-on-surface hover:bg-surface-container-low'}`}
                     >
+                      {React.createElement(getNoticeTypeIcon(t.id), { size: 16, className: 'text-primary' })}
                       {t.label}
                     </button>
                   ))}
@@ -707,96 +737,108 @@ export const DocumentGenerator = ({
               )}
             </AnimatePresence>
           </div>
+          </div>
 
+          <div className="app-shell-panel bg-surface-container-low px-5 py-5">
+          <div className="mb-4">
+            <p className="section-kicker">Parties involved</p>
+            <h3 className="mt-1 text-base font-semibold text-on-surface">Sender and receiver</h3>
+          </div>
           {/* Sender & Receiver */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Sender Name *</label>
+              <FieldLabel required>Sender name</FieldLabel>
               <input
                 value={senderName}
                 onChange={(e) => setSenderName(e.target.value)}
                 placeholder="e.g. Rajesh Kumar"
                 minLength={2}
-                className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+                className="text-field"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Receiver Name *</label>
+              <FieldLabel required>Receiver name</FieldLabel>
               <input
                 value={receiverName}
                 onChange={(e) => setReceiverName(e.target.value)}
                 placeholder="e.g. ABC Pvt Ltd"
                 minLength={2}
-                className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+                className="text-field"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Sender Address *</label>
+              <FieldLabel required>Sender address</FieldLabel>
               <input
                 value={senderAddress}
                 onChange={(e) => setSenderAddress(e.target.value)}
                 placeholder="e.g. Kaushik, Delhi, India"
                 minLength={5}
-                className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+                className="text-field"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Receiver Address *</label>
+              <FieldLabel required>Receiver address</FieldLabel>
               <input
                 value={receiverAddress}
                 onChange={(e) => setReceiverAddress(e.target.value)}
                 placeholder="e.g. BMS Pvt Ltd, Bengaluru, Karnataka"
                 minLength={5}
-                className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+                className="text-field"
               />
             </div>
           </div>
+          </div>
 
+          <div className="app-shell-panel bg-surface-container-low px-5 py-5">
+          <div className="mb-4">
+            <p className="section-kicker">Notice details</p>
+            <h3 className="mt-1 text-base font-semibold text-on-surface">Claim and supporting facts</h3>
+          </div>
           {/* Relationship */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Relationship</label>
+            <FieldLabel>Relationship</FieldLabel>
             <input
               value={relationship}
               onChange={(e) => setRelationship(e.target.value)}
               placeholder="e.g. employee-employer, landlord-tenant"
-              className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+              className="text-field"
             />
           </div>
 
           {/* Claim */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Claim / Issue *</label>
+            <FieldLabel required>Claim or issue</FieldLabel>
             <input
               value={claim}
               onChange={(e) => setClaim(e.target.value)}
               placeholder="e.g. unpaid salary for 3 months"
               minLength={2}
-              className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+              className="text-field"
             />
           </div>
 
           {/* Facts */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant">Facts of the Case *</label>
-              <button onClick={addFact} className="flex items-center gap-1 text-xs text-primary font-semibold hover:text-primary/80 transition">
+              <FieldLabel required>Facts of the case</FieldLabel>
+              <button type="button" onClick={addFact} className="secondary-button px-3 py-2 text-xs">
                 <Plus size={14} /> Add Fact
               </button>
             </div>
             <div className="space-y-2">
               {facts.map((fact, index) => (
                 <div key={index} className="flex gap-2">
-                  <div className="flex items-center justify-center w-7 h-10 text-xs font-bold text-on-surface-variant/50">{index + 1}.</div>
+                  <div className="flex h-12 w-10 items-center justify-center rounded-2xl bg-surface-container text-xs font-bold text-on-surface-variant/60">{index + 1}</div>
                   <input
                     value={fact}
                     onChange={(e) => updateFact(index, e.target.value)}
-                    placeholder={index === 0 ? 'e.g. Worked from January to March 2024' : 'Add another fact...'}
-                    className="flex-1 px-4 py-2.5 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+                    placeholder={index === 0 ? 'e.g. Worked from January to March 2024' : 'Add another fact'}
+                    className="text-field flex-1"
                   />
                   {facts.length > 1 && (
-                    <button onClick={() => removeFact(index)} className="p-2 text-on-surface-variant/40 hover:text-rose-500 transition">
+                    <button type="button" onClick={() => removeFact(index)} className="neutral-button px-3 text-on-surface-variant">
                       <Trash2 size={14} />
                     </button>
                   )}
@@ -807,16 +849,17 @@ export const DocumentGenerator = ({
 
           {/* Tone */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">Tone</label>
+            <FieldLabel>Tone</FieldLabel>
             <div className="grid grid-cols-3 gap-2">
               {TONE_OPTIONS.map((option) => (
                 <button
                   key={option.id}
+                  type="button"
                   onClick={() => setTone(option.id)}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs transition ${
+                  className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs transition ${
                     tone === option.id
-                      ? 'border-primary bg-primary/5 text-primary font-semibold'
-                      : 'border-outline-variant/20 text-on-surface-variant hover:border-primary/20'
+                      ? 'border-primary bg-primary/10 text-primary font-semibold'
+                      : 'border-outline-variant/70 bg-surface-container-lowest text-on-surface-variant hover:border-primary/20'
                   }`}
                 >
                   <option.icon size={16} />
@@ -829,7 +872,7 @@ export const DocumentGenerator = ({
 
           {/* Deadline */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
+            <label className="field-label">
               Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional</span>
             </label>
             <input
@@ -838,14 +881,14 @@ export const DocumentGenerator = ({
               max={90}
               value={deadline}
               onChange={(e) => setDeadline(e.target.value ? Number(e.target.value) : '')}
-              placeholder="Default based on notice type (e.g. 15)"
-              className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition"
+              placeholder="Default based on notice type"
+              className="text-field"
             />
           </div>
 
           {/* Custom Relief */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
+            <label className="field-label">
               Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional, one per line</span>
             </label>
             <textarea
@@ -857,39 +900,48 @@ export const DocumentGenerator = ({
             />
           </div>
         </div>
+        </div>
 
         {/* Generate Button */}
-        <div className="p-6 border-t border-outline-variant/10 space-y-3">
+        <div className="border-t border-outline-variant/70 px-6 py-5">
+          {!isFormValid && validationError ? (
+            <p className="mb-3 text-sm text-on-surface-variant">{validationError}</p>
+          ) : null}
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
+            type="button"
             onClick={handleGenerate}
             disabled={!isFormValid || isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-4 rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition shadow-xl shadow-primary/20"
+            className="primary-button min-w-52"
           >
             {isLoading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Generating Notice (dual-pass)...
+                Creating document...
               </>
             ) : (
               <>
-                <Sparkles size={18} />
-                Generate Legal Notice
+                <ArrowRight size={18} />
+                Create document
               </>
             )}
           </button>
           {result && (
             <button
+              type="button"
               onClick={handleReset}
-              className="w-full py-3 rounded-xl border border-outline-variant/20 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low transition"
+              className="neutral-button"
             >
-              Reset & Start New
+              Reset and start new
             </button>
           )}
+          </div>
         </div>
       </div>
 
       {/* RIGHT: Preview */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="min-h-0 overflow-hidden">
+        <div className="flex h-full flex-col overflow-hidden">
         <AnimatePresence mode="wait">
           {!result && !isLoading && !error ? (
             <motion.div
@@ -897,23 +949,76 @@ export const DocumentGenerator = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex items-center justify-center"
+              className="app-shell-panel flex-1 overflow-y-auto p-6"
             >
-              <div className="text-center space-y-6 max-w-md">
-                <div className="w-20 h-20 bg-primary/8 rounded-full flex items-center justify-center text-primary mx-auto">
-                  <FileText size={40} strokeWidth={1.5} />
+              <div className="mx-auto flex h-full max-w-3xl flex-col gap-6">
+                <div>
+                  <p className="section-kicker">Live preview</p>
+                  <h3 className="mt-1 text-2xl font-semibold text-secondary">Review the notice structure as you fill the form</h3>
+                  <p className="mt-2 text-sm leading-7 text-on-surface-variant">
+                    This preview now uses the full right panel instead of leaving it empty. You can sanity-check the facts, parties, and requested relief before generating the final document.
+                  </p>
                 </div>
-                <h3 className="text-3xl font-headline italic text-primary">Legal Notice Generator</h3>
-                <p className="text-sm text-on-surface-variant leading-relaxed">
-                  Fill in the structured form on the left with your case details. The AI will generate a
-                  professional legal notice using applicable Indian laws, dual-pass refinement, and RAG-powered
-                  legal context.
-                </p>
-                <div className="flex flex-wrap justify-center gap-2 text-[11px] font-label font-bold uppercase tracking-[0.15em] text-on-surface-variant/60">
-                  <span className="px-3 py-1.5 bg-surface-container rounded-full">FIRAC Structure</span>
-                  <span className="px-3 py-1.5 bg-surface-container rounded-full">Dual-Pass AI</span>
-                  <span className="px-3 py-1.5 bg-surface-container rounded-full">RAG Context</span>
-                  <span className="px-3 py-1.5 bg-surface-container rounded-full">9 Notice Types</span>
+
+                <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="app-shell-panel bg-surface-container-low px-5 py-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <FileText size={20} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-on-surface">Draft overview</div>
+                        <div className="text-sm text-on-surface-variant">{selectedTypeLabel}</div>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {previewSections.map((section) => (
+                        <div key={section.label} className="rounded-2xl border border-outline-variant/70 bg-surface-container-lowest px-4 py-3">
+                          <div className="text-[11px] text-on-surface-variant">{section.label}</div>
+                          <div className="mt-1 text-sm font-medium text-on-surface">{section.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="app-shell-panel bg-surface-container-low px-5 py-5">
+                    <div className="mb-3 text-sm font-medium text-on-surface">Requested relief</div>
+                    <div className="rounded-2xl border border-dashed border-outline-variant/70 bg-surface-container-lowest px-4 py-4 text-sm leading-7 text-on-surface-variant">
+                      {customRelief.trim()
+                        ? customRelief
+                            .split('\n')
+                            .map((line) => line.trim())
+                            .filter(Boolean)
+                            .map((line, index) => <div key={`${line}-${index}`}>{line}</div>)
+                        : 'No custom relief entered yet. The generator will use your issue, facts, and notice type to shape the final demands.'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="app-shell-panel bg-surface-container-low px-5 py-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-on-surface">Case facts preview</div>
+                      <div className="text-sm text-on-surface-variant">These points become the narrative backbone of the final notice.</div>
+                    </div>
+                    <span className="status-pill">{previewFacts.length} fact{previewFacts.length === 1 ? '' : 's'}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {previewFacts.length > 0 ? (
+                      previewFacts.map((fact, index) => (
+                        <div key={`${fact}-${index}`} className="flex gap-3 rounded-2xl border border-outline-variant/70 bg-surface-container-lowest px-4 py-3">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                            {index + 1}
+                          </div>
+                          <p className="text-sm leading-7 text-on-surface">{fact}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-outline-variant/70 bg-surface-container-lowest px-4 py-5 text-sm text-on-surface-variant">
+                        Add at least one fact to see the draft structure take shape here.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -923,7 +1028,7 @@ export const DocumentGenerator = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex items-center justify-center"
+              className="app-shell-panel flex flex-1 items-center justify-center p-8"
             >
               <div className="text-center space-y-6">
                 <div className="relative w-20 h-20 mx-auto">
@@ -932,7 +1037,7 @@ export const DocumentGenerator = ({
                   <div className="absolute inset-3 border-4 border-primary/20 border-b-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-headline text-primary">Generating Legal Notice</h3>
+                  <h3 className="text-xl font-semibold text-secondary">Generating legal notice</h3>
                   <p className="text-sm text-on-surface-variant mt-2">
                     Pass 1: Drafting â†’ Pass 2: Refining legal language...
                   </p>
@@ -945,15 +1050,16 @@ export const DocumentGenerator = ({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex items-center justify-center p-8"
+              className="app-shell-panel flex flex-1 items-center justify-center p-8"
             >
-              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 max-w-md text-center">
+              <div className="max-w-md rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
                 <AlertCircle size={40} className="text-rose-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-rose-900">Generation Failed</h3>
+                <h3 className="text-lg font-semibold text-rose-900">Generation failed</h3>
                 <p className="text-sm text-rose-700 mt-2">{error}</p>
                 <button
+                  type="button"
                   onClick={() => setError('')}
-                  className="mt-4 px-6 py-2 bg-rose-100 text-rose-800 rounded-xl text-sm font-semibold hover:bg-rose-200 transition"
+                  className="mt-4 rounded-2xl bg-rose-100 px-6 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-200"
                 >
                   Dismiss
                 </button>
@@ -965,11 +1071,11 @@ export const DocumentGenerator = ({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex-1 flex flex-col overflow-hidden"
+              className="app-shell-panel flex flex-1 flex-col overflow-hidden"
             >
               {/* Result Header */}
-              <div className="px-8 py-5 border-b border-outline-variant/10 bg-surface flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/70 bg-surface-container-low px-6 py-5">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className={`px-3 py-1.5 rounded-full border text-xs font-bold ${CONFIDENCE_COLORS[result.confidence_label] || CONFIDENCE_COLORS.medium}`}>
                     Confidence: {Math.round(result.confidence * 100)}%
                   </div>
@@ -982,16 +1088,18 @@ export const DocumentGenerator = ({
                 </div>
                 <div className="relative flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={handleCopy}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-outline-variant/20 text-xs font-semibold text-on-surface hover:border-primary/30 hover:bg-primary/5 transition"
+                    className="neutral-button px-4 py-2 text-xs"
                   >
                     {copied ? <CheckCircle2 size={14} className="text-emerald-600" /> : <Copy size={14} />}
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowDownloadChooser((prev) => !prev)}
                     aria-label="Open download options"
-                    className="inline-flex items-center justify-center rounded-xl bg-primary text-on-primary w-10 h-10 hover:opacity-90 transition shadow-lg shadow-primary/20"
+                    className="primary-button h-10 w-10 px-0 py-0"
                   >
                     <Download size={16} />
                   </button>
@@ -1000,6 +1108,7 @@ export const DocumentGenerator = ({
                     {showDownloadChooser && (
                       <>
                         <button
+                          type="button"
                           aria-label="Close download options"
                           onClick={() => setShowDownloadChooser(false)}
                           className="fixed inset-0 z-20 bg-transparent"
@@ -1009,20 +1118,22 @@ export const DocumentGenerator = ({
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 20 }}
                           transition={{ duration: 0.18 }}
-                          className="absolute right-0 top-12 z-30 min-w-44 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-2 shadow-ambient"
+                          className="app-shell-panel absolute right-0 top-12 z-30 min-w-44 p-2"
                         >
-                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">
-                            Download As
+                          <div className="px-2 py-1 text-[11px] text-on-surface-variant">
+                            Download as
                           </div>
                           <button
+                            type="button"
                             onClick={handleDownloadPdf}
-                            className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container-low transition"
+                            className="w-full rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
                           >
                             PDF
                           </button>
                           <button
+                            type="button"
                             onClick={handleDownloadWord}
-                            className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold text-on-surface hover:bg-surface-container-low transition"
+                            className="w-full rounded-2xl px-3 py-2.5 text-left text-sm font-medium text-on-surface transition hover:bg-surface-container-low"
                           >
                             Word
                           </button>
@@ -1034,19 +1145,19 @@ export const DocumentGenerator = ({
               </div>
 
               {/* Notice Content */}
-              <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="max-w-3xl mx-auto"
+                  className="mx-auto max-w-3xl"
                 >
                   {/* Notice Preview Card */}
-                  <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/15 shadow-ambient overflow-hidden">
-                    <div className="bg-primary/[.03] px-8 py-4 border-b border-outline-variant/10">
+                  <div className="overflow-hidden rounded-[24px] border border-outline-variant/70 bg-surface-container-lowest shadow-ambient">
+                    <div className="border-b border-outline-variant/70 bg-primary/[.03] px-8 py-4">
                       <div className="flex items-center gap-3">
                         <FileText size={18} className="text-primary" />
-                        <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70">Generated Legal Notice</span>
+                        <span className="text-sm font-medium text-primary">Generated legal notice</span>
                       </div>
                     </div>
                     <div className="px-8 py-6 text-on-surface text-sm leading-relaxed font-body markdown-body whitespace-pre-wrap">
@@ -1060,10 +1171,10 @@ export const DocumentGenerator = ({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="mt-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/15 p-6"
+                      className="mt-6 rounded-[24px] border border-outline-variant/70 bg-surface-container-lowest p-6"
                     >
-                      <div className="text-xs font-bold uppercase tracking-[0.2em] text-primary/70 mb-3">
-                        Authorities Relied Upon
+                      <div className="mb-3 text-sm font-medium text-primary">
+                        Authorities relied upon
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {result.laws_used.map((law, i) => (
@@ -1096,6 +1207,8 @@ export const DocumentGenerator = ({
           ) : null}
         </AnimatePresence>
       </div>
+    </div>
+    </div>
     </div>
   );
 };

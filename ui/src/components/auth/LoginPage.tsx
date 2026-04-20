@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ArrowRight, Lock, Mail, ShieldCheck } from 'lucide-react';
 
 interface AuthUser {
   id: number;
@@ -106,65 +107,107 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-container-low p-6">
-      <div className="w-full max-w-md rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-8 shadow-lg">
-        <h1 className="text-2xl font-headline font-bold text-primary">Legal AI Login</h1>
-        <p className="mt-1 text-sm text-on-surface-variant">Single-admin access-controlled workspace.</p>
+    <div className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6">
+      <div className="grid w-full max-w-6xl overflow-hidden rounded-[28px] border border-outline-variant/70 bg-surface-variant shadow-ambient lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="bg-secondary px-8 py-10 text-white sm:px-10 lg:px-12">
+          <div className="max-w-md">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+              <ShieldCheck size={14} />
+              Trusted legal workspace
+            </div>
+            <h1 className="mt-6 text-4xl font-semibold leading-tight">Legal AI, redesigned to feel calm and capable.</h1>
+            <p className="mt-4 text-sm leading-7 text-white/75">
+              Sign in to continue your legal research, notice drafting, and guided issue analysis in one place. No workflow changes, just a cleaner experience.
+            </p>
 
-        {error && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
-        {info && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{info}</div>}
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-              placeholder="you@example.com"
-            />
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/8 px-4 py-4">
+                <div className="text-sm font-medium">Legal chat</div>
+                <div className="mt-1 text-xs text-white/70">Structured interview flow</div>
+              </div>
+              <div className="rounded-2xl bg-white/8 px-4 py-4">
+                <div className="text-sm font-medium">Notice drafting</div>
+                <div className="mt-1 text-xs text-white/70">Professional output</div>
+              </div>
+              <div className="rounded-2xl bg-white/8 px-4 py-4">
+                <div className="text-sm font-medium">Secure access</div>
+                <div className="mt-1 text-xs text-white/70">Admin-approved workspace</div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm"
-              placeholder="Enter your password"
-            />
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                disabled={forgotPasswordLoading}
-                className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
-              >
-                {forgotPasswordLoading ? 'Sending link...' : 'Forgot password?'}
+        </div>
+
+        <div className="bg-surface-container-lowest px-8 py-10 sm:px-10 lg:px-12">
+          <div className="mx-auto max-w-md">
+            <p className="section-kicker">Sign in</p>
+            <h2 className="mt-1 text-3xl font-semibold text-secondary">Access your workspace</h2>
+            <p className="mt-2 text-sm leading-7 text-on-surface-variant">
+              Use the email address approved for your account.
+            </p>
+
+            {error ? (
+              <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+            ) : null}
+            {info ? (
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{info}</div>
+            ) : null}
+
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              <div>
+                <label className="field-label">Email</label>
+                <div className="relative">
+                  <Mail size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="text-field pl-11"
+                    placeholder="you@example.com"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label">Password</label>
+                <div className="relative">
+                  <Lock size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="text-field pl-11"
+                    placeholder="Enter your password"
+                  />
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={forgotPasswordLoading}
+                    className="text-sm font-medium text-primary transition hover:opacity-80 disabled:opacity-50"
+                  >
+                    {forgotPasswordLoading ? 'Sending link...' : 'Forgot password?'}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading} className="primary-button w-full justify-center">
+                {loading ? 'Signing in...' : 'Sign in'}
+                {!loading ? <ArrowRight size={16} /> : null}
+              </button>
+            </form>
+
+            <div className="mt-8 rounded-2xl border border-outline-variant/70 bg-surface-container-low px-5 py-5">
+              <div className="text-sm font-medium text-on-surface">Need access first?</div>
+              <p className="mt-1 text-sm leading-7 text-on-surface-variant">
+                Request workspace access if your account has not been approved yet.
+              </p>
+              <button type="button" onClick={onShowRequestAccess} className="secondary-button mt-4 w-full justify-center">
+                Request access
               </button>
             </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="mt-6 border-t border-outline-variant/15 pt-4">
-          <p className="text-sm text-on-surface-variant">Need access to the workspace first?</p>
-          <button
-            type="button"
-            onClick={onShowRequestAccess}
-            className="mt-3 w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm font-semibold text-on-surface hover:border-primary/30 hover:text-primary"
-          >
-            Request Access
-          </button>
         </div>
       </div>
     </div>

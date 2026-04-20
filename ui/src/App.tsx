@@ -380,8 +380,8 @@ export default function App() {
         onSelectGeneratorHistory={openGeneratorHistoryItem}
         onSelectSettingsSection={openSettingsSection}
       />
-      
-      <main className="relative z-10 ml-64 flex h-screen flex-1 flex-col">
+
+      <main className="relative z-10 flex h-screen flex-1 flex-col pb-20 md:ml-72 md:pb-0">
         <Header
           currentUserName={currentUser.name}
           onLogout={onLogout}
@@ -480,17 +480,17 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex items-center justify-center p-8"
+              className="flex-1 flex items-center justify-center p-6 sm:p-8"
             >
-              <div className="text-center space-y-4 max-w-md">
-                <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto text-on-surface-variant">
+              <div className="app-shell-panel max-w-xl space-y-4 px-8 py-10 text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/8 text-primary">
                   <Search size={32} />
                 </div>
-                <h2 className="text-2xl font-headline font-bold text-primary">
+                <h2 className="text-2xl font-semibold text-secondary">
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/([A-Z])/g, ' $1')} Module
                 </h2>
-                <p className="text-on-surface-variant">
-                  This module is currently in development. Please use the Document Analyzer to review legal agreements.
+                <p className="text-sm leading-7 text-on-surface-variant">
+                  This workspace is still being shaped. The existing functionality is unchanged, and you can keep working in the document analyzer, legal chat, or notice generator meanwhile.
                 </p>
               </div>
             </motion.div>
