@@ -112,15 +112,14 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
         </form>
 
         <div className="mt-6 border-t border-outline-variant/15 pt-4">
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-on-surface">
-            <p className="font-semibold text-primary">Testing Credentials Only</p>
-            <p className="mt-2">
-              Test email: <span className="font-semibold">test@gmail.com</span>
-            </p>
-            <p className="mt-1">
-              Test password: <span className="font-semibold">Lawyertest@123</span>
-            </p>
-          </div>
+          <p className="text-sm text-on-surface-variant">Need access to the workspace first?</p>
+          <button
+            type="button"
+            onClick={onShowRequestAccess}
+            className="mt-3 w-full rounded-xl border border-outline-variant/30 px-4 py-3 text-sm font-semibold text-on-surface hover:border-primary/30 hover:text-primary"
+          >
+            Request Access
+          </button>
         </div>
       </div>
     </div>
