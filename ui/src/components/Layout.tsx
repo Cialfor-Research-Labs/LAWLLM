@@ -11,7 +11,6 @@ import {
   Plus,
   Settings,
   KeyRound,
-  Bell,
   LogOut,
   Moon,
   Sun,
@@ -405,9 +404,6 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
 
         <div className="flex items-center space-x-4">
           <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
-          <button className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/60 hover:text-primary">
-            <Bell size={20} />
-          </button>
           <div className="relative" ref={profileMenuRef}>
             <button
               type="button"
