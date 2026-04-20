@@ -98,6 +98,8 @@ interface MonitoringFilters {
   authenticatedOnly: 'all' | 'yes' | 'no';
 }
 
+type AdminPanelView = 'user_management' | 'audit_history' | 'access_history';
+
 const MONITORING_PAGE_SIZE = 25;
 
 const EMPTY_MONITORING_SUMMARY: AccessEventSummary = {
@@ -162,6 +164,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
   const initialMonitoringFilters = useMemo(() => getDefaultMonitoringFilters(), []);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [requests, setRequests] = useState<AdminRequestAudit[]>([]);
+  const [activeView, setActiveView] = useState<AdminPanelView>('user_management');
   const [drafts, setDrafts] = useState<Record<number, RowDraft>>({});
   const [setupLinks, setSetupLinks] = useState<Record<number, string>>({});
   const [monitoring, setMonitoring] = useState<AdminAccessMonitoringResponse>({
@@ -368,143 +371,195 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
         {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
         {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div>}
 
-        <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
-          <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">Users ({users.length})</div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-container-low">
-                <tr className="text-left text-on-surface-variant">
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">Organization</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Access</th>
-                  <th className="px-4 py-3">Notes</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => {
-                  const d = drafts[u.id] || { status: u.status, access_granted: u.access_granted, review_notes: '' };
-                  return (
-                    <tr key={u.id} className="border-t border-outline-variant/10 align-top">
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-on-surface">{u.name}</div>
-                        <div className="text-xs text-on-surface-variant">{u.email}</div>
-                        <div className="mt-1 text-xs text-on-surface-variant">Password: {u.has_password ? 'Set' : 'Not set'}</div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-on-surface-variant">
-                        <div>{u.organization || '-'}</div>
-                        <div className="mt-1">{u.use_case || '-'}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <select
-                          value={d.status}
-                          onChange={(e) => updateDraft(u.id, { status: e.target.value as RowDraft['status'] })}
-                          className="rounded-lg border border-outline-variant/30 px-2 py-1 text-xs"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="granted">Granted</option>
-                          <option value="denied">Denied</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <label className="inline-flex items-center gap-2 text-xs">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              id: 'user_management' as const,
+              title: 'User management',
+              subtitle: 'Approve users, update access, and generate setup links.',
+              count: users.length,
+            },
+            {
+              id: 'audit_history' as const,
+              title: 'Audit history',
+              subtitle: 'Review the access request audit trail and status changes.',
+              count: requests.length,
+            },
+            {
+              id: 'access_history' as const,
+              title: 'Access history',
+              subtitle: 'Inspect IP-based access activity and recent admin-visible traffic.',
+              count: monitoring.summary.total,
+            },
+          ].map((card) => {
+            const isActive = activeView === card.id;
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => setActiveView(card.id)}
+                className={`rounded-2xl border px-5 py-4 text-left shadow-sm transition ${
+                  isActive
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-outline-variant/15 bg-surface-container-lowest text-on-surface hover:border-primary/20 hover:bg-surface-container-low'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-base font-semibold">{card.title}</div>
+                    <p className={`mt-2 text-sm ${isActive ? 'text-primary/80' : 'text-on-surface-variant'}`}>{card.subtitle}</p>
+                  </div>
+                  <div className={`rounded-full px-3 py-1 text-xs font-semibold ${isActive ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant'}`}>
+                    {card.count}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {activeView === 'user_management' && (
+          <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+            <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">User management ({users.length})</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-container-low">
+                  <tr className="text-left text-on-surface-variant">
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Organization</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Access</th>
+                    <th className="px-4 py-3">Notes</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => {
+                    const d = drafts[u.id] || { status: u.status, access_granted: u.access_granted, review_notes: '' };
+                    return (
+                      <tr key={u.id} className="border-t border-outline-variant/10 align-top">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-on-surface">{u.name}</div>
+                          <div className="text-xs text-on-surface-variant">{u.email}</div>
+                          <div className="mt-1 text-xs text-on-surface-variant">Password: {u.has_password ? 'Set' : 'Not set'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-on-surface-variant">
+                          <div>{u.organization || '-'}</div>
+                          <div className="mt-1">{u.use_case || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={d.status}
+                            onChange={(e) => updateDraft(u.id, { status: e.target.value as RowDraft['status'] })}
+                            className="rounded-lg border border-outline-variant/30 px-2 py-1 text-xs"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="granted">Granted</option>
+                            <option value="denied">Denied</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <label className="inline-flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={d.access_granted}
+                              onChange={(e) => updateDraft(u.id, { access_granted: e.target.checked })}
+                            />
+                            {d.access_granted ? 'Granted' : 'Not granted'}
+                          </label>
+                        </td>
+                        <td className="px-4 py-3">
                           <input
-                            type="checkbox"
-                            checked={d.access_granted}
-                            onChange={(e) => updateDraft(u.id, { access_granted: e.target.checked })}
+                            value={d.review_notes}
+                            onChange={(e) => updateDraft(u.id, { review_notes: e.target.value })}
+                            placeholder="Optional note"
+                            className="w-full rounded-lg border border-outline-variant/30 px-2 py-1 text-xs"
                           />
-                          {d.access_granted ? 'Granted' : 'Not granted'}
-                        </label>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          value={d.review_notes}
-                          onChange={(e) => updateDraft(u.id, { review_notes: e.target.value })}
-                          placeholder="Optional note"
-                          className="w-full rounded-lg border border-outline-variant/30 px-2 py-1 text-xs"
-                        />
-                      </td>
-                      <td className="space-y-2 px-4 py-3">
-                        <button
-                          onClick={() => void saveAccess(u)}
-                          className="w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90"
-                        >
-                          Save
-                        </button>
-                        <button
-                          disabled={!(d.status === 'granted' && d.access_granted)}
-                          onClick={() => void createSetupLink(u)}
-                          className="w-full rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-                        >
-                          Generate Setup Link
-                        </button>
-                        {setupLinks[u.id] && (
-                          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-2">
-                            <div className="break-all text-[10px] text-on-surface-variant">{setupLinks[u.id]}</div>
-                            <button
-                              onClick={() => void copySetupLink(u.id)}
-                              className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary"
-                            >
-                              <Copy size={12} />
-                              Copy
-                            </button>
-                          </div>
-                        )}
+                        </td>
+                        <td className="space-y-2 px-4 py-3">
+                          <button
+                            onClick={() => void saveAccess(u)}
+                            className="w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:opacity-90"
+                          >
+                            Save
+                          </button>
+                          <button
+                            disabled={!(d.status === 'granted' && d.access_granted)}
+                            onClick={() => void createSetupLink(u)}
+                            className="w-full rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                          >
+                            Generate Setup Link
+                          </button>
+                          {setupLinks[u.id] && (
+                            <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low p-2">
+                              <div className="break-all text-[10px] text-on-surface-variant">{setupLinks[u.id]}</div>
+                              <button
+                                onClick={() => void copySetupLink(u.id)}
+                                className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary"
+                              >
+                                <Copy size={12} />
+                                Copy
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {!loading && users.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                        No user requests yet.
                       </td>
                     </tr>
-                  );
-                })}
-                {!loading && users.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-on-surface-variant">
-                      No user requests yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
-          <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">
-            Request Audit ({requests.length})
-          </div>
-          <div className="max-h-[280px] overflow-y-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-surface-container-low">
-                <tr className="text-left text-on-surface-variant">
-                  <th className="px-4 py-2">Time</th>
-                  <th className="px-4 py-2">Email</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Review Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => (
-                  <tr key={r.id} className="border-t border-outline-variant/10">
-                    <td className="px-4 py-2">{r.created_at}</td>
-                    <td className="px-4 py-2">{r.email}</td>
-                    <td className="px-4 py-2 font-semibold uppercase">{r.status}</td>
-                    <td className="px-4 py-2">{r.review_notes || '-'}</td>
+        {activeView === 'audit_history' && (
+          <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+            <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">
+              Audit history ({requests.length})
+            </div>
+            <div className="max-h-[560px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-container-low">
+                  <tr className="text-left text-on-surface-variant">
+                    <th className="px-4 py-2">Time</th>
+                    <th className="px-4 py-2">Email</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Review Notes</th>
                   </tr>
-                ))}
-                {!loading && requests.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-on-surface-variant">
-                      No request audit entries yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {requests.map((r) => (
+                    <tr key={r.id} className="border-t border-outline-variant/10">
+                      <td className="px-4 py-2">{r.created_at}</td>
+                      <td className="px-4 py-2">{r.email}</td>
+                      <td className="px-4 py-2 font-semibold uppercase">{r.status}</td>
+                      <td className="px-4 py-2">{r.review_notes || '-'}</td>
+                    </tr>
+                  ))}
+                  {!loading && requests.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-on-surface-variant">
+                        No request audit entries yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+        {activeView === 'access_history' && (
+          <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
           <div className="border-b border-outline-variant/10 px-4 py-3">
-            <h3 className="font-semibold text-on-surface">Access Monitoring</h3>
+            <h3 className="font-semibold text-on-surface">Access history</h3>
             <p className="mt-1 text-xs text-on-surface-variant">
               Review backend-visible traffic, top IP addresses, authenticated activity, and failed requests.
             </p>
@@ -768,6 +823,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
