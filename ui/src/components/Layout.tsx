@@ -371,44 +371,85 @@ export const Sidebar = ({
   );
 };
 
-export const Header = ({ currentUserName, onLogout, themeMode, onToggleTheme }: HeaderProps) => (
-  <header className="glass-panel sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/15 px-8 py-4 shadow-ambient">
-    <div className="flex items-center">
-      <span className="text-2xl font-headline italic text-primary">Legal AI</span>
-    </div>
+export const Header = ({ currentUserName, onLogout, themeMode, onToggleTheme }: HeaderProps) => {
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
-    <div className="flex items-center space-x-8">
-      <nav className="flex items-center space-x-6">
-        <a href="#" className="text-sm text-on-surface-variant transition-colors hover:text-primary">
-          Explorer
-        </a>
-        <a href="#" className="border-b-2 border-primary pb-1 text-sm font-bold text-primary">
-          Workspace
-        </a>
-      </nav>
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
 
-      <div className="flex items-center space-x-4">
-        <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
-        <button className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/60 hover:text-primary">
-          <Bell size={20} />
-        </button>
-        <button
-          onClick={onLogout}
-          className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:border-primary/30 hover:text-primary"
-        >
-          <LogOut size={14} />
-          Logout
-        </button>
-        <span className="hidden text-xs font-semibold text-on-surface-variant md:block">{currentUserName}</span>
-        <div className="w-8 h-8 overflow-hidden rounded-full border border-primary/30 ring-2 ring-primary/10">
-          <img
-            src="https://picsum.photos/seed/lawyer/100/100"
-            alt="User Profile"
-            className="h-full w-full object-cover"
-            referrerPolicy="no-referrer"
-          />
+  return (
+    <header className="glass-panel sticky top-0 z-40 flex w-full items-center justify-between border-b border-outline-variant/15 px-8 py-4 shadow-ambient">
+      <div className="flex items-center">
+        <span className="text-2xl font-headline italic text-primary">Legal AI</span>
+      </div>
+
+      <div className="flex items-center space-x-8">
+        <nav className="flex items-center space-x-6">
+          <a href="#" className="text-sm text-on-surface-variant transition-colors hover:text-primary">
+            Explorer
+          </a>
+          <a href="#" className="border-b-2 border-primary pb-1 text-sm font-bold text-primary">
+            Workspace
+          </a>
+        </nav>
+
+        <div className="flex items-center space-x-4">
+          <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
+          <button className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high/60 hover:text-primary">
+            <Bell size={20} />
+          </button>
+          <div className="relative" ref={profileMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+              className="inline-flex items-center gap-3 rounded-full border border-outline-variant/30 bg-surface-container-low px-2 py-1.5 text-on-surface-variant transition hover:border-primary/30 hover:text-primary"
+            >
+              <span className="hidden text-xs font-semibold md:block">{currentUserName}</span>
+              <div className="h-8 w-8 overflow-hidden rounded-full border border-primary/30 ring-2 ring-primary/10">
+                <img
+                  src="https://picsum.photos/seed/lawyer/100/100"
+                  alt="User Profile"
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <ChevronDown size={14} className={`transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isProfileMenuOpen && (
+              <div className="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-56 overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-xl">
+                <div className="border-b border-outline-variant/10 px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">Signed in as</div>
+                  <div className="mt-1 text-sm font-semibold text-on-surface">{currentUserName}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    onLogout();
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
