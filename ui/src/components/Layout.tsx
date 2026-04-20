@@ -412,31 +412,23 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
             <Bell size={20} />
           </button>
           <div className="relative" ref={profileMenuRef}>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenProfile}
-                className="inline-flex items-center gap-3 rounded-full border border-outline-variant/30 bg-surface-container-low px-2 py-1.5 text-on-surface-variant transition hover:border-primary/30 hover:text-primary"
-              >
-                <span className="hidden text-xs font-semibold md:block">{currentUserName}</span>
-                <div className="h-8 w-8 overflow-hidden rounded-full border border-primary/30 ring-2 ring-primary/10">
-                  <img
-                    src="https://picsum.photos/seed/lawyer/100/100"
-                    alt="User Profile"
-                    className="h-full w-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              </button>
-              <button
-                type="button"
-                aria-label="Open profile menu"
-                onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-low text-on-surface-variant transition hover:border-primary/30 hover:text-primary"
-              >
-                <ChevronDown size={14} className={`transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="Open profile menu"
+              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+              className="inline-flex items-center gap-3 rounded-full border border-outline-variant/30 bg-surface-container-low px-2 py-1.5 text-on-surface-variant transition hover:border-primary/30 hover:text-primary"
+            >
+              <span className="hidden text-xs font-semibold md:block">{currentUserName}</span>
+              <div className="h-8 w-8 overflow-hidden rounded-full border border-primary/30 ring-2 ring-primary/10">
+                <img
+                  src="https://picsum.photos/seed/lawyer/100/100"
+                  alt="User Profile"
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <ChevronDown size={14} className={`transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
             {isProfileMenuOpen && (
               <div className="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-56 overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-xl">
@@ -444,6 +436,17 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
                   <div className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">Signed in as</div>
                   <div className="mt-1 text-sm font-semibold text-on-surface">{currentUserName}</div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    onOpenProfile();
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+                >
+                  <Settings size={16} />
+                  Profile Details
+                </button>
                 <button
                   type="button"
                   onClick={() => {
