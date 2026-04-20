@@ -398,9 +398,6 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
 
       <div className="flex items-center space-x-8">
         <nav className="flex items-center space-x-6">
-          <a href="#" className="text-sm text-on-surface-variant transition-colors hover:text-primary">
-            Explorer
-          </a>
           <a href="#" className="border-b-2 border-primary pb-1 text-sm font-bold text-primary">
             Workspace
           </a>
