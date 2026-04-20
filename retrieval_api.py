@@ -2868,6 +2868,20 @@ def get_static_greeting(text: str) -> Optional[str]:
         return "Understood. If you want, I can explain the last answer, help with a new legal question, or draft the next step."
     if any(h in clean for h in ["good morning", "good afternoon", "good evening"]):
         return f"{text.strip()}! How can I assist you with your legal research today?"
+
+
+def _build_non_legal_query_answer(user_query: str) -> str:
+    clean = " ".join(str(user_query or "").split()).strip()
+    return (
+        "I can help with legal questions, rights, notices, complaints, contracts, police/FIR guidance, "
+        "consumer issues, cyber fraud, property disputes, employment issues, and similar legal topics.\n\n"
+        f"Your message, \"{clean}\", looks like a general non-legal question, so I should not generate legal sections "
+        "or cite laws for it.\n\n"
+        "If you want, ask me a legal question instead, for example:\n"
+        "- Someone cheated me online. What legal steps should I take?\n"
+        "- Can you help draft a legal notice?\n"
+        "- What can I do if my employer did not pay salary?"
+    )
     return None
 
 
@@ -3944,6 +3958,26 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             _clear_chat_history(user_id, s_id)
         history = _load_chat_history_for_prompt(user_id, s_id, limit=CHAT_HISTORY_PROMPT_LIMIT)
         SESSIONS[s_id] = list(history)
+
+        if effective_mode != "query_act" and not is_legal_query(user_query):
+            non_legal_answer = _build_non_legal_query_answer(user_query)
+            _record_chat_turn(user_id, s_id, user_query, non_legal_answer)
+            return QueryResponse(
+                ok=True,
+                query=user_query,
+                answer=non_legal_answer,
+                reasoning=["Detected non-legal/general query; returned plain domain-boundary response."],
+                citations=[],
+                context_blocks=[],
+                applicable_laws=[],
+                meta={
+                    "mode": "non_legal",
+                    "requested_mode": requested_mode,
+                    "effective_mode": effective_mode,
+                    "session_id": s_id,
+                    "inference": False,
+                },
+            )
 
         structured_query = extract_structured_query(user_query, payload.llm_model)
         debug_trace["structured_query"] = structured_query
