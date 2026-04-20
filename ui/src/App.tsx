@@ -385,6 +385,7 @@ export default function App() {
         <Header
           currentUserName={currentUser.name}
           onLogout={onLogout}
+          onOpenProfile={() => openSettingsSection('details')}
           themeMode={themeMode}
           onToggleTheme={toggleTheme}
         />
