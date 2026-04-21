@@ -37,6 +37,54 @@ pip install -r requirements.txt
 export QWEN_MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
 ```
 
+## 3A. AWS Bedrock Setup
+
+Use the same application code in every environment. Only the AWS configuration
+should change.
+
+- Production EC2:
+  - attach an IAM role with Bedrock permissions to the instance
+  - do not hardcode AWS credentials in the codebase
+- Test server or local machine:
+  - configure one of these options in the process environment or `.env`
+  - `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN` if needed)
+  - `AWS_PROFILE`
+  - `BEDROCK_ASSUME_ROLE_ARN` if the server should assume a role before calling Bedrock
+
+Minimum Bedrock env:
+
+```env
+BEDROCK_MODEL_ID=<your-model-id>
+AWS_REGION=ap-south-1
+BEDROCK_REGION=ap-south-1
+```
+
+Optional test-server auth via access keys:
+
+```env
+AWS_ACCESS_KEY_ID=<your-access-key>
+AWS_SECRET_ACCESS_KEY=<your-secret-key>
+AWS_SESSION_TOKEN=<optional-session-token>
+```
+
+Optional test-server auth via shared AWS profile:
+
+```env
+AWS_PROFILE=default
+```
+
+Optional test-server auth via assumed role:
+
+```env
+BEDROCK_ASSUME_ROLE_ARN=arn:aws:iam::<account-id>:role/<role-name>
+BEDROCK_ASSUME_ROLE_SESSION_NAME=lawllm-bedrock-session
+BEDROCK_ASSUME_ROLE_EXTERNAL_ID=<optional-external-id>
+```
+
+If a `.env` file exists, it is treated as a fallback only. Environment variables
+provided by the server or shell take priority, which keeps production IAM-role
+based deployment working without code edits.
+
 ## 4. Frontend Setup
 
 ```bash

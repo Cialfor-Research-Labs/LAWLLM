@@ -1,11 +1,16 @@
 import json
 import os
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import (
+    BotoCoreError,
+    ClientError,
+    NoCredentialsError,
+    PartialCredentialsError,
+)
 
 
 def _load_local_env(env_path: str = ".env") -> None:
@@ -21,9 +26,9 @@ def _load_local_env(env_path: str = ".env") -> None:
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip().strip("'").strip('"')
-                # Phase 27: Absolute Priority for .env file.
-                # Overwrite existing environment variables to ensure .env is Source of Truth.
-                if key:
+                # Runtime environment should win over .env so production/test servers
+                # can inject credentials without changing application code.
+                if key and key not in os.environ:
                     os.environ[key] = value
     except Exception:
         # Do not crash startup because of malformed .env.
@@ -77,26 +82,98 @@ def _normalize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return normalized
 
 
-@lru_cache(maxsize=6)
-def _get_bedrock_client(region_name: str) -> Any:
+def _current_region() -> Optional[str]:
+    return os.getenv(
+        "BEDROCK_REGION",
+        os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION")),
+    )
+
+
+def _credential_hint(session: boto3.session.Session, assumed_role: bool = False) -> str:
+    if assumed_role:
+        return "assume-role"
+    credentials = session.get_credentials()
+    method = getattr(credentials, "method", None) if credentials is not None else None
+    return str(method or "unknown")
+
+
+def _build_bedrock_session(region_name: str) -> Tuple[boto3.session.Session, str]:
     session_kwargs: Dict[str, str] = {}
     if region_name:
         session_kwargs["region_name"] = region_name
-    # Use AWS default credential provider chain (EC2 IAM role, ECS task role,
-    # web identity, shared config, etc.). No static secrets in code.
-    session = boto3.session.Session(**session_kwargs)
+    profile_name = (os.getenv("BEDROCK_AWS_PROFILE") or os.getenv("AWS_PROFILE") or "").strip()
+    if profile_name:
+        session_kwargs["profile_name"] = profile_name
 
-    # Much more reasonable values
-    read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "30"))  # 30 seconds
-    connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "10"))  # 10 seconds  
-    retries = int(os.getenv("BEDROCK_MAX_RETRIES", "10"))  # Only 3 retries
+    # Use AWS default credential provider chain (env vars, EC2 IAM role, ECS task
+    # role, web identity, shared config, etc.). No static secrets in code.
+    session = boto3.session.Session(**session_kwargs)
+    assume_role_arn = (os.getenv("BEDROCK_ASSUME_ROLE_ARN") or "").strip()
+    if not assume_role_arn:
+        return session, _credential_hint(session)
+
+    sts = session.client("sts", region_name=region_name or _current_region())
+    assume_role_request: Dict[str, Any] = {
+        "RoleArn": assume_role_arn,
+        "RoleSessionName": os.getenv(
+            "BEDROCK_ASSUME_ROLE_SESSION_NAME",
+            "lawllm-bedrock-session",
+        ),
+    }
+    external_id = (os.getenv("BEDROCK_ASSUME_ROLE_EXTERNAL_ID") or "").strip()
+    if external_id:
+        assume_role_request["ExternalId"] = external_id
+
+    response = sts.assume_role(**assume_role_request)
+    credentials = (response or {}).get("Credentials") or {}
+    assumed_session = boto3.session.Session(
+        aws_access_key_id=credentials.get("AccessKeyId"),
+        aws_secret_access_key=credentials.get("SecretAccessKey"),
+        aws_session_token=credentials.get("SessionToken"),
+        region_name=region_name,
+    )
+    return assumed_session, _credential_hint(assumed_session, assumed_role=True)
+
+
+@lru_cache(maxsize=6)
+def _get_bedrock_runtime(region_name: str) -> Tuple[Any, str]:
+    session, credential_source = _build_bedrock_session(region_name)
+
+    read_timeout = int(os.getenv("BEDROCK_READ_TIMEOUT_SEC", "30"))
+    connect_timeout = int(os.getenv("BEDROCK_CONNECT_TIMEOUT_SEC", "10"))
+    retries = int(os.getenv("BEDROCK_MAX_RETRIES", "10"))
 
     cfg = Config(
         read_timeout=read_timeout,
         connect_timeout=connect_timeout,
         retries={"max_attempts": retries, "mode": "standard"},
     )
-    return session.client("bedrock-runtime", config=cfg)
+    return session.client("bedrock-runtime", config=cfg), credential_source
+
+
+def _format_bedrock_credentials_error(region: Optional[str], model_id: Optional[str]) -> str:
+    return (
+        "[ERROR] AWS Bedrock credentials were not found. "
+        f"region={region or 'unset'} model={model_id or 'unset'}. "
+        "Use one of these setup paths without changing code: "
+        "attach an IAM role to the server, set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY"
+        " (and AWS_SESSION_TOKEN if needed), set AWS_PROFILE, or set "
+        "BEDROCK_ASSUME_ROLE_ARN."
+    )
+
+
+def _format_bedrock_client_error(error: ClientError, region: Optional[str], model_id: Optional[str]) -> str:
+    code = str(((error.response or {}).get("Error") or {}).get("Code") or "")
+    message = str(((error.response or {}).get("Error") or {}).get("Message") or str(error))
+    if code in {"AccessDeniedException", "UnrecognizedClientException", "InvalidSignatureException"}:
+        return (
+            "[ERROR] AWS Bedrock access was denied. "
+            f"region={region or 'unset'} model={model_id or 'unset'} code={code}. "
+            "Check IAM permissions, model access for this region, and whether the test "
+            "server is using the intended AWS credentials or role. "
+            f"Details: {message}"
+        )
+    return f"[ERROR] AWS Bedrock call failed: {message}"
 
 
 def _extract_converse_text(response: Dict[str, Any]) -> str:
@@ -171,17 +248,21 @@ def call_bedrock_chat(
     top_p: float = 0.9,
 ) -> str:
     target_model = model_id or DEFAULT_BEDROCK_MODEL_ID
+    if not target_model:
+        return (
+            "[ERROR] No Bedrock model configured. Set LEGAL_MODEL_ID, BEDROCK_MODEL_ID, "
+            "or BEDROCK_MODEL."
+        )
     
     # Phase 26: Cross-Region Inference Support
     # US inference profiles (us.*) require calling us-east-1 or us-west-2.
     # We auto-switch to us-east-1 for us.* models unless user explicitly sets BEDROCK_REGION.
-    region = DEFAULT_REGION
+    region = _current_region() or DEFAULT_REGION
     if target_model.startswith("us.") and not os.getenv("BEDROCK_REGION"):
         region = "us-east-1"
 
     profile = os.getenv("AWS_PROFILE", "")
-    # Phase 27: Diagnostic Visibility
-    print(f"[BEDROCK] Attempting call to {target_model} in {region} (profile={profile or 'default'})...")
+    credential_source = "unknown"
 
     normalized_messages = _normalize_messages(messages)
     # Global hard cap requested for output size. Claude 3.5 Sonnet needs more than 1000.
@@ -189,9 +270,14 @@ def call_bedrock_chat(
     if not normalized_messages:
         return "[ERROR] No valid message content provided."
     try:
-        client = _get_bedrock_client(region)
+        client, credential_source = _get_bedrock_runtime(region or "")
     except Exception as e:
         return f"[ERROR] Unable to initialize Bedrock client in {region}: {str(e)}"
+
+    print(
+        f"[BEDROCK] Attempting call to {target_model} in {region} "
+        f"(profile={profile or 'default'}, auth={credential_source})..."
+    )
 
     try:
         req: Dict[str, Any] = {
@@ -208,6 +294,8 @@ def call_bedrock_chat(
         response = client.converse(**req)
         text = _extract_converse_text(response)
         return text or "[ERROR] Bedrock returned an empty response."
+    except (NoCredentialsError, PartialCredentialsError):
+        return _format_bedrock_credentials_error(region, target_model)
     except (ClientError, BotoCoreError):
         try:
             payloads = _build_invoke_payloads(
@@ -231,6 +319,8 @@ def call_bedrock_chat(
                     payload = json.loads(raw.decode("utf-8"))
                     text = _extract_invoke_text(payload)
                     return text or "[ERROR] Bedrock returned an empty response."
+                except (NoCredentialsError, PartialCredentialsError):
+                    return _format_bedrock_credentials_error(region, target_model)
                 except ClientError as ce:
                     code = str(((ce.response or {}).get("Error") or {}).get("Code") or "")
                     last_error = ce
@@ -240,8 +330,14 @@ def call_bedrock_chat(
                     last_error = be
                 except Exception as e:
                     last_error = e
+            if isinstance(last_error, ClientError):
+                return _format_bedrock_client_error(last_error, region, target_model)
             return f"[ERROR] AWS Bedrock call failed: {str(last_error)}"
         except Exception as e:
+            if isinstance(e, ClientError):
+                return _format_bedrock_client_error(e, region, target_model)
             return f"[ERROR] AWS Bedrock call failed: {str(e)}"
+    except ClientError as e:
+        return _format_bedrock_client_error(e, region, target_model)
     except Exception as e:
         return f"[ERROR] AWS Bedrock call failed: {str(e)}"
