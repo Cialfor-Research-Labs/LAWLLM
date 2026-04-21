@@ -678,6 +678,12 @@ export const DocumentGenerator = ({
     ? 'Auto-detect'
     : noticeTypes.find((t) => t.id === noticeType)?.label || noticeType;
   const previewFacts = facts.map((fact) => fact.trim()).filter(Boolean);
+  const previewSections = [
+    { label: 'Sender', value: senderName.trim() || 'Not provided' },
+    { label: 'Receiver', value: receiverName.trim() || 'Not provided' },
+    { label: 'Relationship', value: relationship.trim() || 'Not specified' },
+    { label: 'Deadline', value: deadline ? `${deadline} days` : 'Default by notice type' },
+  ];
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
