@@ -1,0 +1,36 @@
+name: Deploy Dev to Test Server
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  deploy-dev:
+    runs-on: self-hosted
+
+    steps:
+      - name: Deploy dev branch on self-hosted test server
+        run: |
+          cd /home/lawllm/Test_Server/LAWLLM
+
+          git fetch origin dev
+          git checkout dev
+          git pull origin dev
+
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+          cd ui
+          npm install
+
+          # Stop any existing frontend/backend dev processes before restarting.
+          pkill -f "vite.*8989" || true
+          pkill -f "uvicorn retrieval_api:app.*8888" || true
+
+          nohup npm run dev -- --host 0.0.0.0 --port 8989 > /tmp/lawllm-ui.log 2>&1 &
+          cd ..
+          nohup .venv/bin/uvicorn retrieval_api:app --host 0.0.0.0 --port 8888 > /tmp/lawllm-api.log 2>&1 &
+
+          
