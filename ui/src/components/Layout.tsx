@@ -186,7 +186,7 @@ function HistoryPanel({
         <span className="status-pill bg-transparent text-[var(--app-sidebar-panel-muted)]">{count}</span>
       </div>
 
-      <div className="space-y-2 overflow-y-auto p-3 no-scrollbar">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 no-scrollbar">
         {items.map((item) => {
           const id = String(item.session_id || item.id || '');
           const title = String(item.title || '');
@@ -364,7 +364,7 @@ export const Sidebar = ({
               ))}
           </div>
 
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
             {activeTab === 'chat' ? (
               <HistoryPanel
                 heading="Chat history"
@@ -392,7 +392,7 @@ export const Sidebar = ({
             )}
           </div>
 
-          <div className="border-t border-[color:var(--app-sidebar-border)] pt-4">
+          <div className="shrink-0 border-t border-[color:var(--app-sidebar-border)] pt-4">
             <p className="px-4 text-[11px] font-medium text-[var(--app-sidebar-muted)]">Utilities</p>
             <div className="mt-1 space-y-1">
               <DesktopNavButton
