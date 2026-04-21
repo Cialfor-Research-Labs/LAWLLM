@@ -21,14 +21,14 @@ jobs:
 
           source .venv/bin/activate
           pip install -r requirements.txt
-          
+          pkill -f "uvicorn retrieval_api:app.*8888" || true
           uvicorn retrieval_api:app --host 0.0.0.0 --port 8888 > /tmp/lawllm-api.log 2>&1 < /dev/null &
           cd ui
           npm install
 
           # Stop any existing frontend/backend dev processes before restarting.
           pkill -f "vite.*8989" || true
-          pkill -f "uvicorn retrieval_api:app.*8888" || true
+          
           setsid npm run dev -- --host 0.0.0.0 --port 8989 > /tmp/lawllm-ui.log 2>&1 < /dev/null &
           
 
