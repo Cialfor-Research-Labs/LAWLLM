@@ -1089,7 +1089,7 @@ export const DocumentGenerator = ({
                 <div>
                   <h3 className="text-xl font-semibold text-secondary">Generating legal notice</h3>
                   <p className="text-sm text-on-surface-variant mt-2">
-                    Pass 1: Drafting -> Pass 2: Refining legal language...
+                    Pass 1: Drafting to Pass 2: Refining legal language...
                   </p>
                 </div>
               </div>
