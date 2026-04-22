@@ -1103,6 +1103,16 @@ export const LegalChat = ({
                                     transition={{ duration: 0.5 }}
                                 />
                             </div>
+                            <div className="mt-2 grid grid-cols-4 items-center text-[10px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant/80">
+                                {[1, 2, 3, 4].map((step) => (
+                                    <span
+                                        key={step}
+                                        className={`text-center ${completedSteps >= step ? 'text-primary' : ''}`}
+                                    >
+                                        Step {step}
+                                    </span>
+                                ))}
+                            </div>
                             <p className="mt-2 text-[12px] text-on-surface-variant">
                                 We keep asking focused follow-ups only until the facts are strong enough for a confident summary.
                             </p>
