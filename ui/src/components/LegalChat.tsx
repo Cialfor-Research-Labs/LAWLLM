@@ -1033,18 +1033,23 @@ export const LegalChat = ({
         );
     };
 
-    const progressLabel =
-        status === 'clarification_required'
-            ? 'Clarifying missing facts - Step 2 of 4'
-            : status === 'complete'
-                ? 'FIRAC analysis ready - Step 4 of 4'
-                : 'Gathering facts - Step 2 of 4';
-    const progressValue =
+    const completedSteps =
         status === 'complete'
-            ? 100
-            : status === 'clarification_required'
-                ? Math.max(45, Math.round(confidence * 100))
-                : Math.max(28, Math.round(confidence * 100));
+            ? 4
+            : status === 'clarification_required' || status === 'review_required'
+                ? 3
+                : hasMeaningfulConversation
+                    ? 2
+                    : 1;
+    const progressValue = completedSteps * 25;
+    const progressLabel =
+        completedSteps === 4
+            ? 'FIRAC analysis ready - Step 4 of 4'
+            : completedSteps === 3
+                ? 'Clarifying missing facts - Step 3 of 4'
+                : completedSteps === 2
+                    ? 'Gathering facts - Step 2 of 4'
+                    : 'Case intake started - Step 1 of 4';
     const systemModeLabel = status.replace('_', ' ');
 
     return (
@@ -1088,7 +1093,7 @@ export const LegalChat = ({
                             <span className="text-sm font-medium text-on-surface">
                                 {progressLabel}
                             </span>
-                            <span className="status-pill">{Math.round(confidence * 100)}%</span>
+                            <span className="status-pill">{progressValue}%</span>
                             </div>
                             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
                                 <motion.div
