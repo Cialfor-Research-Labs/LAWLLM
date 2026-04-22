@@ -214,7 +214,7 @@ function normalizeBrokenListMarkers(notice: string): string {
   const text = String(notice || '');
   if (!text) return text;
 
-  const markerOnlyRe = /^(\s*(?:[-*â€¢]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
+  const markerOnlyRe = /^(\s*(?:[-*\u2022]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
   const srcLines = text.split('\n');
   const out: string[] = [];
   let i = 0;
@@ -245,7 +245,7 @@ function normalizeBrokenListMarkers(notice: string): string {
 
   let normalized = out.join('\n');
   normalized = normalized.replace(
-    /(^|\n)(\s*(?:[-*â€¢]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
+    /(^|\n)(\s*(?:[-*\u2022]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
     '$1$2 ',
   );
   return normalized;
@@ -298,6 +298,68 @@ function applyAdvocateIdentityToNotice(
   }
 
   return normalizeBrokenListMarkers(text);
+}
+
+function loadGeneratorHistoryFromStorage(): GeneratorHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(GENERATOR_HISTORY_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as Array<Partial<GeneratorHistoryItem>> | unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((item): item is Partial<GeneratorHistoryItem> => Boolean(item && typeof item === 'object'))
+      .map((item) => {
+        const result = item.result;
+        const form = item.form;
+        if (
+          !item.id ||
+          !result ||
+          typeof result.notice !== 'string' ||
+          !form ||
+          typeof form.senderName !== 'string' ||
+          typeof form.receiverName !== 'string'
+        ) {
+          return null;
+        }
+
+        return {
+          id: String(item.id),
+          title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Generated Legal Notice',
+          created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+          preview: typeof item.preview === 'string' ? item.preview : '',
+          form: {
+            senderName: form.senderName,
+            receiverName: form.receiverName,
+            senderAddress: typeof form.senderAddress === 'string' ? form.senderAddress : '',
+            receiverAddress: typeof form.receiverAddress === 'string' ? form.receiverAddress : '',
+            relationship: typeof form.relationship === 'string' ? form.relationship : '',
+            facts: Array.isArray(form.facts) && form.facts.length
+              ? form.facts.map((fact) => String(fact))
+              : [''],
+            claim: typeof form.claim === 'string' ? form.claim : '',
+            noticeType: typeof form.noticeType === 'string' ? form.noticeType : 'auto',
+            tone: form.tone === 'polite' || form.tone === 'aggressive' ? form.tone : 'firm',
+            deadline: typeof form.deadline === 'number' ? form.deadline : '',
+            customRelief: typeof form.customRelief === 'string' ? form.customRelief : '',
+          },
+          result: {
+            ok: Boolean(result.ok),
+            notice: result.notice,
+            laws_used: Array.isArray(result.laws_used) ? result.laws_used.map((law) => String(law)) : [],
+            notice_type: typeof result.notice_type === 'string' ? result.notice_type : 'auto',
+            notice_type_label: typeof result.notice_type_label === 'string' ? result.notice_type_label : 'Generated Legal Notice',
+            confidence: typeof result.confidence === 'number' ? result.confidence : 0,
+            confidence_label: typeof result.confidence_label === 'string' ? result.confidence_label : 'unknown',
+            meta: typeof result.meta === 'object' && result.meta !== null ? result.meta : undefined,
+          },
+        } satisfies GeneratorHistoryItem;
+      })
+      .filter((item): item is GeneratorHistoryItem => Boolean(item));
+  } catch {
+    return [];
+  }
 }
 
 // ---- Component ----
@@ -355,7 +417,7 @@ export const DocumentGenerator = ({
   const [copied, setCopied] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showDownloadChooser, setShowDownloadChooser] = useState(false);
-  const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>(() => loadGeneratorHistoryFromStorage());
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
   const normalizedNotice = useMemo(
     () => normalizeBrokenListMarkers(result?.notice || ''),
@@ -428,23 +490,6 @@ export const DocumentGenerator = ({
   };
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(GENERATOR_HISTORY_KEY);
-      if (!raw) {
-        setHistoryItems([]);
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const normalized = parsed.filter(Boolean) as GeneratorHistoryItem[];
-        setHistoryItems(normalized);
-      }
-    } catch {
-      setHistoryItems([]);
-    }
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem(GENERATOR_HISTORY_KEY, JSON.stringify(historyItems));
     onHistoryChange?.(toHistorySummary(historyItems));
   }, [historyItems, onHistoryChange]);
@@ -484,8 +529,7 @@ export const DocumentGenerator = ({
       form: snapshot,
       result: generated,
     };
-    const next = [item, ...historyItems].slice(0, GENERATOR_HISTORY_LIMIT);
-    setHistoryItems(next);
+    setHistoryItems((prev) => [item, ...prev].slice(0, GENERATOR_HISTORY_LIMIT));
     setActiveHistoryId(item.id);
   };
 
@@ -726,7 +770,7 @@ export const DocumentGenerator = ({
                     onClick={() => { setNoticeType('auto'); setShowTypeDropdown(false); }}
                     className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition ${noticeType === 'auto' ? 'bg-primary/10 font-medium text-primary' : 'text-on-surface hover:bg-surface-container-low'}`}
                   >
-                    âœ¨ Auto-detect from claim
+                    Auto-detect from claim
                   </button>
                   {noticeTypes.map((t) => (
                     <button
@@ -879,7 +923,7 @@ export const DocumentGenerator = ({
           {/* Deadline */}
           <div>
             <label className="field-label">
-              Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional</span>
+              Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">- optional</span>
             </label>
             <input
               type="number"
@@ -895,12 +939,12 @@ export const DocumentGenerator = ({
           {/* Custom Relief */}
           <div>
             <label className="field-label">
-              Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional, one per line</span>
+              Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">- optional, one per line</span>
             </label>
             <textarea
               value={customRelief}
               onChange={(e) => setCustomRelief(e.target.value)}
-              placeholder="e.g.&#10;Pay outstanding salary of â‚¹3,00,000&#10;Issue experience certificate"
+              placeholder="e.g.&#10;Pay outstanding salary of Rs 3,00,000&#10;Issue experience certificate"
               rows={3}
               className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition resize-none"
             />
@@ -1045,7 +1089,7 @@ export const DocumentGenerator = ({
                 <div>
                   <h3 className="text-xl font-semibold text-secondary">Generating legal notice</h3>
                   <p className="text-sm text-on-surface-variant mt-2">
-                    Pass 1: Drafting â†’ Pass 2: Refining legal language...
+                    Pass 1: Drafting to Pass 2: Refining legal language...
                   </p>
                 </div>
               </div>
