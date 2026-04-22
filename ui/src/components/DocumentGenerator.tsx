@@ -214,7 +214,7 @@ function normalizeBrokenListMarkers(notice: string): string {
   const text = String(notice || '');
   if (!text) return text;
 
-  const markerOnlyRe = /^(\s*(?:[-*â€¢]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
+  const markerOnlyRe = /^(\s*(?:[-*\u2022]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*$/;
   const srcLines = text.split('\n');
   const out: string[] = [];
   let i = 0;
@@ -245,7 +245,7 @@ function normalizeBrokenListMarkers(notice: string): string {
 
   let normalized = out.join('\n');
   normalized = normalized.replace(
-    /(^|\n)(\s*(?:[-*â€¢]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
+    /(^|\n)(\s*(?:[-*\u2022]|\d+[.)]|[A-Za-z][.)]|[IVXLCDMivxlcdm]+[.)]))\s*\n+(?=\s*\S)/g,
     '$1$2 ',
   );
   return normalized;
@@ -770,7 +770,7 @@ export const DocumentGenerator = ({
                     onClick={() => { setNoticeType('auto'); setShowTypeDropdown(false); }}
                     className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition ${noticeType === 'auto' ? 'bg-primary/10 font-medium text-primary' : 'text-on-surface hover:bg-surface-container-low'}`}
                   >
-                    âœ¨ Auto-detect from claim
+                    Auto-detect from claim
                   </button>
                   {noticeTypes.map((t) => (
                     <button
@@ -923,7 +923,7 @@ export const DocumentGenerator = ({
           {/* Deadline */}
           <div>
             <label className="field-label">
-              Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional</span>
+              Custom Deadline (days) <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">- optional</span>
             </label>
             <input
               type="number"
@@ -939,12 +939,12 @@ export const DocumentGenerator = ({
           {/* Custom Relief */}
           <div>
             <label className="field-label">
-              Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">â€” optional, one per line</span>
+              Custom Relief <span className="font-normal normal-case tracking-normal text-on-surface-variant/60">- optional, one per line</span>
             </label>
             <textarea
               value={customRelief}
               onChange={(e) => setCustomRelief(e.target.value)}
-              placeholder="e.g.&#10;Pay outstanding salary of â‚¹3,00,000&#10;Issue experience certificate"
+              placeholder="e.g.&#10;Pay outstanding salary of Rs 3,00,000&#10;Issue experience certificate"
               rows={3}
               className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/10 focus:border-primary/30 transition resize-none"
             />
@@ -1089,7 +1089,7 @@ export const DocumentGenerator = ({
                 <div>
                   <h3 className="text-xl font-semibold text-secondary">Generating legal notice</h3>
                   <p className="text-sm text-on-surface-variant mt-2">
-                    Pass 1: Drafting â†’ Pass 2: Refining legal language...
+                    Pass 1: Drafting -> Pass 2: Refining legal language...
                   </p>
                 </div>
               </div>
