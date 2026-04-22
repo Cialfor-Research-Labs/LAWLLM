@@ -300,6 +300,68 @@ function applyAdvocateIdentityToNotice(
   return normalizeBrokenListMarkers(text);
 }
 
+function loadGeneratorHistoryFromStorage(): GeneratorHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(GENERATOR_HISTORY_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as Array<Partial<GeneratorHistoryItem>> | unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((item): item is Partial<GeneratorHistoryItem> => Boolean(item && typeof item === 'object'))
+      .map((item) => {
+        const result = item.result;
+        const form = item.form;
+        if (
+          !item.id ||
+          !result ||
+          typeof result.notice !== 'string' ||
+          !form ||
+          typeof form.senderName !== 'string' ||
+          typeof form.receiverName !== 'string'
+        ) {
+          return null;
+        }
+
+        return {
+          id: String(item.id),
+          title: typeof item.title === 'string' && item.title.trim() ? item.title : 'Generated Legal Notice',
+          created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+          preview: typeof item.preview === 'string' ? item.preview : '',
+          form: {
+            senderName: form.senderName,
+            receiverName: form.receiverName,
+            senderAddress: typeof form.senderAddress === 'string' ? form.senderAddress : '',
+            receiverAddress: typeof form.receiverAddress === 'string' ? form.receiverAddress : '',
+            relationship: typeof form.relationship === 'string' ? form.relationship : '',
+            facts: Array.isArray(form.facts) && form.facts.length
+              ? form.facts.map((fact) => String(fact))
+              : [''],
+            claim: typeof form.claim === 'string' ? form.claim : '',
+            noticeType: typeof form.noticeType === 'string' ? form.noticeType : 'auto',
+            tone: form.tone === 'polite' || form.tone === 'aggressive' ? form.tone : 'firm',
+            deadline: typeof form.deadline === 'number' ? form.deadline : '',
+            customRelief: typeof form.customRelief === 'string' ? form.customRelief : '',
+          },
+          result: {
+            ok: Boolean(result.ok),
+            notice: result.notice,
+            laws_used: Array.isArray(result.laws_used) ? result.laws_used.map((law) => String(law)) : [],
+            notice_type: typeof result.notice_type === 'string' ? result.notice_type : 'auto',
+            notice_type_label: typeof result.notice_type_label === 'string' ? result.notice_type_label : 'Generated Legal Notice',
+            confidence: typeof result.confidence === 'number' ? result.confidence : 0,
+            confidence_label: typeof result.confidence_label === 'string' ? result.confidence_label : 'unknown',
+            meta: typeof result.meta === 'object' && result.meta !== null ? result.meta : undefined,
+          },
+        } satisfies GeneratorHistoryItem;
+      })
+      .filter((item): item is GeneratorHistoryItem => Boolean(item));
+  } catch {
+    return [];
+  }
+}
+
 // ---- Component ----
 
 export const DocumentGenerator = ({
@@ -355,7 +417,7 @@ export const DocumentGenerator = ({
   const [copied, setCopied] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showDownloadChooser, setShowDownloadChooser] = useState(false);
-  const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<GeneratorHistoryItem[]>(() => loadGeneratorHistoryFromStorage());
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
   const normalizedNotice = useMemo(
     () => normalizeBrokenListMarkers(result?.notice || ''),
@@ -428,23 +490,6 @@ export const DocumentGenerator = ({
   };
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(GENERATOR_HISTORY_KEY);
-      if (!raw) {
-        setHistoryItems([]);
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const normalized = parsed.filter(Boolean) as GeneratorHistoryItem[];
-        setHistoryItems(normalized);
-      }
-    } catch {
-      setHistoryItems([]);
-    }
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem(GENERATOR_HISTORY_KEY, JSON.stringify(historyItems));
     onHistoryChange?.(toHistorySummary(historyItems));
   }, [historyItems, onHistoryChange]);
@@ -484,8 +529,7 @@ export const DocumentGenerator = ({
       form: snapshot,
       result: generated,
     };
-    const next = [item, ...historyItems].slice(0, GENERATOR_HISTORY_LIMIT);
-    setHistoryItems(next);
+    setHistoryItems((prev) => [item, ...prev].slice(0, GENERATOR_HISTORY_LIMIT));
     setActiveHistoryId(item.id);
   };
 
