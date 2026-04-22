@@ -1033,24 +1033,38 @@ export const LegalChat = ({
         );
     };
 
-    const completedSteps =
-        status === 'complete'
-            ? 4
-            : status === 'clarification_required' || status === 'review_required'
-                ? 3
-                : hasMeaningfulConversation
-                    ? 2
-                    : 1;
-    const progressValue = completedSteps * 25;
-    const progressLabel =
-        completedSteps === 4
-            ? 'FIRAC analysis ready - Step 4 of 4'
-            : completedSteps === 3
-                ? 'Clarifying missing facts - Step 3 of 4'
-                : completedSteps === 2
-                    ? 'Gathering facts - Step 2 of 4'
-                    : 'Case intake started - Step 1 of 4';
-    const systemModeLabel = status.replace('_', ' ');
+    const progressMeta = (() => {
+        if (status === 'complete' || isComplete) {
+            return {
+                step: 4,
+                percent: 100,
+                label: 'FIRAC analysis ready - Step 4 of 4',
+            };
+        }
+        if (status === 'clarification_required' || status === 'review_required') {
+            return {
+                step: 3,
+                percent: 75,
+                label: 'Clarifying missing facts - Step 3 of 4',
+            };
+        }
+        if (hasMeaningfulConversation) {
+            return {
+                step: 2,
+                percent: 50,
+                label: 'Gathering facts - Step 2 of 4',
+            };
+        }
+        return {
+            step: 1,
+            percent: 25,
+            label: 'Case intake started - Step 1 of 4',
+        };
+    })();
+    const progressValue = Math.max(0, Math.min(100, Math.round(progressMeta.percent)));
+    const progressLabel = progressMeta.label;
+    const completedSteps = progressMeta.step;
+    const systemModeLabel = status.replace(/_/g, ' ');
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -1093,7 +1107,7 @@ export const LegalChat = ({
                             <span className="text-sm font-medium text-on-surface">
                                 {progressLabel}
                             </span>
-                            <span className="status-pill">{progressValue}%</span>
+                            <span className="status-pill min-w-[64px] justify-center">{progressValue}%</span>
                             </div>
                             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
                                 <motion.div
@@ -1102,6 +1116,16 @@ export const LegalChat = ({
                                     animate={{ width: `${progressValue}%` }}
                                     transition={{ duration: 0.5 }}
                                 />
+                            </div>
+                            <div className="mt-2 grid grid-cols-4 items-center text-[10px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant/80">
+                                {[1, 2, 3, 4].map((step) => (
+                                    <span
+                                        key={step}
+                                        className={`text-center ${completedSteps >= step ? 'text-primary' : ''}`}
+                                    >
+                                        Step {step}
+                                    </span>
+                                ))}
                             </div>
                             <p className="mt-2 text-[12px] text-on-surface-variant">
                                 We keep asking focused follow-ups only until the facts are strong enough for a confident summary.
