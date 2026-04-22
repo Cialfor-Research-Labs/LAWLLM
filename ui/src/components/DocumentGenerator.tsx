@@ -962,7 +962,7 @@ export const DocumentGenerator = ({
                   <p className="section-kicker">Live preview</p>
                   <h3 className="mt-1 text-2xl font-semibold text-secondary">Review the notice structure as you fill the form</h3>
                   <p className="mt-2 text-sm leading-7 text-on-surface-variant">
-                    This preview now uses the full right panel instead of leaving it empty. You can sanity-check the facts, parties, and requested relief before generating the final document.
+                    You can sanity-check the facts, parties, and requested relief before generating the final document.
                   </p>
                 </div>
 
