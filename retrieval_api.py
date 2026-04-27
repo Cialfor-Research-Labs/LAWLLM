@@ -28,7 +28,7 @@ from bedrock_client import DEFAULT_BEDROCK_MODEL_ID
 from dynamic_intake_engine import handle_query as handle_dynamic_intake
 from deterministic_retrieval import search_sections, reconstruct_section, call_qwen as call_qwen_act, load_data as load_act_data, FULL_ACT_NAMES, is_explanation_query
 from legal_router import classify_legal_issue, build_intent_route
-from security_engine import is_valid_query, is_legal_query, validate_output, sanitize_user_input
+from security_engine import sanitize_user_input
 from legal_heuristics import match_heuristics, format_heuristics_for_prompt, format_heuristics_for_debug
 from legal_confidence import (
     compute_confidence, confidence_label, extract_citations, format_citations_for_prompt,
@@ -1624,6 +1624,37 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
 
     return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 3
 
+
+def _format_interview_response_for_history(data: InterviewChatResponse) -> str:
+    """Format interview responses so saved chat history mirrors the live UI."""
+    status_label = "Case Complete" if data.is_complete else str(data.status or "interviewing").replace("_", " ").upper()
+    lines = [f"**Status**: {status_label}"]
+    out = data.legal_output
+
+    if out:
+        lines.extend(["", f"> {out.summary}"])
+        if data.is_complete:
+            lines.extend(["", "**Final Assessment**", out.analysis])
+            if out.case_strategy:
+                lines.extend(["", "**Next Strategic Steps**"])
+                lines.extend(f"- {step}" for step in out.case_strategy)
+            if out.evidence_checklist:
+                lines.extend(["", "**Evidence & Proof Checklist**"])
+                lines.extend(f"- [ ] {item}" for item in out.evidence_checklist)
+        else:
+            lines.extend(["", "**Reasoning Checkpoint**", out.analysis])
+            if out.case_strategy:
+                lines.extend(["", "**Current Case-Building Focus**"])
+                lines.extend(f"- {step}" for step in out.case_strategy)
+    else:
+        lines.extend(["", "I need a bit more detail before I can provide a legal assessment."])
+
+    if data.questions and not data.is_complete:
+        lines.extend(["", "**Questions to answer:**"])
+        lines.extend(f"{index}. {question}" for index, question in enumerate(data.questions, start=1))
+
+    return "\n".join(lines).strip()
+
 # =========================
 # HELPERS
 # =========================
@@ -2874,21 +2905,6 @@ def get_static_greeting(text: str) -> Optional[str]:
         return f"{text.strip()}! How can I assist you with your legal research today?"
 
 
-def _build_non_legal_query_answer(user_query: str) -> str:
-    clean = " ".join(str(user_query or "").split()).strip()
-    return (
-        "I can help with legal questions, rights, notices, complaints, contracts, police/FIR guidance, "
-        "consumer issues, cyber fraud, property disputes, employment issues, and similar legal topics.\n\n"
-        f"Your message, \"{clean}\", looks like a general non-legal question, so I should not generate legal sections "
-        "or cite laws for it.\n\n"
-        "If you want, ask me a legal question instead, for example:\n"
-        "- Someone cheated me online. What legal steps should I take?\n"
-        "- Can you help draft a legal notice?\n"
-        "- What can I do if my employer did not pay salary?"
-    )
-    return None
-
-
 def _bold_authorities(answer: str, context_blocks: List[Dict[str, Any]]) -> str:
     act_titles = []
     for block in context_blocks:
@@ -3987,26 +4003,6 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
         history = _load_chat_history_for_prompt(user_id, s_id, limit=CHAT_HISTORY_PROMPT_LIMIT)
         SESSIONS[s_id] = list(history)
 
-        if effective_mode != "query_act" and not is_legal_query(user_query):
-            non_legal_answer = _build_non_legal_query_answer(user_query)
-            _record_chat_turn(user_id, s_id, user_query, non_legal_answer)
-            return QueryResponse(
-                ok=True,
-                query=user_query,
-                answer=non_legal_answer,
-                reasoning=["Detected non-legal/general query; returned plain domain-boundary response."],
-                citations=[],
-                context_blocks=[],
-                applicable_laws=[],
-                meta={
-                    "mode": "non_legal",
-                    "requested_mode": requested_mode,
-                    "effective_mode": effective_mode,
-                    "session_id": s_id,
-                    "inference": False,
-                },
-            )
-
         structured_query = extract_structured_query(user_query, payload.llm_model)
         debug_trace["structured_query"] = structured_query
         reasoning.append(
@@ -4509,9 +4505,10 @@ def interview_chat(
     payload: InterviewChatRequest = Body(...),
     authorization: Optional[str] = Header(default=None),
 ) -> InterviewChatResponse:
-    _require_product_access_user(authorization)
+    user_row = _require_product_access_user(authorization)
+    user_id = int(user_row["id"])
     try:
-        s_id = payload.session_id or str(uuid.uuid4())
+        s_id = _sanitize_chat_session_id(payload.session_id)
         
         # 0. Initialize/Load Case Model from Session
         if s_id not in INTERVIEW_SESSIONS:
@@ -4706,7 +4703,7 @@ def interview_chat(
             session["pending_confirmation_retries"] = 0
 
         if decision == "CLARIFY":
-            return InterviewChatResponse(
+            response_payload = InterviewChatResponse(
                 ok=True,
                 session_id=s_id,
                 issue=issue,
@@ -4725,6 +4722,13 @@ def interview_chat(
                     "auto_session_reset": auto_session_reset,
                 }
             )
+            _record_chat_turn(
+                user_id,
+                s_id,
+                payload.query,
+                _format_interview_response_for_history(response_payload),
+            )
+            return response_payload
 
         # 6. Branching Logic (INTERVIEW vs ASSESS)
         is_complete = (decision == "ASSESS")
@@ -4833,7 +4837,7 @@ def interview_chat(
                 ),
             )
 
-        return InterviewChatResponse(
+        response_payload = InterviewChatResponse(
             session_id=s_id,
             issue=issue,
             secondary_issues=active_issues[1:] if len(active_issues) > 1 else [],
@@ -4867,6 +4871,13 @@ def interview_chat(
                 "dashboard_summary": dashboard_summary,
             }
         )
+        _record_chat_turn(
+            user_id,
+            s_id,
+            payload.query,
+            _format_interview_response_for_history(response_payload),
+        )
+        return response_payload
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})

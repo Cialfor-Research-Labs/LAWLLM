@@ -47,6 +47,7 @@ interface ChatSessionDetailResponse {
 interface LegalOutput {
     analysis: string;
     summary: string;
+    severity?: string;
     applicable_laws: string[];
     legal_options: string[];
     next_steps: string[];
@@ -118,23 +119,12 @@ interface InterviewChatResponse {
     status: string; // "interviewing", "clarification_required", "complete", "review_required"
     is_complete: boolean;
     questions: string[];
-    legal_output: LegalOutput;
-    case_model?: CaseModel;
+    legal_output?: LegalOutput | null;
+    case_model?: CaseModel | null;
     behavioral_primitives: BehavioralPrimitive[];
     interpretations: LegalInterpretation[];
     applicable_laws: ApplicableLaw[];
     state_debug?: Record<string, unknown>;
-}
-
-interface RagQueryResponse {
-    ok: boolean;
-    query: string;
-    answer: string;
-    confidence?: number;
-    meta?: {
-        session_id?: string;
-        [key: string]: unknown;
-    };
 }
 
 const markdownComponents: Components = {
@@ -147,7 +137,7 @@ const markdownComponents: Components = {
 };
 
 const DEFAULT_GREETING =
-    'Hello. I am Legal AI. Describe your legal situation, and I will identify the core issues, ask necessary follow-up questions, and provide a full FIRAC legal assessment.';
+    'Hello. I am Legal AI. Describe your legal situation first. I will interview you for the missing facts, build the case map, and only then provide the final legal assessment.';
 
 interface LegalChatProps {
     authToken: string;
@@ -723,35 +713,41 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 
 function formatInterviewResponseClean(data: InterviewChatResponse) {
     const out = data.legal_output;
+    const statusLabel = data.is_complete ? 'Case Complete' : data.status.replace('_', ' ').toUpperCase();
 
     if (!out) {
         const lines = [
-            `**Status**: ${data.status.replace('_', ' ').toUpperCase()}`,
+            `**Status**: ${statusLabel}`,
             '',
-            'I need a bit more detail before I can provide a legal assessment. Please describe the specific incident or legal problem you are facing.',
+            'I need a bit more detail before I can provide a legal assessment.',
         ];
 
         if (data.questions.length > 0) {
             lines.push('');
-            lines.push('**Follow-up Question:**');
-            lines.push(data.questions[0]);
+            lines.push('**Questions to answer:**');
+            data.questions.forEach((question, index) => lines.push(`${index + 1}. ${question}`));
         }
 
         return lines.join('\n').trim();
     }
 
-    const lines = [
-        `**Status**: ${data.is_complete ? 'Case Complete' : 'Interviewing'}`,
-        '',
-        `> ${out.summary}`,
-        '',
-        out.analysis,
-        '',
-        '**Next Strategic Steps**',
-        ...out.case_strategy.map((step) => `- ${step}`),
-    ];
+    const lines = [`**Status**: ${statusLabel}`, '', `> ${out.summary}`];
 
-    if (out.evidence_checklist && out.evidence_checklist.length > 0) {
+    if (data.is_complete) {
+        lines.push('', '**Final Assessment**', out.analysis);
+        if (out.case_strategy.length > 0) {
+            lines.push('', '**Next Strategic Steps**');
+            out.case_strategy.forEach((step) => lines.push(`- ${step}`));
+        }
+    } else {
+        lines.push('', '**Reasoning Checkpoint**', out.analysis);
+        if (out.case_strategy.length > 0) {
+            lines.push('', '**Current Case-Building Focus**');
+            out.case_strategy.forEach((step) => lines.push(`- ${step}`));
+        }
+    }
+
+    if (data.is_complete && out.evidence_checklist && out.evidence_checklist.length > 0) {
         lines.push('');
         lines.push('**Evidence & Proof Checklist**');
         out.evidence_checklist.forEach((item) => lines.push(`- [ ] ${item}`));
@@ -759,8 +755,8 @@ function formatInterviewResponseClean(data: InterviewChatResponse) {
 
     if (data.questions.length > 0 && !data.is_complete) {
         lines.push('');
-        lines.push('**Follow-up Question:**');
-        lines.push(data.questions[0]);
+        lines.push('**Questions to answer:**');
+        data.questions.forEach((question, index) => lines.push(`${index + 1}. ${question}`));
     }
 
     if (data.is_complete && out.notice_draft) {
@@ -865,6 +861,21 @@ export const LegalChat = ({
         setApplicableLaws([]);
     };
 
+    const applyInterviewResponse = (data: InterviewChatResponse) => {
+        setSessionId(data.session_id);
+        setIsComplete(data.is_complete);
+        setStatus(data.status);
+        setSecondaryIssues(data.secondary_issues || []);
+        setLegalOutput(data.legal_output || null);
+        setConfidence(data.confidence || data.legal_output?.confidence || 0);
+        setCaseModel(data.case_model || null);
+        setBehavioralPrimitives(data.behavioral_primitives || []);
+        setInterpretations(data.interpretations || []);
+        setApplicableLaws(data.applicable_laws || []);
+        setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
+        void loadChatSessions();
+    };
+
     const openConversation = async (targetSessionId: string) => {
         if (!targetSessionId) {
             resetConversation();
@@ -933,12 +944,11 @@ export const LegalChat = ({
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${apiBase}/query`, {
+            const response = await fetch(`${apiBase}/query/interview/chat`, {
                 method: 'POST',
                 headers: authHeaders,
                 body: JSON.stringify({
                     query: userMessage,
-                    mode: 'lawyer_case',
                     session_id: sessionId,
                 }),
             });
@@ -948,47 +958,8 @@ export const LegalChat = ({
                 throw new Error(errData.detail?.error || `Request failed: ${response.status}`);
             }
             
-            const data: RagQueryResponse | InterviewChatResponse = await response.json();
-
-            // Primary path: /query RAG response
-            if ('answer' in data) {
-                const nextSessionId = data.meta?.session_id || sessionId || null;
-                setSessionId(nextSessionId);
-                setIsComplete(true);
-                setStatus("complete");
-                setSecondaryIssues([]);
-                setLegalOutput(null);
-                setCaseModel(null);
-                setBehavioralPrimitives([]);
-                setInterpretations([]);
-                setApplicableLaws([]);
-                setConfidence(data.confidence || 0);
-                setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
-                await loadChatSessions();
-            } else {
-                // Backward compatible fallback if interview response is returned
-                setSessionId(data.session_id);
-                setIsComplete(data.is_complete);
-                setStatus(data.status);
-                setSecondaryIssues(data.secondary_issues || []);
-                
-                if (data.legal_output) {
-                    setLegalOutput(data.legal_output);
-                    setConfidence(data.confidence);
-                } else {
-                    setConfidence(data.confidence || 0);
-                }
-                
-                if (data.case_model) {
-                    setCaseModel(data.case_model);
-                }
-                
-                setBehavioralPrimitives(data.behavioral_primitives || []);
-                setInterpretations(data.interpretations || []);
-                setApplicableLaws(data.applicable_laws || []);
-                setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
-                await loadChatSessions();
-            }
+            const data: InterviewChatResponse = await response.json();
+            applyInterviewResponse(data);
             
         } catch (error: any) {
             console.error('Chat Error:', error);
@@ -1264,34 +1235,17 @@ export const LegalChat = ({
                                 onClick={async () => {
                                     setIsLoading(true);
                                     try {
-                                        const response = await fetch(`${apiBase}/query`, {
+                                        const response = await fetch(`${apiBase}/query/interview/chat`, {
                                             method: 'POST',
                                             headers: authHeaders,
                                             body: JSON.stringify({
                                                 query: "Confirmed",
                                                 session_id: sessionId,
-                                                mode: 'lawyer_case',
+                                                case_model_update: caseModel,
                                             }),
                                         });
-                                        const data: RagQueryResponse | InterviewChatResponse = await response.json();
-                                        if ('answer' in data) {
-                                            const nextSessionId = data.meta?.session_id || sessionId || null;
-                                            setSessionId(nextSessionId);
-                                            setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
-                                            setStatus("complete");
-                                            setConfidence(data.confidence || 0);
-                                            setLegalOutput(null);
-                                            setIsComplete(true);
-                                            await loadChatSessions();
-                                        } else {
-                                            setSessionId(data.session_id);
-                                            setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
-                                            setStatus(data.status);
-                                            setConfidence(data.confidence);
-                                            setLegalOutput(data.legal_output);
-                                            setIsComplete(data.is_complete);
-                                            await loadChatSessions();
-                                        }
+                                        const data: InterviewChatResponse = await response.json();
+                                        applyInterviewResponse(data);
                                     } catch (e) {
                                         console.error(e);
                                     } finally {
@@ -1577,13 +1531,17 @@ export const LegalChat = ({
                                 handleSend();
                             }
                         }}
-                        placeholder="Describe your legal issue (e.g., 'My salary is unpaid for 3 months')..."
+                        placeholder={
+                            isComplete
+                                ? "Ask a follow-up or start a new matter..."
+                                : "Describe the matter or answer the interview questions..."
+                        }
                         disabled={isLoading}
                         className="text-field h-24 resize-none pr-20 disabled:opacity-70"
                     />
                     <button
                         type="button"
-                        onClick={handleSend}
+                        onClick={() => handleSend()}
                         disabled={isLoading || !input.trim()}
                         className="primary-button absolute bottom-6 right-6 h-14 w-14 rounded-2xl px-0 py-0 disabled:scale-100"
                     >
