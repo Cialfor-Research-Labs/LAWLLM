@@ -3389,7 +3389,7 @@ def _format_next_steps_section(answer: str) -> str:
 def _enforce_firac_layout(answer: str) -> str:
     normalized = (answer or "").replace("\r\n", "\n").strip()
     if not normalized:
-    return normalized
+        return normalized
 
 
 def _humanize_query_category(category: str) -> str:
