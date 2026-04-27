@@ -137,7 +137,7 @@ const markdownComponents: Components = {
 };
 
 const DEFAULT_GREETING =
-    'Hello. I am Legal AI. Describe your legal situation first. I will interview you for the missing facts, build the case map, and only then provide the final legal assessment.';
+    'Hello. I am Legal AI. Describe your legal situation in as much detail as you have. If the facts are already complete, I will answer directly. If something important is missing, I will ask only the next needed question.';
 
 interface LegalChatProps {
     authToken: string;
@@ -1028,13 +1028,13 @@ export const LegalChat = ({
             <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
                     <div className="max-w-3xl">
-                        <p className="section-kicker">Intelligent interviewer</p>
-                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We will structure the legal facts.</h2>
+                        <p className="section-kicker">Adaptive legal intake</p>
+                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We answer directly when the facts are already strong.</h2>
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
                         <p className="mt-2 text-base text-on-surface-variant">
-                            Unified Legal Case Engine · Factual Extraction · FIRAC Analysis
+                            Unified Legal Case Engine · Adaptive Intake · FIRAC Analysis
                         </p>
                     </div>
                     <div className="hidden items-center gap-3">
@@ -1085,7 +1085,7 @@ export const LegalChat = ({
                                 ))}
                             </div>
                             <p className="mt-2 text-[12px] text-on-surface-variant">
-                                We keep asking focused follow-ups only until the facts are strong enough for a confident summary.
+                                We only ask follow-up questions when your first description still leaves important gaps.
                             </p>
                         </div>
                         <div className="hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 shadow-sm">
@@ -1165,13 +1165,13 @@ export const LegalChat = ({
                         <div className="chat-assistant-bubble flex items-center gap-4 rounded-[24px] border px-5 py-4">
                             <Loader2 size={18} className="animate-spin text-primary" />
                             <div className="text-sm font-medium text-on-surface">
-                                Analyzing the facts and preparing the next legal question...
+                                Reviewing the facts and deciding whether we can answer now or need one more detail...
                             </div>
                         </div>
                     </div>
                 )}
 
-                {status === 'review_required' && caseModel && (
+                {status === 'review_required' && caseModel && !isComplete && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1179,11 +1179,11 @@ export const LegalChat = ({
                     >
                         <div className="flex items-center gap-2 text-amber-700 font-bold uppercase tracking-wider text-xs mb-4">
                             <FileText size={16} />
-                            Case Model Review Required
+                            Case Model Review
                         </div>
                         
                         <p className="text-sm text-amber-900 mb-6">
-                            I've reconstructed the timeline and parties involved. Please confirm if this is correct before we proceed to legal analysis.
+                            I reconstructed the likely timeline and parties from your description. If anything looks off, you can correct it. Otherwise, confirm and continue.
                         </p>
 
                         <div className="grid gap-6 md:grid-cols-2">
@@ -1254,7 +1254,7 @@ export const LegalChat = ({
                                 }}
                                 className="flex-1 bg-primary text-on-primary py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20"
                             >
-                                Confirm & Proceed
+                                Confirm Timeline
                             </button>
                             <button className="px-6 py-3 border border-outline-variant rounded-xl text-xs font-bold text-on-surface hover:bg-surface-container">
                                 Edit
@@ -1534,7 +1534,7 @@ export const LegalChat = ({
                         placeholder={
                             isComplete
                                 ? "Ask a follow-up or start a new matter..."
-                                : "Describe the matter or answer the interview questions..."
+                                : "Describe the matter fully. If anything important is missing, I will ask the next needed question..."
                         }
                         disabled={isLoading}
                         className="text-field h-24 resize-none pr-20 disabled:opacity-70"

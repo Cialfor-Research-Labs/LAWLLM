@@ -4526,8 +4526,8 @@ def interview_chat(
         session.setdefault("asked_contradiction_codes", [])
         session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
 
-        status = "interviewing"
         fact_progress = False
+        case_model_changed = False
         forced_assess = False
         user_confidence = None
         previous_top_law = session.get("last_top_law")
@@ -4536,7 +4536,6 @@ def interview_chat(
         # If the user is providing a confirmed/edited model from the UI
         if payload.case_model_update:
             session["case_model"] = payload.case_model_update.dict()
-            status = "interviewing" # User confirmed, proceed to analysis
             fact_progress = True
         else:
             # Run the new multi-step pipeline
@@ -4547,6 +4546,7 @@ def interview_chat(
                 session["case_model"] = new_case.dict()
                 if new_case.events or new_case.parties:
                     fact_progress = True
+                    case_model_changed = True
             else:
                 current_model = CaseModel(**session["case_model"])
                 prev_event_count = len(current_model.events)
@@ -4555,11 +4555,13 @@ def interview_chat(
                     if not any(cp.id == p.id for cp in current_model.parties):
                         current_model.parties.append(p)
                         fact_progress = True
+                        case_model_changed = True
                 
                 new_events = [e for e in new_case.events if e.sequence > prev_event_count]
                 if new_events:
                     current_model.events.extend(new_events)
                     fact_progress = True
+                    case_model_changed = True
 
                 current_model.financials.extend(new_case.financials)
                 current_model.documents.extend(new_case.documents)
@@ -4567,10 +4569,6 @@ def interview_chat(
                 current_model.meta.claims = list(set(current_model.meta.claims + new_case.meta.claims))
                 current_model.missing_information = new_case.missing_information
                 session["case_model"] = current_model.dict()
-
-            # Detection of 'review_required' (New events/parties found)
-            if fact_progress:
-                status = "review_required"
 
         case_obj = CaseModel(**session["case_model"])
         
@@ -4811,12 +4809,22 @@ def interview_chat(
         output_data["confidence"] = strength 
         legal_output = LegalOutput(**output_data)
 
+        should_review_case_model = (
+            not is_complete
+            and not payload.case_model_update
+            and case_model_changed
+            and not contradictions_present
+            and not session.get("pending_confirmation")
+            and not final_questions_text
+            and bool(case_obj.events or case_obj.parties)
+        )
+
         # Final Status determination
         if is_complete:
             final_status = "complete"
         elif contradictions_present or session.get("pending_confirmation"):
             final_status = "clarification_required"
-        elif status == "review_required":
+        elif should_review_case_model:
             final_status = "review_required"
         else:
             final_status = "interviewing"
@@ -4855,6 +4863,8 @@ def interview_chat(
                 "decision": decision,
                 "forced_assess": forced_assess,
                 "auto_session_reset": auto_session_reset,
+                "case_model_changed": case_model_changed,
+                "case_model_review_recommended": should_review_case_model,
                 "behavioral_count": len(brain_response.behavioral_primitives),
                 "interpretation_count": len(brain_response.interpretations),
                 "law_count": len(laws_response.applicable_laws),
