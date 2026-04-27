@@ -964,7 +964,7 @@ export const LegalChat = ({
                 setApplicableLaws([]);
                 setConfidence(data.confidence || 0);
                 setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
-                await loadChatSessions();
+                void loadChatSessions();
             } else {
                 // Backward compatible fallback if interview response is returned
                 setSessionId(data.session_id);
@@ -987,7 +987,7 @@ export const LegalChat = ({
                 setInterpretations(data.interpretations || []);
                 setApplicableLaws(data.applicable_laws || []);
                 setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
-                await loadChatSessions();
+                void loadChatSessions();
             }
             
         } catch (error: any) {
@@ -1282,7 +1282,7 @@ export const LegalChat = ({
                                             setConfidence(data.confidence || 0);
                                             setLegalOutput(null);
                                             setIsComplete(true);
-                                            await loadChatSessions();
+                                            void loadChatSessions();
                                         } else {
                                             setSessionId(data.session_id);
                                             setMessages((prev) => [...prev, { role: 'assistant', content: formatInterviewResponseClean(data) }]);
@@ -1290,7 +1290,7 @@ export const LegalChat = ({
                                             setConfidence(data.confidence);
                                             setLegalOutput(data.legal_output);
                                             setIsComplete(data.is_complete);
-                                            await loadChatSessions();
+                                            void loadChatSessions();
                                         }
                                     } catch (e) {
                                         console.error(e);
