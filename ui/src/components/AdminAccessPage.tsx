@@ -128,7 +128,7 @@ interface MonitoringFilters {
   authenticatedOnly: 'all' | 'yes' | 'no';
 }
 
-type AdminPanelView = 'user_management' | 'audit_history' | 'access_history';
+type AdminPanelView = 'user_management' | 'query_insights' | 'audit_history' | 'access_history';
 
 const MONITORING_PAGE_SIZE = 25;
 
@@ -424,6 +424,12 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
               count: users.length,
             },
             {
+              id: 'query_insights' as const,
+              title: 'Query insights',
+              subtitle: 'See what users are asking and how those queries are classified.',
+              count: queryCategorySummary.total_queries,
+            },
+            {
               id: 'audit_history' as const,
               title: 'Audit history',
               subtitle: 'Review the access request audit trail and status changes.',
@@ -464,100 +470,6 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
 
         {activeView === 'user_management' && (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Most common overall</div>
-                <div className="mt-3 text-lg font-semibold text-on-surface">
-                  {queryCategorySummary.overall[0]?.label || 'No query data yet'}
-                </div>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  {queryCategorySummary.overall[0]
-                    ? `${queryCategorySummary.overall[0].count} user messages classified into the top category.`
-                    : 'This will populate as users submit chat queries.'}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Total classified queries</div>
-                <div className="mt-3 text-3xl font-semibold text-primary">{queryCategorySummary.total_queries}</div>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  Based on stored user chat messages.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Users with query history</div>
-                <div className="mt-3 text-3xl font-semibold text-secondary">{queryCategorySummary.users_with_queries}</div>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  Per-user category trends are shown below.
-                </p>
-              </div>
-            </div>
-
-            {queryCategorySummary.overall.length > 0 && (
-              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
-                <div className="text-sm font-semibold text-on-surface">Top query categories across users</div>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {queryCategorySummary.overall.map((item) => (
-                    <div
-                      key={item.category}
-                      className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3"
-                    >
-                      <div className="text-sm font-semibold text-on-surface">{item.label}</div>
-                      <div className="mt-1 text-xs text-on-surface-variant">{item.count} queries</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
-              <div className="border-b border-outline-variant/10 px-4 py-3">
-                <div className="text-sm font-semibold text-on-surface">Recent user queries</div>
-                <p className="mt-1 text-xs text-on-surface-variant">
-                  See what users are asking, who asked it, and how the system classified it.
-                </p>
-              </div>
-              <div className="max-h-[420px] overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-surface-container-low">
-                    <tr className="text-left text-on-surface-variant">
-                      <th className="px-4 py-3">User</th>
-                      <th className="px-4 py-3">Category</th>
-                      <th className="px-4 py-3">Query</th>
-                      <th className="px-4 py-3">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentQueries.map((query, index) => (
-                      <tr key={`${query.user_id}-${query.session_id || 'session'}-${index}`} className="border-t border-outline-variant/10 align-top">
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-on-surface">{query.user_name || `User ${query.user_id}`}</div>
-                          <div className="text-xs text-on-surface-variant">{query.user_email || '-'}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="inline-flex rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-on-surface">
-                            {query.label}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-xs leading-5 text-on-surface-variant">
-                          <div className="max-w-3xl whitespace-pre-wrap">{query.content}</div>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-on-surface-variant whitespace-nowrap">
-                          {formatTimestamp(query.created_at)}
-                        </td>
-                      </tr>
-                    ))}
-                    {!loading && recentQueries.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-sm text-on-surface-variant">
-                          No stored user queries yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
               <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">User management ({users.length})</div>
               <div className="overflow-x-auto">
@@ -669,6 +581,100 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
               </table>
             </div>
           </div>
+          </div>
+        )}
+
+        {activeView === 'query_insights' && (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Most common overall</div>
+                <div className="mt-3 text-lg font-semibold text-on-surface">
+                  {queryCategorySummary.overall[0]?.label || 'No query data yet'}
+                </div>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {queryCategorySummary.overall[0]
+                    ? `${queryCategorySummary.overall[0].count} user messages classified into the top category.`
+                    : 'This will populate as users submit chat queries.'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Total classified queries</div>
+                <div className="mt-3 text-3xl font-semibold text-primary">{queryCategorySummary.total_queries}</div>
+                <p className="mt-1 text-sm text-on-surface-variant">Based on stored user chat messages.</p>
+              </div>
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Users with query history</div>
+                <div className="mt-3 text-3xl font-semibold text-secondary">{queryCategorySummary.users_with_queries}</div>
+                <p className="mt-1 text-sm text-on-surface-variant">Per-user category trends are shown below.</p>
+              </div>
+            </div>
+
+            {queryCategorySummary.overall.length > 0 && (
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-sm font-semibold text-on-surface">Top query categories across users</div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {queryCategorySummary.overall.map((item) => (
+                    <div
+                      key={item.category}
+                      className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3"
+                    >
+                      <div className="text-sm font-semibold text-on-surface">{item.label}</div>
+                      <div className="mt-1 text-xs text-on-surface-variant">{item.count} queries</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+              <div className="border-b border-outline-variant/10 px-4 py-3">
+                <div className="text-sm font-semibold text-on-surface">Recent user queries</div>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  See what users are asking, who asked it, and how the system classified it.
+                </p>
+              </div>
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-surface-container-low">
+                    <tr className="text-left text-on-surface-variant">
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Query</th>
+                      <th className="px-4 py-3">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentQueries.map((query, index) => (
+                      <tr key={`${query.user_id}-${query.session_id || 'session'}-${index}`} className="border-t border-outline-variant/10 align-top">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-on-surface">{query.user_name || `User ${query.user_id}`}</div>
+                          <div className="text-xs text-on-surface-variant">{query.user_email || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="inline-flex rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-on-surface">
+                            {query.label}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs leading-5 text-on-surface-variant">
+                          <div className="max-w-3xl whitespace-pre-wrap">{query.content}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-on-surface-variant whitespace-nowrap">
+                          {formatTimestamp(query.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                    {!loading && recentQueries.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                          No stored user queries yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
