@@ -70,6 +70,8 @@ from phase65_engine import (
 
 app = FastAPI(title="Legal AI API", version="2.5")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -80,7 +82,7 @@ app.add_middleware(
 
 # 🧠 Session Storage
 SESSIONS: Dict[str, List[Dict[str, str]]] = {}
-LOG_PATH = os.path.join("logs", "query_logs.json")
+LOG_PATH = os.path.join(BASE_DIR, "logs", "query_logs.json")
 DISABLE_EMBEDDING_RETRIEVAL = os.getenv("DISABLE_EMBEDDING_RETRIEVAL", "true").strip().lower() == "true"
 USE_JUDGEMENT_EMBEDDINGS = os.getenv("USE_JUDGEMENT_EMBEDDINGS", "true").strip().lower() == "true"
 # PHASE 1: Score thresholds disabled — no chunk is rejected due to score.
@@ -90,7 +92,7 @@ MAX_RETRIEVAL_QUERIES = int(os.getenv("MAX_RETRIEVAL_QUERIES", "5"))
 DEFAULT_ALLOWED_DOCS = {"acts", "judgements"}
 LAWYER_SESSIONS: Dict[str, Dict[str, Any]] = {}
 INTERVIEW_SESSIONS: Dict[str, Dict[str, Any]] = {}
-INTERACTION_LOG_PATH = os.path.join("test", "interaction_logs.jsonl")
+INTERACTION_LOG_PATH = os.path.join(BASE_DIR, "test", "interaction_logs.jsonl")
 MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
 MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
 MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
@@ -101,7 +103,7 @@ PASSWORD_SETUP_TOKEN_TTL_HOURS = int(os.getenv("PASSWORD_SETUP_TOKEN_TTL_HOURS",
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
 PASSWORD_HASH_ITERATIONS = 120_000
 MAILER_NODE_BIN = os.getenv("MAILER_NODE_BIN", "node")
-MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join("ui", "scripts", "send_setup_email.cjs"))
+MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join(BASE_DIR, "ui", "scripts", "send_setup_email.cjs"))
 CHAT_HISTORY_PROMPT_LIMIT = int(os.getenv("CHAT_HISTORY_PROMPT_LIMIT", "24"))
 CHAT_HISTORY_DETAIL_LIMIT = int(os.getenv("CHAT_HISTORY_DETAIL_LIMIT", "200"))
 CHAT_HISTORY_LIST_LIMIT = int(os.getenv("CHAT_HISTORY_LIST_LIMIT", "50"))
@@ -118,7 +120,7 @@ def _load_dotenv_cache() -> Dict[str, str]:
         return _DOTENV_CACHE
 
     parsed: Dict[str, str] = {}
-    env_path = ".env"
+    env_path = os.path.join(BASE_DIR, ".env")
     if os.path.exists(env_path):
         try:
             with open(env_path, "r", encoding="utf-8") as fh:
@@ -598,7 +600,11 @@ class _AuthConnection:
 
 def _get_sqlite_auth_db_path() -> str:
     raw = (_get_env_with_dotenv_fallback("SQLITE_AUTH_DB_PATH", "auth_access.db") or "auth_access.db").strip()
-    return raw or "auth_access.db"
+    if not raw:
+        raw = "auth_access.db"
+    if os.path.isabs(raw):
+        return raw
+    return os.path.join(BASE_DIR, raw)
 
 
 def _db_conn() -> _AuthConnection:
