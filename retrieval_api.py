@@ -1624,6 +1624,37 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
 
     return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 3
 
+
+def _format_interview_response_for_history(data: InterviewChatResponse) -> str:
+    """Format interview responses so saved chat history mirrors the live UI."""
+    status_label = "Case Complete" if data.is_complete else str(data.status or "interviewing").replace("_", " ").upper()
+    lines = [f"**Status**: {status_label}"]
+    out = data.legal_output
+
+    if out:
+        lines.extend(["", f"> {out.summary}"])
+        if data.is_complete:
+            lines.extend(["", "**Final Assessment**", out.analysis])
+            if out.case_strategy:
+                lines.extend(["", "**Next Strategic Steps**"])
+                lines.extend(f"- {step}" for step in out.case_strategy)
+            if out.evidence_checklist:
+                lines.extend(["", "**Evidence & Proof Checklist**"])
+                lines.extend(f"- [ ] {item}" for item in out.evidence_checklist)
+        else:
+            lines.extend(["", "**Reasoning Checkpoint**", out.analysis])
+            if out.case_strategy:
+                lines.extend(["", "**Current Case-Building Focus**"])
+                lines.extend(f"- {step}" for step in out.case_strategy)
+    else:
+        lines.extend(["", "I need a bit more detail before I can provide a legal assessment."])
+
+    if data.questions and not data.is_complete:
+        lines.extend(["", "**Questions to answer:**"])
+        lines.extend(f"{index}. {question}" for index, question in enumerate(data.questions, start=1))
+
+    return "\n".join(lines).strip()
+
 # =========================
 # HELPERS
 # =========================
@@ -4509,9 +4540,10 @@ def interview_chat(
     payload: InterviewChatRequest = Body(...),
     authorization: Optional[str] = Header(default=None),
 ) -> InterviewChatResponse:
-    _require_product_access_user(authorization)
+    user_row = _require_product_access_user(authorization)
+    user_id = int(user_row["id"])
     try:
-        s_id = payload.session_id or str(uuid.uuid4())
+        s_id = _sanitize_chat_session_id(payload.session_id)
         
         # 0. Initialize/Load Case Model from Session
         if s_id not in INTERVIEW_SESSIONS:
@@ -4706,7 +4738,7 @@ def interview_chat(
             session["pending_confirmation_retries"] = 0
 
         if decision == "CLARIFY":
-            return InterviewChatResponse(
+            response_payload = InterviewChatResponse(
                 ok=True,
                 session_id=s_id,
                 issue=issue,
@@ -4725,6 +4757,13 @@ def interview_chat(
                     "auto_session_reset": auto_session_reset,
                 }
             )
+            _record_chat_turn(
+                user_id,
+                s_id,
+                payload.query,
+                _format_interview_response_for_history(response_payload),
+            )
+            return response_payload
 
         # 6. Branching Logic (INTERVIEW vs ASSESS)
         is_complete = (decision == "ASSESS")
@@ -4833,7 +4872,7 @@ def interview_chat(
                 ),
             )
 
-        return InterviewChatResponse(
+        response_payload = InterviewChatResponse(
             session_id=s_id,
             issue=issue,
             secondary_issues=active_issues[1:] if len(active_issues) > 1 else [],
@@ -4867,6 +4906,13 @@ def interview_chat(
                 "dashboard_summary": dashboard_summary,
             }
         )
+        _record_chat_turn(
+            user_id,
+            s_id,
+            payload.query,
+            _format_interview_response_for_history(response_payload),
+        )
+        return response_payload
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})
