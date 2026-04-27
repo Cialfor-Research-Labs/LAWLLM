@@ -53,6 +53,22 @@ DEFAULT_REGION = os.getenv(
 )
 
 
+def _get_guardrail_config() -> Optional[Dict[str, str]]:
+    identifier = os.getenv("BEDROCK_GUARDRAIL_IDENTIFIER", "").strip()
+    version = os.getenv("BEDROCK_GUARDRAIL_VERSION", "").strip()
+    if not identifier and not version:
+        return None
+    if not identifier or not version:
+        raise ValueError(
+            "Bedrock guardrail config is incomplete. Set both "
+            "BEDROCK_GUARDRAIL_IDENTIFIER and BEDROCK_GUARDRAIL_VERSION."
+        )
+    return {
+        "guardrailIdentifier": identifier,
+        "guardrailVersion": version,
+    }
+
+
 def _as_text(content: Any) -> str:
     if content is None:
         return ""
@@ -271,6 +287,7 @@ def call_bedrock_chat(
         return "[ERROR] No valid message content provided."
     try:
         client, credential_source = _get_bedrock_runtime(region or "")
+        guardrail_config = _get_guardrail_config()
     except Exception as e:
         return f"[ERROR] Unable to initialize Bedrock client in {region}: {str(e)}"
 
@@ -291,6 +308,8 @@ def call_bedrock_chat(
         }
         if system_prompt and system_prompt.strip():
             req["system"] = [{"text": system_prompt.strip()}]
+        if guardrail_config:
+            req["guardrailConfig"] = guardrail_config
         response = client.converse(**req)
         text = _extract_converse_text(response)
         return text or "[ERROR] Bedrock returned an empty response."
@@ -308,12 +327,15 @@ def call_bedrock_chat(
             last_error: Optional[Exception] = None
             for invoke_body in payloads:
                 try:
-                    response = client.invoke_model(
-                        modelId=target_model,
-                        contentType="application/json",
-                        accept="application/json",
-                        body=json.dumps(invoke_body).encode("utf-8"),
-                    )
+                    invoke_request: Dict[str, Any] = {
+                        "modelId": target_model,
+                        "contentType": "application/json",
+                        "accept": "application/json",
+                        "body": json.dumps(invoke_body).encode("utf-8"),
+                    }
+                    if guardrail_config:
+                        invoke_request.update(guardrail_config)
+                    response = client.invoke_model(**invoke_request)
                     body = response.get("body")
                     raw = body.read() if body is not None else b"{}"
                     payload = json.loads(raw.decode("utf-8"))
