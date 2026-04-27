@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import traceback
 import uuid
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple
@@ -375,6 +376,7 @@ class AdminAccessListResponse(BaseModel):
     ok: bool
     users: List[Dict[str, Any]]
     requests: List[Dict[str, Any]]
+    query_category_summary: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AdminAccessUpdateResponse(BaseModel):
@@ -3200,7 +3202,65 @@ def _format_next_steps_section(answer: str) -> str:
 def _enforce_firac_layout(answer: str) -> str:
     normalized = (answer or "").replace("\r\n", "\n").strip()
     if not normalized:
-        return normalized
+    return normalized
+
+
+def _humanize_query_category(category: str) -> str:
+    cleaned = str(category or "unknown").strip().lower()
+    if cleaned in {"", "unknown"}:
+        return "General / Unclear"
+    return cleaned.replace("_", " ").title()
+
+
+def _build_query_category_summary(user_rows: Sequence[AuthRow], query_rows: Sequence[AuthRow]) -> Dict[str, Any]:
+    per_user_counter: Dict[int, Counter[str]] = defaultdict(Counter)
+    overall_counter: Counter[str] = Counter()
+
+    for row in query_rows:
+        user_id = int(row["user_id"])
+        content = str(row["content"] or "").strip()
+        if not content:
+            continue
+        detected = detect_issues(content) or {}
+        primary = str(detected.get("primary") or "unknown").strip().lower() or "unknown"
+        per_user_counter[user_id][primary] += 1
+        overall_counter[primary] += 1
+
+    per_user_payload: Dict[int, Dict[str, Any]] = {}
+    for row in user_rows:
+        user_id = int(row["id"])
+        counts = per_user_counter.get(user_id, Counter())
+        top_category, top_count = counts.most_common(1)[0] if counts else ("unknown", 0)
+        per_user_payload[user_id] = {
+            "top_category": top_category,
+            "top_category_label": _humanize_query_category(top_category),
+            "top_category_count": int(top_count),
+            "query_count": int(sum(counts.values())),
+            "category_breakdown": [
+                {
+                    "category": category,
+                    "label": _humanize_query_category(category),
+                    "count": int(count),
+                }
+                for category, count in counts.most_common(5)
+            ],
+        }
+
+    overall_payload = [
+        {
+            "category": category,
+            "label": _humanize_query_category(category),
+            "count": int(count),
+        }
+        for category, count in overall_counter.most_common(5)
+    ]
+
+    return {
+        "overall": overall_payload,
+        "total_queries": int(sum(overall_counter.values())),
+        "users_with_queries": int(sum(1 for item in per_user_payload.values() if item["query_count"] > 0)),
+        "per_user": per_user_payload,
+    }
 
     # Ensure Part headings start on their own line even if the model emits inline prose.
     heading_token = r"(?:\*\*)?Part\s*[1-6]\s*-\s*(?:Facts|Issue|Rule|Application|Conclusion|Disclaimer)(?:\*\*)?"
@@ -3697,16 +3757,37 @@ def admin_access_requests(authorization: Optional[str] = Header(default=None)) -
             LIMIT 500
             """
         ).fetchall()
+        query_rows = conn.execute(
+            """
+            SELECT user_id, content
+            FROM chat_messages
+            WHERE role = 'user'
+            ORDER BY id DESC
+            LIMIT 5000
+            """
+        ).fetchall()
 
     users_payload = []
+    query_category_summary = _build_query_category_summary(user_rows, query_rows)
     for row in user_rows:
         item = dict(row)
+        user_query_summary = query_category_summary["per_user"].get(int(item["id"]), {})
         item["access_granted"] = bool(item.get("access_granted"))
         item["has_password"] = bool(item.get("has_password"))
+        item["top_query_category"] = user_query_summary.get("top_category", "unknown")
+        item["top_query_category_label"] = user_query_summary.get("top_category_label", "General / Unclear")
+        item["top_query_category_count"] = int(user_query_summary.get("top_category_count", 0))
+        item["query_count"] = int(user_query_summary.get("query_count", 0))
+        item["query_category_breakdown"] = user_query_summary.get("category_breakdown", [])
         users_payload.append(item)
 
     requests_payload = [dict(row) for row in request_rows]
-    return AdminAccessListResponse(ok=True, users=users_payload, requests=requests_payload)
+    return AdminAccessListResponse(
+        ok=True,
+        users=users_payload,
+        requests=requests_payload,
+        query_category_summary=query_category_summary,
+    )
 
 
 @app.get("/admin/monitoring/access-events", response_model=AdminAccessMonitoringResponse)

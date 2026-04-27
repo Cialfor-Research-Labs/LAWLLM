@@ -13,6 +13,23 @@ interface AdminUser {
   created_at: string;
   updated_at: string;
   has_password?: boolean;
+  top_query_category?: string;
+  top_query_category_label?: string;
+  top_query_category_count?: number;
+  query_count?: number;
+  query_category_breakdown?: QueryCategoryCount[];
+}
+
+interface QueryCategoryCount {
+  category: string;
+  label: string;
+  count: number;
+}
+
+interface QueryCategorySummary {
+  overall: QueryCategoryCount[];
+  total_queries: number;
+  users_with_queries: number;
 }
 
 interface AdminRequestAudit {
@@ -33,6 +50,7 @@ interface AdminAccessResponse {
   ok: boolean;
   users: AdminUser[];
   requests: AdminRequestAudit[];
+  query_category_summary?: QueryCategorySummary;
 }
 
 interface RowDraft {
@@ -182,6 +200,11 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
   const [monitoringLoading, setMonitoringLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [queryCategorySummary, setQueryCategorySummary] = useState<QueryCategorySummary>({
+    overall: [],
+    total_queries: 0,
+    users_with_queries: 0,
+  });
 
   const headers = useMemo(
     () => ({
@@ -202,6 +225,13 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
       const data: AdminAccessResponse = await res.json();
       setUsers(data.users || []);
       setRequests(data.requests || []);
+      setQueryCategorySummary(
+        data.query_category_summary || {
+          overall: [],
+          total_queries: 0,
+          users_with_queries: 0,
+        },
+      );
       const nextDrafts: Record<number, RowDraft> = {};
       for (const u of data.users || []) {
         nextDrafts[u.id] = {
@@ -419,14 +449,61 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
         </div>
 
         {activeView === 'user_management' && (
-          <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
-            <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">User management ({users.length})</div>
-            <div className="overflow-x-auto">
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Most common overall</div>
+                <div className="mt-3 text-lg font-semibold text-on-surface">
+                  {queryCategorySummary.overall[0]?.label || 'No query data yet'}
+                </div>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  {queryCategorySummary.overall[0]
+                    ? `${queryCategorySummary.overall[0].count} user messages classified into the top category.`
+                    : 'This will populate as users submit chat queries.'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Total classified queries</div>
+                <div className="mt-3 text-3xl font-semibold text-primary">{queryCategorySummary.total_queries}</div>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Based on stored user chat messages.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-on-surface-variant">Users with query history</div>
+                <div className="mt-3 text-3xl font-semibold text-secondary">{queryCategorySummary.users_with_queries}</div>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Per-user category trends are shown below.
+                </p>
+              </div>
+            </div>
+
+            {queryCategorySummary.overall.length > 0 && (
+              <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                <div className="text-sm font-semibold text-on-surface">Top query categories across users</div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {queryCategorySummary.overall.map((item) => (
+                    <div
+                      key={item.category}
+                      className="rounded-xl border border-outline-variant/20 bg-surface-container-low px-4 py-3"
+                    >
+                      <div className="text-sm font-semibold text-on-surface">{item.label}</div>
+                      <div className="mt-1 text-xs text-on-surface-variant">{item.count} queries</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+              <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">User management ({users.length})</div>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-surface-container-low">
                   <tr className="text-left text-on-surface-variant">
                     <th className="px-4 py-3">User</th>
                     <th className="px-4 py-3">Organization</th>
+                    <th className="px-4 py-3">Common query</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Access</th>
                     <th className="px-4 py-3">Notes</th>
@@ -446,6 +523,18 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
                         <td className="px-4 py-3 text-xs text-on-surface-variant">
                           <div>{u.organization || '-'}</div>
                           <div className="mt-1">{u.use_case || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-on-surface-variant">
+                          {u.query_count ? (
+                            <div>
+                              <div className="font-semibold text-on-surface">{u.top_query_category_label || 'General / Unclear'}</div>
+                              <div className="mt-1">
+                                {u.top_query_category_count || 0} of {u.query_count} queries
+                              </div>
+                            </div>
+                          ) : (
+                            <div>-</div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <select
@@ -508,7 +597,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
                   })}
                   {!loading && users.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-on-surface-variant">
                         No user requests yet.
                       </td>
                     </tr>
@@ -516,6 +605,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         )}
 
