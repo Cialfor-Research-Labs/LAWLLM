@@ -379,6 +379,7 @@ class AdminAccessListResponse(BaseModel):
     users: List[Dict[str, Any]]
     requests: List[Dict[str, Any]]
     query_category_summary: Dict[str, Any] = Field(default_factory=dict)
+    recent_queries: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AdminAccessUpdateResponse(BaseModel):
@@ -3402,6 +3403,14 @@ def _humanize_query_category(category: str) -> str:
 def _build_query_category_summary(user_rows: Sequence[AuthRow], query_rows: Sequence[AuthRow]) -> Dict[str, Any]:
     per_user_counter: Dict[int, Counter[str]] = defaultdict(Counter)
     overall_counter: Counter[str] = Counter()
+    user_lookup: Dict[int, Dict[str, str]] = {
+        int(row["id"]): {
+            "name": str(row["name"] or "").strip(),
+            "email": str(row["email"] or "").strip(),
+        }
+        for row in user_rows
+    }
+    recent_queries: List[Dict[str, Any]] = []
 
     for row in query_rows:
         user_id = int(row["user_id"])
@@ -3412,6 +3421,20 @@ def _build_query_category_summary(user_rows: Sequence[AuthRow], query_rows: Sequ
         primary = str(detected.get("primary") or "unknown").strip().lower() or "unknown"
         per_user_counter[user_id][primary] += 1
         overall_counter[primary] += 1
+        if len(recent_queries) < 100:
+            user_meta = user_lookup.get(user_id, {})
+            recent_queries.append(
+                {
+                    "user_id": user_id,
+                    "user_name": user_meta.get("name", ""),
+                    "user_email": user_meta.get("email", ""),
+                    "session_id": str(row["session_id"] or "").strip(),
+                    "content": content,
+                    "created_at": str(row["created_at"] or ""),
+                    "category": primary,
+                    "label": _humanize_query_category(primary),
+                }
+            )
 
     per_user_payload: Dict[int, Dict[str, Any]] = {}
     for row in user_rows:
@@ -3447,6 +3470,7 @@ def _build_query_category_summary(user_rows: Sequence[AuthRow], query_rows: Sequ
         "total_queries": int(sum(overall_counter.values())),
         "users_with_queries": int(sum(1 for item in per_user_payload.values() if item["query_count"] > 0)),
         "per_user": per_user_payload,
+        "recent_queries": recent_queries,
     }
 
     # Ensure Part headings start on their own line even if the model emits inline prose.
@@ -3948,7 +3972,7 @@ def admin_access_requests(authorization: Optional[str] = Header(default=None)) -
         ).fetchall()
         query_rows = conn.execute(
             """
-            SELECT user_id, content
+            SELECT user_id, session_id, content, created_at
             FROM chat_messages
             WHERE role = 'user'
             ORDER BY id DESC
@@ -3976,6 +4000,7 @@ def admin_access_requests(authorization: Optional[str] = Header(default=None)) -
         users=users_payload,
         requests=requests_payload,
         query_category_summary=query_category_summary,
+        recent_queries=query_category_summary.get("recent_queries", []),
     )
 
 

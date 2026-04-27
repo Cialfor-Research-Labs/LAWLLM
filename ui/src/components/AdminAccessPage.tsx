@@ -32,6 +32,17 @@ interface QueryCategorySummary {
   users_with_queries: number;
 }
 
+interface AdminQueryInsight {
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  session_id?: string;
+  content: string;
+  created_at: string;
+  category: string;
+  label: string;
+}
+
 interface AdminRequestAudit {
   id: number;
   user_id: number;
@@ -51,6 +62,7 @@ interface AdminAccessResponse {
   users: AdminUser[];
   requests: AdminRequestAudit[];
   query_category_summary?: QueryCategorySummary;
+  recent_queries?: AdminQueryInsight[];
 }
 
 interface RowDraft {
@@ -205,6 +217,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
     total_queries: 0,
     users_with_queries: 0,
   });
+  const [recentQueries, setRecentQueries] = useState<AdminQueryInsight[]>([]);
 
   const headers = useMemo(
     () => ({
@@ -232,6 +245,7 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
           users_with_queries: 0,
         },
       );
+      setRecentQueries(data.recent_queries || []);
       const nextDrafts: Record<number, RowDraft> = {};
       for (const u of data.users || []) {
         nextDrafts[u.id] = {
@@ -494,6 +508,55 @@ export const AdminAccessPage = ({ apiBase, authToken }: { apiBase: string; authT
                 </div>
               </div>
             )}
+
+            <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
+              <div className="border-b border-outline-variant/10 px-4 py-3">
+                <div className="text-sm font-semibold text-on-surface">Recent user queries</div>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  See what users are asking, who asked it, and how the system classified it.
+                </p>
+              </div>
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-surface-container-low">
+                    <tr className="text-left text-on-surface-variant">
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Query</th>
+                      <th className="px-4 py-3">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentQueries.map((query, index) => (
+                      <tr key={`${query.user_id}-${query.session_id || 'session'}-${index}`} className="border-t border-outline-variant/10 align-top">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-on-surface">{query.user_name || `User ${query.user_id}`}</div>
+                          <div className="text-xs text-on-surface-variant">{query.user_email || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="inline-flex rounded-full bg-surface-container-low px-3 py-1 text-xs font-semibold text-on-surface">
+                            {query.label}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs leading-5 text-on-surface-variant">
+                          <div className="max-w-3xl whitespace-pre-wrap">{query.content}</div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-on-surface-variant whitespace-nowrap">
+                          {formatTimestamp(query.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                    {!loading && recentQueries.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                          No stored user queries yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
             <div className="overflow-hidden rounded-2xl border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
               <div className="border-b border-outline-variant/10 px-4 py-3 font-semibold text-sm text-on-surface">User management ({users.length})</div>
