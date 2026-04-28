@@ -759,6 +759,20 @@ function formatInterviewResponseClean(data: InterviewChatResponse) {
         out.evidence_checklist.forEach((item) => lines.push(`- [ ] ${item}`));
     }
 
+    const ragDebug = data.state_debug?.rag as { citations?: unknown[] } | undefined;
+    const ragCitations = Array.isArray(ragDebug?.citations) ? ragDebug.citations : [];
+    if (data.is_complete && ragCitations.length > 0) {
+        lines.push('');
+        lines.push('**Retrieved Sources**');
+        ragCitations.slice(0, 5).forEach((raw) => {
+            const citation = raw as Record<string, unknown>;
+            const title = String(citation.title || citation.source || citation.document || 'Retrieved legal source');
+            const section = citation.section_number ? `Section ${String(citation.section_number)}` : '';
+            const corpus = citation.corpus ? String(citation.corpus) : '';
+            lines.push(`- ${[title, section, corpus].filter(Boolean).join(' | ')}`);
+        });
+    }
+
     if (data.questions.length > 0 && !data.is_complete) {
         lines.push('');
         lines.push('**Questions to answer:**');

@@ -1780,6 +1780,7 @@ def _fresh_interview_session_state() -> Dict[str, Any]:
         "facts": {},
         "asked_questions": [],
         "asked_gap_questions": [],
+        "user_turns": [],
         "case_model": None,
         "signals": {},
         "pending_confirmation": None,
@@ -3069,6 +3070,278 @@ def _generate_lawyer_final_analysis(
             for block in context_blocks[:6]
         ],
     }
+
+
+INTERVIEW_ISSUE_DOMAIN_MAP = {
+    "wage_dispute": "labour",
+    "termination_dispute": "labour",
+    "consumer_dispute": "consumer",
+    "builder_delay": "consumer",
+    "rent_dispute": "property",
+    "eviction_issue": "property",
+    "ownership_dispute": "property",
+    "property_fraud": "property",
+    "contract_dispute": "contract",
+    "cheque_bounce": "contract",
+    "fraud": "criminal",
+    "criminal_complaint": "criminal",
+    "harassment": "criminal",
+    "defamation": "criminal",
+    "account_hacking": "criminal",
+    "online_fraud": "criminal",
+    "identity_theft": "criminal",
+    "data_breach": "criminal",
+    "harassment_cyber": "criminal",
+}
+
+CASE_MODEL_DOMAIN_MAP = {
+    "cyber": "criminal",
+    "employment": "labour",
+    "financial": "contract",
+    "consumer": "consumer",
+    "property": "property",
+    "contract": "contract",
+}
+
+
+def _interview_retrieval_domain(issue: str, case_obj: CaseModel) -> str:
+    case_domain = str(case_obj.domain or "").strip().lower()
+    if case_domain in CASE_MODEL_DOMAIN_MAP:
+        return CASE_MODEL_DOMAIN_MAP[case_domain]
+    return INTERVIEW_ISSUE_DOMAIN_MAP.get(str(issue or "").strip().lower(), "general")
+
+
+def _build_interview_case_text(
+    *,
+    issue: str,
+    active_issues: Sequence[str],
+    case_obj: CaseModel,
+    facts: Dict[str, Any],
+    user_turns: Sequence[str],
+) -> str:
+    lines = [
+        f"Primary issue: {str(issue or 'unknown').replace('_', ' ')}",
+        f"Related issues: {', '.join(str(i).replace('_', ' ') for i in active_issues if i) or 'none'}",
+    ]
+
+    if user_turns:
+        lines.append("User narrative:")
+        for turn in user_turns[-8:]:
+            cleaned = " ".join(str(turn or "").split()).strip()
+            if cleaned:
+                lines.append(f"- {cleaned}")
+
+    if facts:
+        lines.append("Extracted facts:")
+        for key, value in list(facts.items())[:12]:
+            if value is not None and str(value).strip() != "":
+                lines.append(f"- {str(key).replace('_', ' ')}: {value}")
+
+    if case_obj.detected_relationship:
+        lines.append(f"Detected relationship: {case_obj.detected_relationship}")
+
+    if case_obj.events:
+        lines.append("Timeline/events:")
+        for event in case_obj.events[:10]:
+            parts = [
+                f"event {event.sequence}",
+                event.action,
+                event.description,
+            ]
+            if event.timestamp:
+                parts.append(f"date/time: {event.timestamp}")
+            if event.location:
+                parts.append(f"location: {event.location}")
+            lines.append("- " + " | ".join(str(part) for part in parts if part))
+
+    if case_obj.financials:
+        lines.append("Financials:")
+        for item in case_obj.financials[:5]:
+            lines.append(f"- {item.currency} {item.amount}: {item.context} ({item.status})")
+
+    if case_obj.documents:
+        lines.append("Documents/evidence:")
+        for doc in case_obj.documents[:8]:
+            lines.append(f"- {doc.type}: {doc.description} ({doc.status})")
+
+    if case_obj.meta.intents or case_obj.meta.claims:
+        lines.append("Intent/claims:")
+        for item in list(case_obj.meta.intents + case_obj.meta.claims)[:8]:
+            cleaned = " ".join(str(item or "").split()).strip()
+            if cleaned:
+                lines.append(f"- {cleaned}")
+
+    return "\n".join(lines).strip()
+
+
+def _law_focus_from_law_engine(laws_response: Any) -> Dict[str, List[str]]:
+    laws: List[str] = []
+    for item in getattr(laws_response, "applicable_laws", []) or []:
+        law = _display_law_name(str(getattr(item, "law", "") or ""))
+        if law and law not in laws:
+            laws.append(law)
+    return {
+        "relevant_laws": laws[:6],
+        "preferred_laws": laws[:3],
+        "disallowed_law_hints": [],
+    }
+
+
+def _generate_interview_rag_answer(
+    *,
+    case_text: str,
+    issue: str,
+    active_issues: Sequence[str],
+    facts: Dict[str, Any],
+    context_blocks: List[Dict[str, Any]],
+    existing_analysis: str,
+    model_name: str,
+    timeout_sec: int = 45,
+) -> str:
+    context_text = build_context_text(context_blocks)
+    authority_summary = build_authority_summary(context_blocks)
+    if authority_summary:
+        context_text = f"{authority_summary}\n\n{context_text}".strip()
+
+    prompt = (
+        "You are an Indian legal assistant producing the final answer after a structured interview.\n"
+        "Use the retrieved legal context below as the authority base. Do not cite or rely on laws that are not in the retrieved context.\n"
+        "If retrieval is incomplete, say what is uncertain instead of inventing sections.\n"
+        "Return a concise professional assessment in markdown with these headings:\n"
+        "Facts, Legal Issues, Applicable Law, Application, Remedies / Next Steps, Remaining Gaps.\n\n"
+        f"Interview issue: {issue}\n"
+        f"Related issues: {json.dumps(list(active_issues), ensure_ascii=False)}\n"
+        f"Extracted facts: {json.dumps(facts, ensure_ascii=False, default=str)}\n"
+        f"Interview case narrative:\n{case_text}\n\n"
+        f"Existing non-RAG draft, for factual orientation only:\n{existing_analysis}\n\n"
+        f"Retrieved legal context:\n{context_text}\n"
+    )
+    answer = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec, max_tokens=2200)
+    if _is_legal_advice_refusal(answer):
+        answer = call_llm(
+            model_name=model_name,
+            prompt=(
+                f"{prompt}\n\n"
+                "Do not refuse. Provide general legal information grounded only in the retrieved Indian legal context."
+            ),
+            timeout_sec=timeout_sec,
+            max_tokens=2200,
+        )
+    if not answer or str(answer).startswith("[ERROR]"):
+        return existing_analysis
+    return str(answer).strip()
+
+
+def _apply_interview_rag_final_answer(
+    *,
+    session: Dict[str, Any],
+    issue: str,
+    active_issues: Sequence[str],
+    case_obj: CaseModel,
+    laws_response: Any,
+    output_data: Dict[str, Any],
+    model_name: str,
+) -> Dict[str, Any]:
+    case_text = _build_interview_case_text(
+        issue=issue,
+        active_issues=active_issues,
+        case_obj=case_obj,
+        facts=session.get("facts", {}),
+        user_turns=session.get("user_turns", []),
+    )
+    domain = _interview_retrieval_domain(issue, case_obj)
+    structured_query = {
+        "domain": domain,
+        "intent": "legal_query",
+        "facts": [
+            line[2:] for line in case_text.splitlines()
+            if line.startswith("- ") and len(line) > 2
+        ][:8],
+    }
+    law_focus = _law_focus_from_law_engine(laws_response)
+    retrieval_seed = case_text or str(issue or "")
+    dense_query = build_query(retrieval_seed).expanded_query
+    retrieval_queries = generate_retrieval_queries(
+        user_query=retrieval_seed,
+        structured_query=structured_query,
+        dense_query=dense_query,
+        rewritten_query=retrieval_seed,
+        model_name=model_name,
+        timeout_sec=20,
+    )
+    intent_route = build_intent_route(retrieval_seed, forced_domain=domain)
+    retrieval_args = SimpleNamespace(
+        q=retrieval_seed,
+        mode="understand_case",
+        corpus="all" if USE_JUDGEMENT_EMBEDDINGS else "acts",
+        top_k=6,
+        dense_k=20,
+        bm25_k=20,
+        dense_weight=0.7,
+        bm25_weight=0.3,
+        rerank=True,
+        rerank_top_n=20,
+        rerank_model="cross-encoder/ms-marco-MiniLM-L-2-v2",
+        rerank_batch_size=16,
+        domain_filter=domain if domain == "criminal" else None,
+        legal_domain=domain,
+        act_filter=None,
+        section_filter=None,
+        era_filter=_infer_era_filter(retrieval_seed, structured_query),
+        intent_route=intent_route,
+        relevant_laws=law_focus.get("relevant_laws", []),
+        preferred_laws=law_focus.get("preferred_laws", []),
+        disallowed_law_hints=law_focus.get("disallowed_law_hints", []),
+    )
+
+    results, retrieval_debug = retrieve_for_queries(retrieval_queries, retrieval_args, allowed_docs=DEFAULT_ALLOWED_DOCS)
+    if not _query_mentions_specific_state(retrieval_seed):
+        results = _filter_state_specific_results(retrieval_seed, results)
+    if not results:
+        fallback_results, fallback_debug = retrieve_with_keyword_fallback(
+            user_query=retrieval_seed,
+            base_args=retrieval_args,
+            allowed_docs=DEFAULT_ALLOWED_DOCS,
+        )
+        if fallback_results:
+            results = fallback_results
+            retrieval_debug["keyword_fallback"] = fallback_debug
+
+    acts_lookup = load_acts_chunk_lookup("JSON_acts")
+    pack = build_context_pack(query=retrieval_seed, results=results, acts_lookup=acts_lookup, max_chars=12000)
+    context_blocks = pack.get("context_blocks", [])
+    rag_debug = {
+        "enabled": True,
+        "domain": domain,
+        "queries": retrieval_queries,
+        "retrieval": retrieval_debug,
+        "citations": pack.get("citations", []),
+        "context_count": len(context_blocks),
+    }
+    if not context_blocks:
+        rag_debug["answer_grounded"] = False
+        return {"output_data": output_data, "rag_debug": rag_debug}
+
+    output_data = dict(output_data)
+    output_data["analysis"] = _generate_interview_rag_answer(
+        case_text=case_text,
+        issue=issue,
+        active_issues=active_issues,
+        facts=session.get("facts", {}),
+        context_blocks=context_blocks,
+        existing_analysis=str(output_data.get("analysis") or ""),
+        model_name=model_name,
+    )
+    retrieved_laws = _extract_applicable_law_lines(
+        context_blocks,
+        fallback_laws=output_data.get("applicable_laws", []),
+    )
+    if retrieved_laws:
+        output_data["applicable_laws"] = retrieved_laws
+    output_data["summary"] = "RAG-grounded case assessment generated."
+    output_data["confidence"] = max(float(output_data.get("confidence", 0.0) or 0.0), 0.75)
+    rag_debug["answer_grounded"] = True
+    return {"output_data": output_data, "rag_debug": rag_debug}
 
 
 def append_query_log(entry: Dict[str, Any]) -> None:
@@ -4955,6 +5228,7 @@ def interview_chat(
         session.setdefault("facts", {})
         session.setdefault("signals", {})
         session.setdefault("asked_questions", [])
+        session.setdefault("user_turns", [])
         session.setdefault("interview_turns", 0)
         session.setdefault("stagnant_turns", 0)
         session.setdefault("pending_confirmation_retries", 0)
@@ -4963,6 +5237,7 @@ def interview_chat(
         session.setdefault("asked_gap_questions", [])
         session.setdefault("asked_contradiction_codes", [])
         session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
+        session["user_turns"] = (session.get("user_turns", []) + [payload.query])[-12:]
 
         fact_progress = False
         case_model_changed = False
@@ -5282,7 +5557,27 @@ def interview_chat(
         
         # 7. Generate Output
         output_data = generate_legal_output(issue, subtype, session["facts"], is_complete, payload.llm_model)
-        output_data["confidence"] = strength 
+        interview_rag_debug: Dict[str, Any] = {"enabled": False}
+        if is_complete:
+            try:
+                rag_payload = _apply_interview_rag_final_answer(
+                    session=session,
+                    issue=issue,
+                    active_issues=active_issues,
+                    case_obj=case_obj,
+                    laws_response=laws_response,
+                    output_data=output_data,
+                    model_name=payload.llm_model,
+                )
+                output_data = rag_payload["output_data"]
+                interview_rag_debug = rag_payload["rag_debug"]
+            except Exception as rag_exc:
+                interview_rag_debug = {
+                    "enabled": True,
+                    "answer_grounded": False,
+                    "error": str(rag_exc),
+                }
+        output_data["confidence"] = max(float(output_data.get("confidence", 0.0) or 0.0), strength)
         legal_output = LegalOutput(**output_data)
 
         should_review_case_model = (
@@ -5357,6 +5652,7 @@ def interview_chat(
                 "contradiction_penalty": contradiction_penalty,
                 "last_top_law": session.get("last_top_law"),
                 "dashboard_summary": dashboard_summary,
+                "rag": interview_rag_debug,
             }
         )
         _record_chat_turn(
