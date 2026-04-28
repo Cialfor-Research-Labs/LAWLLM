@@ -10,9 +10,14 @@ import {
   Sparkles, 
   User, 
   FileText, 
-  TrendingUp 
+  TrendingUp,
+  ArrowUpIcon,
+  Paperclip,
+  PlusIcon
 } from 'lucide-react';
 import type { GeneratorPrefillPayload } from '../types/generatorPrefill';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -1547,9 +1552,9 @@ export const LegalChat = ({
 
             <div className="border-t border-outline-variant/70 bg-surface-variant px-4 py-5 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto max-w-6xl">
-                    <div className="rounded-[2rem] border border-outline-variant/60 bg-surface p-4 shadow-sm">
-                        <div className="relative rounded-3xl border border-outline-variant/50 bg-surface-container-low px-5 py-4">
-                            <textarea
+                    <div className="relative rounded-xl border border-neutral-800 bg-neutral-900 p-2 shadow-sm">
+                        <div className="overflow-y-auto">
+                            <Textarea
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => {
@@ -1564,16 +1569,53 @@ export const LegalChat = ({
                                         : "Describe the matter fully. If anything important is missing, I will ask the next needed question..."
                                 }
                                 disabled={isLoading}
-                                className="h-24 w-full resize-none bg-transparent pr-20 text-base text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none disabled:opacity-70"
+                                className={cn(
+                                    "min-h-[72px] w-full resize-none border-none bg-transparent px-4 py-3 pr-20 text-sm text-white focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                                    "placeholder:text-neutral-500 disabled:opacity-70"
+                                )}
+                                style={{ overflow: 'hidden' }}
                             />
-                            <button
-                                type="button"
-                                onClick={() => handleSend()}
-                                disabled={isLoading || !input.trim()}
-                                className="absolute bottom-2 right-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#8CCFBF] text-white transition hover:brightness-95 disabled:opacity-60"
-                            >
-                                <Send size={22} />
-                            </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-2">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="group flex items-center gap-1 rounded-lg p-2 transition-colors hover:bg-neutral-800"
+                                >
+                                    <Paperclip className="h-4 w-4 text-white" />
+                                    <span className="hidden text-xs text-zinc-400 transition-opacity group-hover:inline">
+                                        Attach
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="flex items-center justify-between gap-1 rounded-lg border border-dashed border-zinc-700 px-2 py-1 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:bg-zinc-800"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
+                                    Project
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSend()}
+                                    disabled={isLoading || !input.trim()}
+                                    className={cn(
+                                        "flex items-center justify-between gap-1 rounded-lg border border-zinc-700 px-1.5 py-1.5 text-sm transition-colors hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-60",
+                                        input.trim() ? "bg-white text-black" : "text-zinc-400"
+                                    )}
+                                >
+                                    <ArrowUpIcon
+                                        className={cn(
+                                            "h-4 w-4",
+                                            input.trim() ? "text-black" : "text-zinc-400"
+                                        )}
+                                    />
+                                    <span className="sr-only">Send</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
