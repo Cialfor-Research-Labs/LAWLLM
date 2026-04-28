@@ -110,10 +110,10 @@
   --app-color-on-primary: #082018;
   --app-color-on-primary-container: #e8f5f0;
 
-  --app-color-secondary: #d7e6ff;
-  --app-color-secondary-container: rgba(93, 202, 165, 0.14);
-  --app-color-on-secondary: #10263d;
-  --app-color-on-secondary-container: #dff8ef;
+  --app-color-secondary: #4a3f86;
+  --app-color-secondary-container: #2d2552;
+  --app-color-on-secondary: #f2edff;
+  --app-color-on-secondary-container: #ddd3ff;
 
   --app-color-surface: #0f2720;
   --app-color-on-surface: #e8f5f0;
