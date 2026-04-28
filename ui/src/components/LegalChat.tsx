@@ -1029,7 +1029,7 @@ export const LegalChat = ({
                 <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
                     <div className="max-w-3xl">
                         <p className="section-kicker">Intelligent interviewer</p>
-                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We will structure the legal facts.</h2>
+                        <h2 className="mt-1 text-3xl font-semibold text-on-surface">Describe the issue. We will structure the legal facts.</h2>
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
