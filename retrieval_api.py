@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import traceback
 import uuid
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple
@@ -69,6 +70,8 @@ from phase65_engine import (
 
 app = FastAPI(title="Legal AI API", version="2.5")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -79,7 +82,7 @@ app.add_middleware(
 
 # 🧠 Session Storage
 SESSIONS: Dict[str, List[Dict[str, str]]] = {}
-LOG_PATH = os.path.join("logs", "query_logs.json")
+LOG_PATH = os.path.join(BASE_DIR, "logs", "query_logs.json")
 DISABLE_EMBEDDING_RETRIEVAL = os.getenv("DISABLE_EMBEDDING_RETRIEVAL", "true").strip().lower() == "true"
 USE_JUDGEMENT_EMBEDDINGS = os.getenv("USE_JUDGEMENT_EMBEDDINGS", "true").strip().lower() == "true"
 # PHASE 1: Score thresholds disabled — no chunk is rejected due to score.
@@ -89,10 +92,15 @@ MAX_RETRIEVAL_QUERIES = int(os.getenv("MAX_RETRIEVAL_QUERIES", "5"))
 DEFAULT_ALLOWED_DOCS = {"acts", "judgements"}
 LAWYER_SESSIONS: Dict[str, Dict[str, Any]] = {}
 INTERVIEW_SESSIONS: Dict[str, Dict[str, Any]] = {}
-INTERACTION_LOG_PATH = os.path.join("test", "interaction_logs.jsonl")
+INTERACTION_LOG_PATH = os.path.join(BASE_DIR, "test", "interaction_logs.jsonl")
 MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
 MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
 MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
+MAX_PENDING_SIGNAL_RETRIES = int(os.getenv("MAX_PENDING_SIGNAL_RETRIES", "1"))
+LEGAL_GUARDRAIL_RESPONSE = (
+    "I can only assist with Indian legal queries such as laws, cases, legal documents, "
+    "notices, complaints, disputes, and legal concepts. Please ask a question related to Indian law."
+)
 
 # Auth / Access control settings
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
@@ -100,7 +108,7 @@ PASSWORD_SETUP_TOKEN_TTL_HOURS = int(os.getenv("PASSWORD_SETUP_TOKEN_TTL_HOURS",
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
 PASSWORD_HASH_ITERATIONS = 120_000
 MAILER_NODE_BIN = os.getenv("MAILER_NODE_BIN", "node")
-MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join("ui", "scripts", "send_setup_email.cjs"))
+MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join(BASE_DIR, "ui", "scripts", "send_setup_email.cjs"))
 CHAT_HISTORY_PROMPT_LIMIT = int(os.getenv("CHAT_HISTORY_PROMPT_LIMIT", "24"))
 CHAT_HISTORY_DETAIL_LIMIT = int(os.getenv("CHAT_HISTORY_DETAIL_LIMIT", "200"))
 CHAT_HISTORY_LIST_LIMIT = int(os.getenv("CHAT_HISTORY_LIST_LIMIT", "50"))
@@ -117,7 +125,7 @@ def _load_dotenv_cache() -> Dict[str, str]:
         return _DOTENV_CACHE
 
     parsed: Dict[str, str] = {}
-    env_path = ".env"
+    env_path = os.path.join(BASE_DIR, ".env")
     if os.path.exists(env_path):
         try:
             with open(env_path, "r", encoding="utf-8") as fh:
@@ -375,6 +383,8 @@ class AdminAccessListResponse(BaseModel):
     ok: bool
     users: List[Dict[str, Any]]
     requests: List[Dict[str, Any]]
+    query_category_summary: Dict[str, Any] = Field(default_factory=dict)
+    recent_queries: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AdminAccessUpdateResponse(BaseModel):
@@ -501,7 +511,7 @@ class InterviewChatResponse(BaseModel):
     issue: str
     secondary_issues: List[str] = []
     confidence: float
-    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required"
+    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required", "out_of_scope"
     is_complete: bool
     questions: List[str]
     legal_output: Optional[LegalOutput] = None
@@ -527,8 +537,10 @@ def _utc_iso_days_ago(days: int) -> str:
 AuthRow = Mapping[str, Any]
 
 
-def _translate_auth_sql(query: str) -> str:
-    return query.replace("?", "%s")
+def _translate_auth_sql(query: str, backend: str) -> str:
+    if backend == "postgres":
+        return query.replace("?", "%s")
+    return query
 
 
 class _AuthCursor:
@@ -558,8 +570,9 @@ class _AuthCursorResult:
 
 
 class _AuthConnection:
-    def __init__(self, conn: Any) -> None:
+    def __init__(self, conn: Any, backend: str) -> None:
         self._conn = conn
+        self.backend = backend
 
     def __enter__(self) -> "_AuthConnection":
         self._conn.__enter__()
@@ -569,23 +582,41 @@ class _AuthConnection:
         return bool(self._conn.__exit__(exc_type, exc, tb))
 
     def execute(self, query: str, params: Sequence[Any] = ()) -> _AuthCursor:
-        return _AuthCursor(self._conn.execute(_translate_auth_sql(query), params))
+        return _AuthCursor(self._conn.execute(_translate_auth_sql(query, self.backend), params))
 
     def executemany(self, query: str, params_seq: Sequence[Sequence[Any]]) -> _AuthCursor:
-        translated = _translate_auth_sql(query)
-        with self._conn.cursor() as cur:
+        translated = _translate_auth_sql(query, self.backend)
+        if self.backend == "postgres":
+            with self._conn.cursor() as cur:
+                cur.executemany(translated, params_seq)
+                rowcount = int(cur.rowcount or 0)
+            return _AuthCursor(_AuthCursorResult(rowcount))
+
+        cur = self._conn.cursor()
+        try:
             cur.executemany(translated, params_seq)
             rowcount = int(cur.rowcount or 0)
+        finally:
+            cur.close()
         return _AuthCursor(_AuthCursorResult(rowcount))
 
     def commit(self) -> None:
         self._conn.commit()
 
 
+def _get_sqlite_auth_db_path() -> str:
+    raw = (_get_env_with_dotenv_fallback("SQLITE_AUTH_DB_PATH", "auth_access.db") or "auth_access.db").strip()
+    if not raw:
+        raw = "auth_access.db"
+    if os.path.isabs(raw):
+        return raw
+    return os.path.join(BASE_DIR, raw)
+
+
 def _db_conn() -> _AuthConnection:
     dsn = (_get_env_with_dotenv_fallback("AUTH_DB_DSN", "") or "").strip()
     if dsn:
-        return _AuthConnection(psycopg.connect(dsn, row_factory=dict_row))
+        return _AuthConnection(psycopg.connect(dsn, row_factory=dict_row), backend="postgres")
 
     host = (_get_env_with_dotenv_fallback("AUTH_DB_HOST", "") or "").strip()
     port = (_get_env_with_dotenv_fallback("AUTH_DB_PORT", "5432") or "5432").strip()
@@ -593,6 +624,14 @@ def _db_conn() -> _AuthConnection:
     user = (_get_env_with_dotenv_fallback("AUTH_DB_USER", "") or "").strip()
     password = _get_env_with_dotenv_fallback("AUTH_DB_PASSWORD", "")
     sslmode = (_get_env_with_dotenv_fallback("AUTH_DB_SSLMODE", "prefer") or "prefer").strip()
+
+    pg_values = (host, dbname, user, password)
+    if not any(str(value or "").strip() for value in pg_values):
+        sqlite_path = _get_sqlite_auth_db_path()
+        sqlite_conn = sqlite3.connect(sqlite_path)
+        sqlite_conn.row_factory = sqlite3.Row
+        sqlite_conn.execute("PRAGMA foreign_keys = ON")
+        return _AuthConnection(sqlite_conn, backend="sqlite")
 
     missing = [
         key
@@ -606,9 +645,9 @@ def _db_conn() -> _AuthConnection:
     ]
     if missing:
         raise RuntimeError(
-            "Missing PostgreSQL auth DB config. Set AUTH_DB_DSN or "
-            + ", ".join(missing)
-            + "."
+            "Incomplete PostgreSQL auth DB config. Set AUTH_DB_DSN or provide all AUTH_DB_HOST, "
+            "AUTH_DB_NAME, AUTH_DB_USER, and AUTH_DB_PASSWORD values. To use local SQLite for auth, "
+            "leave all AUTH_DB_* values empty and set SQLITE_AUTH_DB_PATH."
         )
 
     return _AuthConnection(
@@ -620,7 +659,8 @@ def _db_conn() -> _AuthConnection:
             password=password,
             sslmode=sslmode,
             row_factory=dict_row,
-        )
+        ),
+        backend="postgres",
     )
 
 
@@ -668,9 +708,14 @@ def _row_to_user_view(row: AuthRow) -> Dict[str, Any]:
     }
 
 
+def _sqlite_column_exists(conn: _AuthConnection, table_name: str, column_name: str) -> bool:
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return any(str(row["name"]) == column_name for row in rows)
+
+
 def _ensure_auth_schema() -> None:
     with _db_conn() as conn:
-        for statement in (
+        postgres_statements = (
             """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -812,8 +857,156 @@ def _ensure_auth_schema() -> None:
             """,
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS advocate_address TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS advocate_mobile TEXT NOT NULL DEFAULT ''",
-        ):
+        )
+        sqlite_statements = (
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                organization TEXT NOT NULL DEFAULT '',
+                use_case TEXT NOT NULL DEFAULT '',
+                advocate_address TEXT NOT NULL DEFAULT '',
+                advocate_mobile TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
+                access_granted INTEGER NOT NULL DEFAULT 0,
+                password_hash TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_single_admin_role
+            ON users(role) WHERE role = 'admin'
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS access_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                organization TEXT NOT NULL DEFAULT '',
+                use_case TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
+                reviewed_by INTEGER,
+                review_notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS password_setup_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                created_by_admin_id INTEGER,
+                created_at TEXT NOT NULL,
+                used_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                revoked INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                revoked_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_message_at TEXT NOT NULL,
+                archived INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_last
+            ON chat_sessions(user_id, last_message_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id
+            ON chat_messages(session_id, id)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS access_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                occurred_at TEXT NOT NULL,
+                ip_address TEXT NOT NULL DEFAULT '',
+                forwarded_for TEXT NOT NULL DEFAULT '',
+                real_ip TEXT NOT NULL DEFAULT '',
+                method TEXT NOT NULL,
+                path TEXT NOT NULL,
+                status_code INTEGER NOT NULL,
+                outcome TEXT NOT NULL CHECK (outcome IN ('success', 'client_error', 'server_error')),
+                user_agent TEXT NOT NULL DEFAULT '',
+                referer TEXT NOT NULL DEFAULT '',
+                origin TEXT NOT NULL DEFAULT '',
+                query_string_present INTEGER NOT NULL DEFAULT 0,
+                user_id INTEGER,
+                user_email TEXT NOT NULL DEFAULT '',
+                user_role TEXT NOT NULL DEFAULT '',
+                session_id INTEGER,
+                is_authenticated INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_occurred_at_desc
+            ON access_events(occurred_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_ip_address
+            ON access_events(ip_address)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_user_id
+            ON access_events(user_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_path
+            ON access_events(path)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_status_occurred
+            ON access_events(status_code, occurred_at DESC)
+            """,
+        )
+
+        for statement in postgres_statements if conn.backend == "postgres" else sqlite_statements:
             conn.execute(statement)
+        if conn.backend == "sqlite":
+            if not _sqlite_column_exists(conn, "users", "advocate_address"):
+                conn.execute("ALTER TABLE users ADD COLUMN advocate_address TEXT NOT NULL DEFAULT ''")
+            if not _sqlite_column_exists(conn, "users", "advocate_mobile"):
+                conn.execute("ALTER TABLE users ADD COLUMN advocate_mobile TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -838,16 +1031,18 @@ def _bootstrap_single_admin() -> None:
         now = _utc_now_iso()
         if not admins:
             password_hash = _hash_password(admin_password) if admin_password else None
-            cur = conn.execute(
+            conn.execute(
                 """
                 INSERT INTO users
                 (name, email, organization, use_case, role, status, access_granted, password_hash, created_at, updated_at)
                 VALUES (?, ?, '', 'Seeded admin account', 'admin', 'granted', TRUE, ?, ?, ?)
-                RETURNING id
                 """,
                 (admin_name, admin_email, password_hash, now, now),
             )
-            admin_row = cur.fetchone()
+            admin_row = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                (admin_email,),
+            ).fetchone()
             if not admin_row:
                 raise RuntimeError("Failed to create seeded admin account.")
             admin_id = int(admin_row["id"])
@@ -1584,16 +1779,145 @@ def _fresh_interview_session_state() -> Dict[str, Any]:
         "active_issues": [],
         "facts": {},
         "asked_questions": [],
+        "asked_gap_questions": [],
+        "user_turns": [],
         "case_model": None,
         "signals": {},
         "pending_confirmation": None,
+        "pending_signal_question": None,
         "contradictions": [],
         "last_top_law": None,
         "interview_turns": 0,
         "stagnant_turns": 0,
         "pending_confirmation_retries": 0,
+        "pending_signal_retries": 0,
         "asked_contradiction_codes": [],
     }
+
+
+def _contains_any(text: str, tokens: Sequence[str]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _build_signal_answer_update(signal_name: str, value: Any, raw_text: str, confidence: float = 0.85) -> Dict[str, Dict[str, Any]]:
+    return {
+        signal_name: {
+            "value": value,
+            "source": "user_signal_answer",
+            "user_confidence": confidence,
+            "confirmed": True,
+            "raw_text": raw_text,
+        }
+    }
+
+
+def _coerce_pending_signal_answer(answer: str, pending_signal: Optional[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Map a direct answer to a previously asked signal-ranking question into signal state."""
+    if not pending_signal:
+        return {}
+
+    signal_name = str(pending_signal.get("signal_name") or "").strip()
+    if not signal_name:
+        return {}
+
+    raw = str(answer or "").strip()
+    low = raw.lower()
+    if not low:
+        return {}
+
+    if signal_name == "payment_type":
+        if _contains_any(low, ["monthly salary", "salary", "wage", "pay slip", "salary slip"]):
+            return _build_signal_answer_update(signal_name, "monthly_salary", raw)
+        if _contains_any(low, ["final settlement", "full and final", "fnf", "gratuity", "after leaving"]):
+            return _build_signal_answer_update(signal_name, "gratuity", raw)
+        if _contains_any(low, ["pf", "provident", "retirement", "uan"]):
+            return _build_signal_answer_update(signal_name, "retirement_benefit", raw)
+        if "bonus" in low or "incentive" in low:
+            return _build_signal_answer_update(signal_name, "bonus", raw)
+        if _contains_any(low, ["something else", "other", "different"]):
+            return _build_signal_answer_update(signal_name, "other", raw, 0.65)
+
+    if signal_name == "employment_end":
+        years_match = re.search(r"(\d+)\s*\+?\s*years?", low)
+        if _contains_any(low, ["still working", "currently employed", "not left", "still employed"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+        if _contains_any(low, ["less than 5", "less than five", "under 5", "under five"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+        if years_match:
+            return _build_signal_answer_update(signal_name, int(years_match.group(1)) >= 5, raw)
+        if _contains_any(low, ["yes", "completed", "more than 5", "more than five", "left", "ended"]):
+            return _build_signal_answer_update(signal_name, True, raw)
+        if _contains_any(low, ["no", "not completed"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+
+    if signal_name == "employer_contribution":
+        if _contains_any(low, ["contribution", "contribute", "not deposited", "did not deposit"]):
+            return _build_signal_answer_update(signal_name, "missing_contribution", raw)
+        if _contains_any(low, ["withdrawal", "withdraw", "claim rejected", "stopped"]):
+            return _build_signal_answer_update(signal_name, "withdrawal_blocked", raw)
+        if "uan" in low:
+            return _build_signal_answer_update(signal_name, "no_uan", raw)
+
+    if signal_name == "access_type":
+        if _contains_any(low, ["phishing", "otp", "one time password"]):
+            return _build_signal_answer_update(signal_name, "phishing_otp", raw)
+        if _contains_any(low, ["link", "malware", "hacked"]):
+            return _build_signal_answer_update(signal_name, "hacked_link", raw)
+        if _contains_any(low, ["former employee", "old login", "ex employee", "partner"]):
+            return _build_signal_answer_update(signal_name, "old_login_misuse", raw)
+
+    for option in pending_signal.get("options") or []:
+        option_text = str(option or "").strip().lower()
+        if option_text and (option_text in low or low in option_text):
+            value = re.sub(r"[^a-z0-9]+", "_", option_text).strip("_") or option_text
+            return _build_signal_answer_update(signal_name, value, raw, 0.75)
+
+    return {}
+
+
+LEGAL_INTERVIEW_ANCHOR_TERMS = {
+    "act", "advocate", "agreement", "arbitration", "bail", "case", "cheating", "claim",
+    "compensation", "complaint", "consumer", "contract", "court", "crime", "criminal",
+    "damages", "defamation", "defect", "defective", "dispute", "employee", "employer",
+    "evict", "eviction", "fir", "fraud", "gratuity", "harassment", "illegal", "injury",
+    "judge", "judgment", "landlord", "law", "lawsuit", "lawyer", "lease", "legal",
+    "liability", "notice", "police", "property", "refund", "rent", "rights", "salary",
+    "section", "sue", "tenant", "termination", "theft", "wages", "warranty",
+}
+
+NON_LEGAL_INTERVIEW_PATTERNS = [
+    r"\bhow\s+to\s+(make|cook|prepare|boil|fry|bake)\b",
+    r"\b(recipe|ingredients|cooking|maggi|noodles|pasta|tea|coffee|snack|dish)\b",
+    r"\b(weather|joke|poem|song|movie|cricket|sports score|horoscope)\b",
+]
+
+
+def _is_clearly_non_legal_interview_query(query: str) -> bool:
+    low = str(query or "").strip().lower()
+    if not low:
+        return False
+    if any(re.search(rf"\b{re.escape(term)}\b", low) for term in LEGAL_INTERVIEW_ANCHOR_TERMS):
+        return False
+    return any(re.search(pattern, low) for pattern in NON_LEGAL_INTERVIEW_PATTERNS)
+
+
+def _build_out_of_scope_interview_response(session_id: str) -> InterviewChatResponse:
+    return InterviewChatResponse(
+        ok=True,
+        session_id=session_id,
+        issue="out_of_scope",
+        secondary_issues=[],
+        confidence=0.0,
+        status="out_of_scope",
+        is_complete=False,
+        questions=[LEGAL_GUARDRAIL_RESPONSE],
+        legal_output=None,
+        case_model=None,
+        behavioral_primitives=[],
+        interpretations=[],
+        applicable_laws=[],
+        state_debug={"guardrail": "non_legal_interview_query"},
+    )
 
 
 def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) -> bool:
@@ -2748,6 +3072,278 @@ def _generate_lawyer_final_analysis(
     }
 
 
+INTERVIEW_ISSUE_DOMAIN_MAP = {
+    "wage_dispute": "labour",
+    "termination_dispute": "labour",
+    "consumer_dispute": "consumer",
+    "builder_delay": "consumer",
+    "rent_dispute": "property",
+    "eviction_issue": "property",
+    "ownership_dispute": "property",
+    "property_fraud": "property",
+    "contract_dispute": "contract",
+    "cheque_bounce": "contract",
+    "fraud": "criminal",
+    "criminal_complaint": "criminal",
+    "harassment": "criminal",
+    "defamation": "criminal",
+    "account_hacking": "criminal",
+    "online_fraud": "criminal",
+    "identity_theft": "criminal",
+    "data_breach": "criminal",
+    "harassment_cyber": "criminal",
+}
+
+CASE_MODEL_DOMAIN_MAP = {
+    "cyber": "criminal",
+    "employment": "labour",
+    "financial": "contract",
+    "consumer": "consumer",
+    "property": "property",
+    "contract": "contract",
+}
+
+
+def _interview_retrieval_domain(issue: str, case_obj: CaseModel) -> str:
+    case_domain = str(case_obj.domain or "").strip().lower()
+    if case_domain in CASE_MODEL_DOMAIN_MAP:
+        return CASE_MODEL_DOMAIN_MAP[case_domain]
+    return INTERVIEW_ISSUE_DOMAIN_MAP.get(str(issue or "").strip().lower(), "general")
+
+
+def _build_interview_case_text(
+    *,
+    issue: str,
+    active_issues: Sequence[str],
+    case_obj: CaseModel,
+    facts: Dict[str, Any],
+    user_turns: Sequence[str],
+) -> str:
+    lines = [
+        f"Primary issue: {str(issue or 'unknown').replace('_', ' ')}",
+        f"Related issues: {', '.join(str(i).replace('_', ' ') for i in active_issues if i) or 'none'}",
+    ]
+
+    if user_turns:
+        lines.append("User narrative:")
+        for turn in user_turns[-8:]:
+            cleaned = " ".join(str(turn or "").split()).strip()
+            if cleaned:
+                lines.append(f"- {cleaned}")
+
+    if facts:
+        lines.append("Extracted facts:")
+        for key, value in list(facts.items())[:12]:
+            if value is not None and str(value).strip() != "":
+                lines.append(f"- {str(key).replace('_', ' ')}: {value}")
+
+    if case_obj.detected_relationship:
+        lines.append(f"Detected relationship: {case_obj.detected_relationship}")
+
+    if case_obj.events:
+        lines.append("Timeline/events:")
+        for event in case_obj.events[:10]:
+            parts = [
+                f"event {event.sequence}",
+                event.action,
+                event.description,
+            ]
+            if event.timestamp:
+                parts.append(f"date/time: {event.timestamp}")
+            if event.location:
+                parts.append(f"location: {event.location}")
+            lines.append("- " + " | ".join(str(part) for part in parts if part))
+
+    if case_obj.financials:
+        lines.append("Financials:")
+        for item in case_obj.financials[:5]:
+            lines.append(f"- {item.currency} {item.amount}: {item.context} ({item.status})")
+
+    if case_obj.documents:
+        lines.append("Documents/evidence:")
+        for doc in case_obj.documents[:8]:
+            lines.append(f"- {doc.type}: {doc.description} ({doc.status})")
+
+    if case_obj.meta.intents or case_obj.meta.claims:
+        lines.append("Intent/claims:")
+        for item in list(case_obj.meta.intents + case_obj.meta.claims)[:8]:
+            cleaned = " ".join(str(item or "").split()).strip()
+            if cleaned:
+                lines.append(f"- {cleaned}")
+
+    return "\n".join(lines).strip()
+
+
+def _law_focus_from_law_engine(laws_response: Any) -> Dict[str, List[str]]:
+    laws: List[str] = []
+    for item in getattr(laws_response, "applicable_laws", []) or []:
+        law = _display_law_name(str(getattr(item, "law", "") or ""))
+        if law and law not in laws:
+            laws.append(law)
+    return {
+        "relevant_laws": laws[:6],
+        "preferred_laws": laws[:3],
+        "disallowed_law_hints": [],
+    }
+
+
+def _generate_interview_rag_answer(
+    *,
+    case_text: str,
+    issue: str,
+    active_issues: Sequence[str],
+    facts: Dict[str, Any],
+    context_blocks: List[Dict[str, Any]],
+    existing_analysis: str,
+    model_name: str,
+    timeout_sec: int = 45,
+) -> str:
+    context_text = build_context_text(context_blocks)
+    authority_summary = build_authority_summary(context_blocks)
+    if authority_summary:
+        context_text = f"{authority_summary}\n\n{context_text}".strip()
+
+    prompt = (
+        "You are an Indian legal assistant producing the final answer after a structured interview.\n"
+        "Use the retrieved legal context below as the authority base. Do not cite or rely on laws that are not in the retrieved context.\n"
+        "If retrieval is incomplete, say what is uncertain instead of inventing sections.\n"
+        "Return a concise professional assessment in markdown with these headings:\n"
+        "Facts, Legal Issues, Applicable Law, Application, Remedies / Next Steps, Remaining Gaps.\n\n"
+        f"Interview issue: {issue}\n"
+        f"Related issues: {json.dumps(list(active_issues), ensure_ascii=False)}\n"
+        f"Extracted facts: {json.dumps(facts, ensure_ascii=False, default=str)}\n"
+        f"Interview case narrative:\n{case_text}\n\n"
+        f"Existing non-RAG draft, for factual orientation only:\n{existing_analysis}\n\n"
+        f"Retrieved legal context:\n{context_text}\n"
+    )
+    answer = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec, max_tokens=2200)
+    if _is_legal_advice_refusal(answer):
+        answer = call_llm(
+            model_name=model_name,
+            prompt=(
+                f"{prompt}\n\n"
+                "Do not refuse. Provide general legal information grounded only in the retrieved Indian legal context."
+            ),
+            timeout_sec=timeout_sec,
+            max_tokens=2200,
+        )
+    if not answer or str(answer).startswith("[ERROR]"):
+        return existing_analysis
+    return str(answer).strip()
+
+
+def _apply_interview_rag_final_answer(
+    *,
+    session: Dict[str, Any],
+    issue: str,
+    active_issues: Sequence[str],
+    case_obj: CaseModel,
+    laws_response: Any,
+    output_data: Dict[str, Any],
+    model_name: str,
+) -> Dict[str, Any]:
+    case_text = _build_interview_case_text(
+        issue=issue,
+        active_issues=active_issues,
+        case_obj=case_obj,
+        facts=session.get("facts", {}),
+        user_turns=session.get("user_turns", []),
+    )
+    domain = _interview_retrieval_domain(issue, case_obj)
+    structured_query = {
+        "domain": domain,
+        "intent": "legal_query",
+        "facts": [
+            line[2:] for line in case_text.splitlines()
+            if line.startswith("- ") and len(line) > 2
+        ][:8],
+    }
+    law_focus = _law_focus_from_law_engine(laws_response)
+    retrieval_seed = case_text or str(issue or "")
+    dense_query = build_query(retrieval_seed).expanded_query
+    retrieval_queries = generate_retrieval_queries(
+        user_query=retrieval_seed,
+        structured_query=structured_query,
+        dense_query=dense_query,
+        rewritten_query=retrieval_seed,
+        model_name=model_name,
+        timeout_sec=20,
+    )
+    intent_route = build_intent_route(retrieval_seed, forced_domain=domain)
+    retrieval_args = SimpleNamespace(
+        q=retrieval_seed,
+        mode="understand_case",
+        corpus="all" if USE_JUDGEMENT_EMBEDDINGS else "acts",
+        top_k=6,
+        dense_k=20,
+        bm25_k=20,
+        dense_weight=0.7,
+        bm25_weight=0.3,
+        rerank=True,
+        rerank_top_n=20,
+        rerank_model="cross-encoder/ms-marco-MiniLM-L-2-v2",
+        rerank_batch_size=16,
+        domain_filter=domain if domain == "criminal" else None,
+        legal_domain=domain,
+        act_filter=None,
+        section_filter=None,
+        era_filter=_infer_era_filter(retrieval_seed, structured_query),
+        intent_route=intent_route,
+        relevant_laws=law_focus.get("relevant_laws", []),
+        preferred_laws=law_focus.get("preferred_laws", []),
+        disallowed_law_hints=law_focus.get("disallowed_law_hints", []),
+    )
+
+    results, retrieval_debug = retrieve_for_queries(retrieval_queries, retrieval_args, allowed_docs=DEFAULT_ALLOWED_DOCS)
+    if not _query_mentions_specific_state(retrieval_seed):
+        results = _filter_state_specific_results(retrieval_seed, results)
+    if not results:
+        fallback_results, fallback_debug = retrieve_with_keyword_fallback(
+            user_query=retrieval_seed,
+            base_args=retrieval_args,
+            allowed_docs=DEFAULT_ALLOWED_DOCS,
+        )
+        if fallback_results:
+            results = fallback_results
+            retrieval_debug["keyword_fallback"] = fallback_debug
+
+    acts_lookup = load_acts_chunk_lookup("JSON_acts")
+    pack = build_context_pack(query=retrieval_seed, results=results, acts_lookup=acts_lookup, max_chars=12000)
+    context_blocks = pack.get("context_blocks", [])
+    rag_debug = {
+        "enabled": True,
+        "domain": domain,
+        "queries": retrieval_queries,
+        "retrieval": retrieval_debug,
+        "citations": pack.get("citations", []),
+        "context_count": len(context_blocks),
+    }
+    if not context_blocks:
+        rag_debug["answer_grounded"] = False
+        return {"output_data": output_data, "rag_debug": rag_debug}
+
+    output_data = dict(output_data)
+    output_data["analysis"] = _generate_interview_rag_answer(
+        case_text=case_text,
+        issue=issue,
+        active_issues=active_issues,
+        facts=session.get("facts", {}),
+        context_blocks=context_blocks,
+        existing_analysis=str(output_data.get("analysis") or ""),
+        model_name=model_name,
+    )
+    retrieved_laws = _extract_applicable_law_lines(
+        context_blocks,
+        fallback_laws=output_data.get("applicable_laws", []),
+    )
+    if retrieved_laws:
+        output_data["applicable_laws"] = retrieved_laws
+    output_data["summary"] = "RAG-grounded case assessment generated."
+    output_data["confidence"] = max(float(output_data.get("confidence", 0.0) or 0.0), 0.75)
+    rag_debug["answer_grounded"] = True
+    return {"output_data": output_data, "rag_debug": rag_debug}
+
+
 def append_query_log(entry: Dict[str, Any]) -> None:
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     records: List[Dict[str, Any]] = []
@@ -3202,6 +3798,87 @@ def _enforce_firac_layout(answer: str) -> str:
     if not normalized:
         return normalized
 
+
+def _humanize_query_category(category: str) -> str:
+    cleaned = str(category or "unknown").strip().lower()
+    if cleaned in {"", "unknown"}:
+        return "General / Unclear"
+    return cleaned.replace("_", " ").title()
+
+
+def _build_query_category_summary(user_rows: Sequence[AuthRow], query_rows: Sequence[AuthRow]) -> Dict[str, Any]:
+    per_user_counter: Dict[int, Counter[str]] = defaultdict(Counter)
+    overall_counter: Counter[str] = Counter()
+    user_lookup: Dict[int, Dict[str, str]] = {
+        int(row["id"]): {
+            "name": str(row["name"] or "").strip(),
+            "email": str(row["email"] or "").strip(),
+        }
+        for row in user_rows
+    }
+    recent_queries: List[Dict[str, Any]] = []
+
+    for row in query_rows:
+        user_id = int(row["user_id"])
+        content = str(row["content"] or "").strip()
+        if not content:
+            continue
+        detected = detect_issues(content) or {}
+        primary = str(detected.get("primary") or "unknown").strip().lower() or "unknown"
+        per_user_counter[user_id][primary] += 1
+        overall_counter[primary] += 1
+        if len(recent_queries) < 100:
+            user_meta = user_lookup.get(user_id, {})
+            recent_queries.append(
+                {
+                    "user_id": user_id,
+                    "user_name": user_meta.get("name", ""),
+                    "user_email": user_meta.get("email", ""),
+                    "session_id": str(row["session_id"] or "").strip(),
+                    "content": content,
+                    "created_at": str(row["created_at"] or ""),
+                    "category": primary,
+                    "label": _humanize_query_category(primary),
+                }
+            )
+
+    per_user_payload: Dict[int, Dict[str, Any]] = {}
+    for row in user_rows:
+        user_id = int(row["id"])
+        counts = per_user_counter.get(user_id, Counter())
+        top_category, top_count = counts.most_common(1)[0] if counts else ("unknown", 0)
+        per_user_payload[user_id] = {
+            "top_category": top_category,
+            "top_category_label": _humanize_query_category(top_category),
+            "top_category_count": int(top_count),
+            "query_count": int(sum(counts.values())),
+            "category_breakdown": [
+                {
+                    "category": category,
+                    "label": _humanize_query_category(category),
+                    "count": int(count),
+                }
+                for category, count in counts.most_common(5)
+            ],
+        }
+
+    overall_payload = [
+        {
+            "category": category,
+            "label": _humanize_query_category(category),
+            "count": int(count),
+        }
+        for category, count in overall_counter.most_common(5)
+    ]
+
+    return {
+        "overall": overall_payload,
+        "total_queries": int(sum(overall_counter.values())),
+        "users_with_queries": int(sum(1 for item in per_user_payload.values() if item["query_count"] > 0)),
+        "per_user": per_user_payload,
+        "recent_queries": recent_queries,
+    }
+
     # Ensure Part headings start on their own line even if the model emits inline prose.
     heading_token = r"(?:\*\*)?Part\s*[1-6]\s*-\s*(?:Facts|Issue|Rule|Application|Conclusion|Disclaimer)(?:\*\*)?"
     normalized = re.sub(rf"(?<!\n)(?={heading_token})", "\n\n", normalized, flags=re.IGNORECASE)
@@ -3404,12 +4081,11 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
             final_status = target_status
             has_access = bool(target_access)
         else:
-            cur = conn.execute(
+            conn.execute(
                 """
                 INSERT INTO users
                 (name, email, organization, use_case, role, status, access_granted, password_hash, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'user', 'pending', FALSE, NULL, ?, ?)
-                RETURNING id
                 """,
                 (
                     full_name,
@@ -3420,7 +4096,10 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
                     now,
                 ),
             )
-            user_row = cur.fetchone()
+            user_row = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                (email,),
+            ).fetchone()
             if not user_row:
                 raise HTTPException(status_code=500, detail="Failed to create user record.")
             user_id = int(user_row["id"])
@@ -3697,16 +4376,38 @@ def admin_access_requests(authorization: Optional[str] = Header(default=None)) -
             LIMIT 500
             """
         ).fetchall()
+        query_rows = conn.execute(
+            """
+            SELECT user_id, session_id, content, created_at
+            FROM chat_messages
+            WHERE role = 'user'
+            ORDER BY id DESC
+            LIMIT 5000
+            """
+        ).fetchall()
 
     users_payload = []
+    query_category_summary = _build_query_category_summary(user_rows, query_rows)
     for row in user_rows:
         item = dict(row)
+        user_query_summary = query_category_summary["per_user"].get(int(item["id"]), {})
         item["access_granted"] = bool(item.get("access_granted"))
         item["has_password"] = bool(item.get("has_password"))
+        item["top_query_category"] = user_query_summary.get("top_category", "unknown")
+        item["top_query_category_label"] = user_query_summary.get("top_category_label", "General / Unclear")
+        item["top_query_category_count"] = int(user_query_summary.get("top_category_count", 0))
+        item["query_count"] = int(user_query_summary.get("query_count", 0))
+        item["query_category_breakdown"] = user_query_summary.get("category_breakdown", [])
         users_payload.append(item)
 
     requests_payload = [dict(row) for row in request_rows]
-    return AdminAccessListResponse(ok=True, users=users_payload, requests=requests_payload)
+    return AdminAccessListResponse(
+        ok=True,
+        users=users_payload,
+        requests=requests_payload,
+        query_category_summary=query_category_summary,
+        recent_queries=query_category_summary.get("recent_queries", []),
+    )
 
 
 @app.get("/admin/monitoring/access-events", response_model=AdminAccessMonitoringResponse)
@@ -4509,6 +5210,10 @@ def interview_chat(
     user_id = int(user_row["id"])
     try:
         s_id = _sanitize_chat_session_id(payload.session_id)
+        if _is_clearly_non_legal_interview_query(payload.query):
+            response_payload = _build_out_of_scope_interview_response(s_id)
+            _record_chat_turn(user_id, s_id, payload.query, LEGAL_GUARDRAIL_RESPONSE)
+            return response_payload
         
         # 0. Initialize/Load Case Model from Session
         if s_id not in INTERVIEW_SESSIONS:
@@ -4520,14 +5225,22 @@ def interview_chat(
             session = INTERVIEW_SESSIONS[s_id]
             auto_session_reset = True
         # Backfill guard fields for old sessions.
+        session.setdefault("facts", {})
+        session.setdefault("signals", {})
+        session.setdefault("asked_questions", [])
+        session.setdefault("user_turns", [])
         session.setdefault("interview_turns", 0)
         session.setdefault("stagnant_turns", 0)
         session.setdefault("pending_confirmation_retries", 0)
+        session.setdefault("pending_signal_question", None)
+        session.setdefault("pending_signal_retries", 0)
+        session.setdefault("asked_gap_questions", [])
         session.setdefault("asked_contradiction_codes", [])
         session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
+        session["user_turns"] = (session.get("user_turns", []) + [payload.query])[-12:]
 
-        status = "interviewing"
         fact_progress = False
+        case_model_changed = False
         forced_assess = False
         user_confidence = None
         previous_top_law = session.get("last_top_law")
@@ -4536,7 +5249,6 @@ def interview_chat(
         # If the user is providing a confirmed/edited model from the UI
         if payload.case_model_update:
             session["case_model"] = payload.case_model_update.dict()
-            status = "interviewing" # User confirmed, proceed to analysis
             fact_progress = True
         else:
             # Run the new multi-step pipeline
@@ -4547,6 +5259,7 @@ def interview_chat(
                 session["case_model"] = new_case.dict()
                 if new_case.events or new_case.parties:
                     fact_progress = True
+                    case_model_changed = True
             else:
                 current_model = CaseModel(**session["case_model"])
                 prev_event_count = len(current_model.events)
@@ -4555,11 +5268,13 @@ def interview_chat(
                     if not any(cp.id == p.id for cp in current_model.parties):
                         current_model.parties.append(p)
                         fact_progress = True
+                        case_model_changed = True
                 
                 new_events = [e for e in new_case.events if e.sequence > prev_event_count]
                 if new_events:
                     current_model.events.extend(new_events)
                     fact_progress = True
+                    case_model_changed = True
 
                 current_model.financials.extend(new_case.financials)
                 current_model.documents.extend(new_case.documents)
@@ -4567,10 +5282,6 @@ def interview_chat(
                 current_model.meta.claims = list(set(current_model.meta.claims + new_case.meta.claims))
                 current_model.missing_information = new_case.missing_information
                 session["case_model"] = current_model.dict()
-
-            # Detection of 'review_required' (New events/parties found)
-            if fact_progress:
-                status = "review_required"
 
         case_obj = CaseModel(**session["case_model"])
         
@@ -4606,6 +5317,10 @@ def interview_chat(
             # Ignore stale employment-specific signal prompts for non-employment matters.
             for signal_name in ["work_relationship", "service_years", "employment_end", "payment_type"]:
                 session["signals"].pop(signal_name, None)
+            pending_signal = session.get("pending_signal_question")
+            if pending_signal and pending_signal.get("signal_name") in {"work_relationship", "service_years", "employment_end", "payment_type"}:
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
 
         pending_confirmation = session.get("pending_confirmation")
         confirmation_progress = False
@@ -4629,8 +5344,23 @@ def interview_chat(
                     session["pending_confirmation"] = None
                     session["pending_confirmation_retries"] = 0
 
+        pending_signal_question = session.get("pending_signal_question")
+        signal_answer_progress = False
+        if pending_signal_question:
+            interpreted_signal = _coerce_pending_signal_answer(payload.query, pending_signal_question)
+            if interpreted_signal:
+                signal_updates.update(interpreted_signal)
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
+                signal_answer_progress = True
+            else:
+                session["pending_signal_retries"] = int(session.get("pending_signal_retries", 0)) + 1
+                if signal_updates or session["pending_signal_retries"] >= MAX_PENDING_SIGNAL_RETRIES:
+                    session["pending_signal_question"] = None
+                    session["pending_signal_retries"] = 0
+
         session["signals"] = merge_signal_state(session.get("signals", {}), signal_updates)
-        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress)
+        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress or signal_answer_progress)
         if progress_this_turn:
             session["stagnant_turns"] = 0
         else:
@@ -4701,6 +5431,8 @@ def interview_chat(
             forced_assess = True
             session["pending_confirmation"] = None
             session["pending_confirmation_retries"] = 0
+            session["pending_signal_question"] = None
+            session["pending_signal_retries"] = 0
 
         if decision == "CLARIFY":
             response_payload = InterviewChatResponse(
@@ -4766,10 +5498,16 @@ def interview_chat(
                     signal_state=session["signals"],
                     contradictions=contradictions,
                 )
+                ranked_signal_questions = [
+                    q for q in ranked_signal_questions
+                    if q.get("id") not in session.get("asked_questions", [])
+                ]
                 if ranked_signal_questions:
                     chosen_signal_question = ranked_signal_questions[0]
                     if chosen_signal_question["id"] not in session["asked_questions"]:
                         session["asked_questions"].append(chosen_signal_question["id"])
+                    session["pending_signal_question"] = chosen_signal_question
+                    session["pending_signal_retries"] = 0
                     final_questions_text.append(chosen_signal_question["question"])
 
             # INTERVIEW Mode: Get targeted questions for ALL active issues
@@ -4805,18 +5543,59 @@ def interview_chat(
                         final_questions_text.append(gap_question)
                         asked_gap_questions.add(gap_question)
                 session["asked_gap_questions"] = list(asked_gap_questions)
+
+            if not final_questions_text:
+                # Nothing new remains to ask. Return the best assessment with the facts available
+                # instead of leaving the client in an interview state with an empty question set.
+                decision = "ASSESS"
+                is_complete = True
+                forced_assess = True
+                session["pending_confirmation"] = None
+                session["pending_confirmation_retries"] = 0
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
         
         # 7. Generate Output
         output_data = generate_legal_output(issue, subtype, session["facts"], is_complete, payload.llm_model)
-        output_data["confidence"] = strength 
+        interview_rag_debug: Dict[str, Any] = {"enabled": False}
+        if is_complete:
+            try:
+                rag_payload = _apply_interview_rag_final_answer(
+                    session=session,
+                    issue=issue,
+                    active_issues=active_issues,
+                    case_obj=case_obj,
+                    laws_response=laws_response,
+                    output_data=output_data,
+                    model_name=payload.llm_model,
+                )
+                output_data = rag_payload["output_data"]
+                interview_rag_debug = rag_payload["rag_debug"]
+            except Exception as rag_exc:
+                interview_rag_debug = {
+                    "enabled": True,
+                    "answer_grounded": False,
+                    "error": str(rag_exc),
+                }
+        output_data["confidence"] = max(float(output_data.get("confidence", 0.0) or 0.0), strength)
         legal_output = LegalOutput(**output_data)
+
+        should_review_case_model = (
+            not is_complete
+            and not payload.case_model_update
+            and case_model_changed
+            and not contradictions_present
+            and not session.get("pending_confirmation")
+            and not final_questions_text
+            and bool(case_obj.events or case_obj.parties)
+        )
 
         # Final Status determination
         if is_complete:
             final_status = "complete"
         elif contradictions_present or session.get("pending_confirmation"):
             final_status = "clarification_required"
-        elif status == "review_required":
+        elif should_review_case_model:
             final_status = "review_required"
         else:
             final_status = "interviewing"
@@ -4855,6 +5634,8 @@ def interview_chat(
                 "decision": decision,
                 "forced_assess": forced_assess,
                 "auto_session_reset": auto_session_reset,
+                "case_model_changed": case_model_changed,
+                "case_model_review_recommended": should_review_case_model,
                 "behavioral_count": len(brain_response.behavioral_primitives),
                 "interpretation_count": len(brain_response.interpretations),
                 "law_count": len(laws_response.applicable_laws),
@@ -4862,6 +5643,8 @@ def interview_chat(
                 "interview_turns": session.get("interview_turns", 0),
                 "stagnant_turns": session.get("stagnant_turns", 0),
                 "pending_confirmation_retries": session.get("pending_confirmation_retries", 0),
+                "pending_signal_retries": session.get("pending_signal_retries", 0),
+                "pending_signal_question": session.get("pending_signal_question"),
                 "signals": summarize_signal_state(session["signals"]),
                 "confirmed_tags": confirmed_tags,
                 "confirmed_tag_confidence": confirmed_tag_confidence,
@@ -4869,6 +5652,7 @@ def interview_chat(
                 "contradiction_penalty": contradiction_penalty,
                 "last_top_law": session.get("last_top_law"),
                 "dashboard_summary": dashboard_summary,
+                "rag": interview_rag_debug,
             }
         )
         _record_chat_turn(
