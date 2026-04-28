@@ -1877,12 +1877,18 @@ def _coerce_pending_signal_answer(answer: str, pending_signal: Optional[Mapping[
 
 LEGAL_INTERVIEW_ANCHOR_TERMS = {
     "act", "advocate", "agreement", "arbitration", "bail", "case", "cheating", "claim",
-    "compensation", "complaint", "consumer", "contract", "court", "crime", "criminal",
-    "damages", "defamation", "defect", "defective", "dispute", "employee", "employer",
-    "evict", "eviction", "fir", "fraud", "gratuity", "harassment", "illegal", "injury",
-    "judge", "judgment", "landlord", "law", "lawsuit", "lawyer", "lease", "legal",
-    "liability", "notice", "police", "property", "refund", "rent", "rights", "salary",
-    "section", "sue", "tenant", "termination", "theft", "wages", "warranty",
+    "company", "compensation", "complaint", "consumer", "contract", "court", "crime",
+    "criminal", "damages", "defamation", "defect", "defective", "dismissed", "dispute",
+    "employee", "employer", "employment", "evict", "eviction", "fir", "fired", "fraud",
+    "gratuity", "harassment", "hr", "illegal", "injury", "job", "judge", "judgment",
+    "landlord", "law", "lawsuit", "lawyer", "lease", "legal", "liability", "manager",
+    "notice", "police", "property", "refund", "rent", "rights", "salary", "section",
+    "sue", "tenant", "terminated", "termination", "theft", "wages", "warranty", "workplace",
+}
+
+INTERVIEW_PROFANITY_TERMS = {
+    "fuck", "fucks", "fucked", "fucking", "shit", "bullshit", "damn", "bastard",
+    "asshole", "idiot", "stupid", "chutiya", "madarchod", "bhenchod", "bc", "mc",
 }
 
 NON_LEGAL_INTERVIEW_PATTERNS = [
@@ -1892,12 +1898,33 @@ NON_LEGAL_INTERVIEW_PATTERNS = [
 ]
 
 
+def _has_legal_interview_anchor(text: str) -> bool:
+    low = str(text or "").strip().lower()
+    return any(re.search(rf"\b{re.escape(term)}\b", low) for term in LEGAL_INTERVIEW_ANCHOR_TERMS)
+
+
+def _is_noise_only_interview_text(text: str) -> bool:
+    low = str(text or "").strip().lower()
+    if not low:
+        return True
+    if _has_legal_interview_anchor(low):
+        return False
+    words = re.findall(r"[a-z0-9]+", low)
+    if not words:
+        return True
+    if len(words) <= 6 and any(word in INTERVIEW_PROFANITY_TERMS for word in words):
+        return True
+    return False
+
+
 def _is_clearly_non_legal_interview_query(query: str) -> bool:
     low = str(query or "").strip().lower()
     if not low:
         return False
-    if any(re.search(rf"\b{re.escape(term)}\b", low) for term in LEGAL_INTERVIEW_ANCHOR_TERMS):
+    if _has_legal_interview_anchor(low):
         return False
+    if _is_noise_only_interview_text(low):
+        return True
     return any(re.search(pattern, low) for pattern in NON_LEGAL_INTERVIEW_PATTERNS)
 
 
@@ -1925,6 +1952,15 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
     if not session:
         return False
     prior_turns = int(session.get("interview_turns", 0))
+    current = str(session.get("issue") or "unknown")
+    if (
+        prior_turns >= 1
+        and current in {"unknown", "out_of_scope", ""}
+        and _has_legal_interview_anchor(query)
+        and not session.get("facts")
+    ):
+        return True
+
     if prior_turns < 2:
         return False
 
@@ -1943,7 +1979,6 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
         return False
 
     hinted = str((detect_issues(q) or {}).get("primary") or "unknown")
-    current = str(session.get("issue") or "unknown")
     issue_shift = hinted not in {"unknown", ""} and current not in {"unknown", ""} and hinted != current
 
     return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 3
@@ -2112,7 +2147,16 @@ def _is_legal_advice_refusal(answer: str) -> bool:
         "not able to provide legal advice",
         "i am not a lawyer so i cannot",
     ]
-    return any(p in text for p in patterns)
+    return any(p in text for p in patterns) or _is_scope_guardrail_response(text)
+
+
+def _is_scope_guardrail_response(answer: str) -> bool:
+    text = (answer or "").strip().lower()
+    return (
+        "i can only assist with indian legal queries" in text
+        or "please ask a question related to indian law" in text
+        or "i can only assist with indian legal" in text
+    )
 
 
 def _retry_prompt_for_general_info(user_query: str) -> str:
@@ -3125,11 +3169,14 @@ def _build_interview_case_text(
     ]
 
     if user_turns:
-        lines.append("User narrative:")
+        narrative_lines: List[str] = []
         for turn in user_turns[-8:]:
             cleaned = " ".join(str(turn or "").split()).strip()
-            if cleaned:
-                lines.append(f"- {cleaned}")
+            if cleaned and not _is_noise_only_interview_text(cleaned):
+                narrative_lines.append(f"- {cleaned}")
+        if narrative_lines:
+            lines.append("User narrative:")
+            lines.extend(narrative_lines)
 
     if facts:
         lines.append("Extracted facts:")
@@ -3141,8 +3188,11 @@ def _build_interview_case_text(
         lines.append(f"Detected relationship: {case_obj.detected_relationship}")
 
     if case_obj.events:
-        lines.append("Timeline/events:")
+        event_lines: List[str] = []
         for event in case_obj.events[:10]:
+            event_text = " ".join([str(event.action or ""), str(event.description or "")]).strip()
+            if _is_noise_only_interview_text(event_text):
+                continue
             parts = [
                 f"event {event.sequence}",
                 event.action,
@@ -3152,7 +3202,10 @@ def _build_interview_case_text(
                 parts.append(f"date/time: {event.timestamp}")
             if event.location:
                 parts.append(f"location: {event.location}")
-            lines.append("- " + " | ".join(str(part) for part in parts if part))
+            event_lines.append("- " + " | ".join(str(part) for part in parts if part))
+        if event_lines:
+            lines.append("Timeline/events:")
+            lines.extend(event_lines)
 
     if case_obj.financials:
         lines.append("Financials:")
@@ -3168,7 +3221,7 @@ def _build_interview_case_text(
         lines.append("Intent/claims:")
         for item in list(case_obj.meta.intents + case_obj.meta.claims)[:8]:
             cleaned = " ".join(str(item or "").split()).strip()
-            if cleaned:
+            if cleaned and not _is_noise_only_interview_text(cleaned):
                 lines.append(f"- {cleaned}")
 
     return "\n".join(lines).strip()
@@ -3185,6 +3238,58 @@ def _law_focus_from_law_engine(laws_response: Any) -> Dict[str, List[str]]:
         "preferred_laws": laws[:3],
         "disallowed_law_hints": [],
     }
+
+
+def _build_interview_context_grounded_fallback(
+    *,
+    case_text: str,
+    issue: str,
+    facts: Dict[str, Any],
+    context_blocks: List[Dict[str, Any]],
+) -> str:
+    law_lines = _extract_applicable_law_lines(context_blocks, limit=6)
+    facts_lines = [
+        f"- {str(key).replace('_', ' ')}: {value}"
+        for key, value in list((facts or {}).items())[:8]
+        if value is not None and str(value).strip() != ""
+    ]
+    if not facts_lines:
+        facts_lines = [
+            line for line in case_text.splitlines()
+            if line.startswith("- ") and not _is_noise_only_interview_text(line[2:])
+        ][:8]
+
+    lines = [
+        "### Facts",
+        *(facts_lines or ["- The interview indicates a potential legal dispute, but the extracted facts are limited."]),
+        "",
+        "### Legal Issues",
+        f"- {str(issue or 'legal issue').replace('_', ' ').capitalize()} under Indian law.",
+        "",
+        "### Applicable Law",
+    ]
+    if law_lines:
+        lines.extend(f"- {law}" for law in law_lines)
+    else:
+        lines.append("- Retrieved legal context was not strong enough to name specific provisions safely.")
+
+    lines.extend(
+        [
+            "",
+            "### Application",
+            "- Based on the interview facts, preserve all written communications, termination messages, notices, contracts, salary records, and witness details.",
+            "- The exact remedy depends on employment status, contract terms, notice period, reason for termination, and proof of what was said or done.",
+            "",
+            "### Remedies / Next Steps",
+            "- Ask the employer for the termination reason and final settlement details in writing.",
+            "- Collect appointment letter, employment contract, salary slips, emails/messages, and any termination communication.",
+            "- Consider a formal legal notice or labour/employment forum route after reviewing the documents.",
+            "",
+            "### Remaining Gaps",
+            "- Confirm employment type, length of service, notice-period clause, pending dues, and available proof.",
+        ]
+    )
+    return "\n".join(lines).strip()
 
 
 def _generate_interview_rag_answer(
@@ -3216,19 +3321,28 @@ def _generate_interview_rag_answer(
         f"Existing non-RAG draft, for factual orientation only:\n{existing_analysis}\n\n"
         f"Retrieved legal context:\n{context_text}\n"
     )
+    fallback_answer = _build_interview_context_grounded_fallback(
+        case_text=case_text,
+        issue=issue,
+        facts=facts,
+        context_blocks=context_blocks,
+    )
     answer = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec, max_tokens=2200)
     if _is_legal_advice_refusal(answer):
         answer = call_llm(
             model_name=model_name,
             prompt=(
                 f"{prompt}\n\n"
-                "Do not refuse. Provide general legal information grounded only in the retrieved Indian legal context."
+                "The user is asking a legal/employment question even if a quoted abusive phrase appears in the facts. "
+                "Do not return the legal-domain guardrail. Provide general legal information grounded only in the retrieved Indian legal context."
             ),
             timeout_sec=timeout_sec,
             max_tokens=2200,
         )
-    if not answer or str(answer).startswith("[ERROR]"):
-        return existing_analysis
+    if not answer or str(answer).startswith("[ERROR]") or _is_scope_guardrail_response(str(answer)):
+        if existing_analysis and not _is_scope_guardrail_response(existing_analysis):
+            return existing_analysis
+        return fallback_answer
     return str(answer).strip()
 
 
@@ -3320,6 +3434,14 @@ def _apply_interview_rag_final_answer(
     }
     if not context_blocks:
         rag_debug["answer_grounded"] = False
+        if _is_scope_guardrail_response(str(output_data.get("analysis") or "")):
+            output_data = dict(output_data)
+            output_data["analysis"] = _build_interview_context_grounded_fallback(
+                case_text=case_text,
+                issue=issue,
+                facts=session.get("facts", {}),
+                context_blocks=[],
+            )
         return {"output_data": output_data, "rag_debug": rag_debug}
 
     output_data = dict(output_data)
@@ -5290,10 +5412,17 @@ def interview_chat(
         candidates = sorted(extracted_data.incident_type_candidates, key=lambda x: x.confidence, reverse=True)
         top_incident = candidates[0].type if candidates else "unknown"
         top_confidence = candidates[0].confidence if candidates else 0.0
+        heuristic_issue = detect_issues(payload.query) or {}
+        heuristic_primary = str(heuristic_issue.get("primary") or "unknown")
+        if heuristic_primary not in {"unknown", ""} and (top_incident in {"unknown", "general", "labour"} or top_confidence < 0.6):
+            top_incident = heuristic_primary
+            top_confidence = max(top_confidence, 0.65)
         
         # Update issues
         if session["issue"] == "unknown" or top_confidence > 0.8:
             session["issue"] = top_incident
+        if heuristic_primary not in {"unknown", ""} and heuristic_primary not in session["active_issues"]:
+            session["active_issues"].append(heuristic_primary)
         for c in candidates:
             if c.confidence >= 0.7 and c.type not in session["active_issues"]:
                 session["active_issues"].append(c.type)
