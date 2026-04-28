@@ -2752,6 +2752,147 @@ def generate_relevant_laws(
     }
 
 
+def analyze_query_for_retrieval(
+    user_query: str,
+    dense_query: str,
+    model_name: str,
+    timeout_sec: int = 20,
+) -> Dict[str, Any]:
+    prompt = (
+        "Analyze the following Indian legal query and return ONLY valid JSON with this schema:\n"
+        "{\n"
+        '  "domain": "consumer|criminal|contract|property|labour|general",\n'
+        '  "intent": "legal_notice|legal_query",\n'
+        '  "facts": ["fact 1", "fact 2"],\n'
+        '  "relevant_laws": ["law 1", "law 2"],\n'
+        '  "preferred_laws": ["law 1"],\n'
+        '  "disallowed_law_hints": ["irrelevant law hint"],\n'
+        '  "rewritten_query": "dense legal keywords",\n'
+        '  "retrieval_queries": ["query 1", "query 2", "query 3"]\n'
+        "}\n"
+        "Rules:\n"
+        "- 'facts': Extract atomic facts. Do not rely on punctuation splitting alone.\n"
+        "- 'relevant_laws', 'preferred_laws', 'disallowed_law_hints': Keep lists short. Focus on Indian laws only. Prefer central laws if state is not mentioned.\n"
+        "- 'rewritten_query': Precise legal search query for INDIA. Do NOT include foreign laws.\n"
+        "- 'retrieval_queries': Generate at most 5 highly relevant queries. Avoid unrelated laws or noisy expansion.\n"
+        "- Return ONLY a valid JSON object. No markdown formatting.\n\n"
+        f"User query:\n{user_query}\n"
+    )
+
+    raw = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec)
+    parsed: Dict[str, Any] = {}
+    if raw and not raw.startswith("[ERROR]"):
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start >= 0 and end > start:
+                parsed = json.loads(raw[start : end + 1])
+        except Exception:
+            parsed = {}
+
+    # 1. Structured query
+    structured_query = {
+        "domain": parsed.get("domain", classify_legal_issue(user_query)),
+        "intent": parsed.get("intent", "legal_query"),
+        "facts": parsed.get("facts", [])
+    }
+    facts = structured_query["facts"]
+    if not isinstance(facts, list) or not facts:
+        facts = [
+            frag.strip(" .")
+            for frag in re.split(r"\b(?:and|but|because|after|when|while)\b|[.;!?]", user_query, flags=re.IGNORECASE)
+            if frag.strip()
+        ]
+    structured_query["facts"] = [str(f).strip() for f in facts if str(f).strip()][:5]
+
+    # 2. Relevant Laws
+    relevant_laws = [str(x).strip() for x in parsed.get("relevant_laws", []) if str(x).strip()]
+    preferred_laws = [str(x).strip() for x in parsed.get("preferred_laws", []) if str(x).strip()]
+    disallowed_law_hints = [str(x).strip() for x in parsed.get("disallowed_law_hints", []) if str(x).strip()]
+    relevant_laws = [_clean_law_name(x) for x in relevant_laws if _clean_law_name(x)]
+    preferred_laws = [_clean_law_name(x) for x in preferred_laws if _clean_law_name(x)]
+    disallowed_law_hints = [_clean_law_name(x) for x in disallowed_law_hints if _clean_law_name(x)]
+
+    q = (user_query or "").lower()
+    if structured_query.get("domain") == "property" and any(
+        term in q for term in ["landlord", "tenant", "lease", "rent", "deposit", "security deposit", "vacated"]
+    ):
+        relevant_keys = [_canonical_law_key(x) for x in relevant_laws]
+        preferred_keys = [_canonical_law_key(x) for x in preferred_laws]
+        for law in ["transfer of property act", "indian contract act", "specific relief act"]:
+            if law not in relevant_keys:
+                relevant_laws.append(law)
+                relevant_keys.append(law)
+        for law in ["transfer of property act", "indian contract act", "specific relief act"]:
+            if law not in preferred_keys:
+                preferred_laws.append(law)
+                preferred_keys.append(law)
+        preferred_laws = [x for x in preferred_laws if "consumer protection act" not in _canonical_law_key(x)]
+        if not _query_mentions_specific_state(user_query):
+            for hint in GENERIC_STATE_RENT_HINTS:
+                if hint not in [x.lower() for x in disallowed_law_hints]:
+                    disallowed_law_hints.append(hint)
+
+    if _is_cyber_it_act_query(user_query, structured_query):
+        relevant_keys = [_canonical_law_key(x) for x in relevant_laws]
+        preferred_keys = [_canonical_law_key(x) for x in preferred_laws]
+        cyber_laws = ["information technology act", "bharatiya nyaya sanhita", "bharatiya nagrik suraksha sanhita"]
+        for law in cyber_laws:
+            if law not in relevant_keys:
+                relevant_laws.append(law)
+                relevant_keys.append(law)
+        if "information technology act" not in preferred_keys:
+            preferred_laws.insert(0, "information technology act")
+            preferred_keys.insert(0, "information technology act")
+        for hint in ["transfer of property act", "specific relief act", "consumer protection act"]:
+            if hint not in [x.lower() for x in disallowed_law_hints]:
+                disallowed_law_hints.append(hint)
+
+    law_focus = {
+        "relevant_laws": relevant_laws[:8],
+        "preferred_laws": preferred_laws[:5],
+        "disallowed_law_hints": disallowed_law_hints[:8],
+    }
+
+    # 3. Rewritten query
+    llm_query = str(parsed.get("rewritten_query") or user_query).strip()
+    foreign_markers = ["u.s.", "united states", "cfaa", "gdpr", "wiretap act", "ecpa", "eu law", "uk law"]
+    if any(tok in llm_query.lower() for tok in foreign_markers):
+        llm_query = user_query
+
+    # 4. Retrieval queries
+    raw_retrieval_queries = parsed.get("retrieval_queries", [])
+    deterministic = _deterministic_retrieval_queries(user_query, structured_query)
+    if deterministic:
+        retrieval_queries = deterministic
+    else:
+        fallback = [llm_query, dense_query, user_query] + structured_query["facts"][:2]
+        cleaned: List[str] = []
+        seen = set()
+        for candidate in raw_retrieval_queries + fallback:
+            candidate = " ".join(str(candidate or "").replace("\n", " ").split()).strip()
+            if not candidate:
+                continue
+            bad_markers = ["triple the security deposit", "rental agreement act", "section 11 of the transfer of property act"]
+            lowered_candidate = candidate.lower()
+            if any(marker in lowered_candidate for marker in bad_markers):
+                continue
+            if lowered_candidate in seen:
+                continue
+            seen.add(lowered_candidate)
+            cleaned.append(candidate)
+            if len(cleaned) >= MAX_RETRIEVAL_QUERIES:
+                break
+        retrieval_queries = cleaned[:MAX_RETRIEVAL_QUERIES]
+
+    return {
+        "structured_query": structured_query,
+        "law_focus": law_focus,
+        "llm_query": llm_query,
+        "retrieval_queries": retrieval_queries
+    }
+
+
 def _result_score(item: Dict[str, Any]) -> float:
     return float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0)
 
@@ -4826,7 +4967,18 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
         history = _load_chat_history_for_prompt(user_id, s_id, limit=CHAT_HISTORY_PROMPT_LIMIT)
         SESSIONS[s_id] = list(history)
 
-        structured_query = extract_structured_query(user_query, payload.llm_model)
+        expanded_obj = build_query(user_query)
+        dense_keywords = expanded_obj.expanded_query
+        precise_statute_query = bool(expanded_obj.filters.get("section_number") and expanded_obj.filters.get("act"))
+
+        unified_analysis = analyze_query_for_retrieval(
+            user_query=user_query,
+            dense_query=dense_keywords,
+            model_name=payload.llm_model,
+            timeout_sec=min(payload.llm_timeout_sec, 20),
+        )
+        
+        structured_query = unified_analysis["structured_query"]
         debug_trace["structured_query"] = structured_query
         reasoning.append(
             "Understanding facts: "
@@ -4835,44 +4987,30 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             else "Understanding facts from the user query."
         )
 
-        expanded_obj = build_query(user_query)
         intent_route = build_intent_route(user_query, forced_domain=structured_query.get("domain", ""))
         debug_trace["intent_route"] = intent_route
-        law_focus = generate_relevant_laws(
-            user_query=user_query,
-            structured_query=structured_query,
-            model_name=payload.llm_model,
-            timeout_sec=min(payload.llm_timeout_sec, 20),
-        )
+
+        law_focus = unified_analysis["law_focus"]
         debug_trace["law_focus"] = law_focus
         if law_focus.get("preferred_laws"):
             reasoning.append("Preferred laws: " + ", ".join(law_focus["preferred_laws"]))
         law_candidates = _law_focus_candidates(law_focus)
-        precise_statute_query = bool(expanded_obj.filters.get("section_number") and expanded_obj.filters.get("act"))
 
-        # --- STEP 1: Query Rewriter ---
         reasoning.append("Step 1: Rewriting query to dense legal keywords...")
-        dense_keywords = expanded_obj.expanded_query
 
         if precise_statute_query:
             llm_query = user_query
             legal_query = dense_keywords
             reasoning.append("Detected direct act-section lookup; skipped free-form rewrite.")
+            retrieval_queries = [legal_query]
         else:
-            llm_query = rewrite_query(user_query, payload.llm_model, timeout_sec=15)
+            llm_query = unified_analysis["llm_query"]
             llm_query = " ".join((llm_query or "").splitlines()[:1]).strip() or user_query
             legal_query = " ".join(part for part in [llm_query, dense_keywords] if part).strip()
+            retrieval_queries = unified_analysis["retrieval_queries"]
 
         reasoning.append(f"Rewritten Query: {llm_query}")
         reasoning.append(f"Dense Expansion: {dense_keywords}")
-        retrieval_queries = [legal_query] if precise_statute_query else generate_retrieval_queries(
-            user_query=user_query,
-            structured_query=structured_query,
-            dense_query=dense_keywords,
-            rewritten_query=llm_query,
-            model_name=payload.llm_model,
-            timeout_sec=min(payload.llm_timeout_sec, 20),
-        )
         reasoning.append(f"Retrieval Queries ({len(retrieval_queries)} max {MAX_RETRIEVAL_QUERIES}): " + " | ".join(retrieval_queries))
         debug_trace["expanded_queries"] = retrieval_queries
 
@@ -5806,13 +5944,16 @@ def query_lawyer_init(payload: LawyerInitRequest, authorization: Optional[str] =
     session_id = payload.session_id or str(uuid.uuid4())
     LAWYER_SESSIONS[session_id] = {}
 
-    structured_query = extract_structured_query(user_query, payload.llm_model)
-    law_focus = generate_relevant_laws(
+    expanded_obj = build_query(user_query)
+    dense_keywords = expanded_obj.expanded_query
+    unified_analysis = analyze_query_for_retrieval(
         user_query=user_query,
-        structured_query=structured_query,
+        dense_query=dense_keywords,
         model_name=payload.llm_model,
         timeout_sec=min(payload.llm_timeout_sec, 20),
     )
+    structured_query = unified_analysis["structured_query"]
+    law_focus = unified_analysis["law_focus"]
     init_payload = _generate_lawyer_init_payload(
         user_query=user_query,
         structured_query=structured_query,
