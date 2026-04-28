@@ -97,6 +97,10 @@ MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
 MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
 MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
 MAX_PENDING_SIGNAL_RETRIES = int(os.getenv("MAX_PENDING_SIGNAL_RETRIES", "1"))
+LEGAL_GUARDRAIL_RESPONSE = (
+    "I can only assist with Indian legal queries such as laws, cases, legal documents, "
+    "notices, complaints, disputes, and legal concepts. Please ask a question related to Indian law."
+)
 
 # Auth / Access control settings
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
@@ -507,7 +511,7 @@ class InterviewChatResponse(BaseModel):
     issue: str
     secondary_issues: List[str] = []
     confidence: float
-    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required"
+    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required", "out_of_scope"
     is_complete: bool
     questions: List[str]
     legal_output: Optional[LegalOutput] = None
@@ -1868,6 +1872,51 @@ def _coerce_pending_signal_answer(answer: str, pending_signal: Optional[Mapping[
             return _build_signal_answer_update(signal_name, value, raw, 0.75)
 
     return {}
+
+
+LEGAL_INTERVIEW_ANCHOR_TERMS = {
+    "act", "advocate", "agreement", "arbitration", "bail", "case", "cheating", "claim",
+    "compensation", "complaint", "consumer", "contract", "court", "crime", "criminal",
+    "damages", "defamation", "defect", "defective", "dispute", "employee", "employer",
+    "evict", "eviction", "fir", "fraud", "gratuity", "harassment", "illegal", "injury",
+    "judge", "judgment", "landlord", "law", "lawsuit", "lawyer", "lease", "legal",
+    "liability", "notice", "police", "property", "refund", "rent", "rights", "salary",
+    "section", "sue", "tenant", "termination", "theft", "wages", "warranty",
+}
+
+NON_LEGAL_INTERVIEW_PATTERNS = [
+    r"\bhow\s+to\s+(make|cook|prepare|boil|fry|bake)\b",
+    r"\b(recipe|ingredients|cooking|maggi|noodles|pasta|tea|coffee|snack|dish)\b",
+    r"\b(weather|joke|poem|song|movie|cricket|sports score|horoscope)\b",
+]
+
+
+def _is_clearly_non_legal_interview_query(query: str) -> bool:
+    low = str(query or "").strip().lower()
+    if not low:
+        return False
+    if any(re.search(rf"\b{re.escape(term)}\b", low) for term in LEGAL_INTERVIEW_ANCHOR_TERMS):
+        return False
+    return any(re.search(pattern, low) for pattern in NON_LEGAL_INTERVIEW_PATTERNS)
+
+
+def _build_out_of_scope_interview_response(session_id: str) -> InterviewChatResponse:
+    return InterviewChatResponse(
+        ok=True,
+        session_id=session_id,
+        issue="out_of_scope",
+        secondary_issues=[],
+        confidence=0.0,
+        status="out_of_scope",
+        is_complete=False,
+        questions=[LEGAL_GUARDRAIL_RESPONSE],
+        legal_output=None,
+        case_model=None,
+        behavioral_primitives=[],
+        interpretations=[],
+        applicable_laws=[],
+        state_debug={"guardrail": "non_legal_interview_query"},
+    )
 
 
 def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) -> bool:
@@ -4888,6 +4937,10 @@ def interview_chat(
     user_id = int(user_row["id"])
     try:
         s_id = _sanitize_chat_session_id(payload.session_id)
+        if _is_clearly_non_legal_interview_query(payload.query):
+            response_payload = _build_out_of_scope_interview_response(s_id)
+            _record_chat_turn(user_id, s_id, payload.query, LEGAL_GUARDRAIL_RESPONSE)
+            return response_payload
         
         # 0. Initialize/Load Case Model from Session
         if s_id not in INTERVIEW_SESSIONS:

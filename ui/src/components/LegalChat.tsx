@@ -116,7 +116,7 @@ interface InterviewChatResponse {
     issue: string;
     secondary_issues: string[];
     confidence: number;
-    status: string; // "interviewing", "clarification_required", "complete", "review_required"
+    status: string; // "interviewing", "clarification_required", "complete", "review_required", "out_of_scope"
     is_complete: boolean;
     questions: string[];
     legal_output?: LegalOutput | null;
@@ -712,6 +712,10 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 }
 
 function formatInterviewResponseClean(data: InterviewChatResponse) {
+    if (data.status === 'out_of_scope') {
+        return data.questions[0] || 'I can only assist with Indian legal queries. Please ask a question related to Indian law.';
+    }
+
     const out = data.legal_output;
     const statusLabel = data.is_complete ? 'Case Complete' : data.status.replace('_', ' ').toUpperCase();
 
@@ -981,7 +985,8 @@ export const LegalChat = ({
         ) &&
         extractMeaningfulTranscriptLines(messages).length > 0;
 
-    const canPrefillDocumentGenerator = !isLoading && hasMeaningfulConversation;
+    const isOutOfScope = status === 'out_of_scope';
+    const canPrefillDocumentGenerator = !isLoading && hasMeaningfulConversation && !isOutOfScope;
     const showQuickStartChips = !hasMeaningfulConversation && !isLoading;
     const quickStartChips = [
         'Salary not paid',
@@ -1005,7 +1010,9 @@ export const LegalChat = ({
     };
 
     const completedSteps =
-        status === 'complete'
+        isOutOfScope
+            ? 1
+            : status === 'complete'
             ? 4
             : status === 'clarification_required' || status === 'review_required'
                 ? 3
@@ -1014,7 +1021,9 @@ export const LegalChat = ({
                     : 1;
     const progressValue = completedSteps * 25;
     const progressLabel =
-        completedSteps === 4
+        isOutOfScope
+            ? 'Legal question needed - Step 1 of 4'
+            : completedSteps === 4
             ? 'FIRAC analysis ready - Step 4 of 4'
             : completedSteps === 3
                 ? 'Clarifying missing facts - Step 3 of 4'
