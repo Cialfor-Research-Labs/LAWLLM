@@ -377,6 +377,9 @@ def detect_issues(query: str) -> Dict[str, Any]:
     if any(w in q for w in ["brother", "father", "share", "inheritance", "ancestral", "heir"]):
         detected_issues.append("ownership_dispute")
 
+    if any(w in q for w in ["fired", "terminated", "dismissed", "wrongful termination", "boss fired", "manager fired"]):
+        detected_issues.append("termination_dispute")
+
     if "salary" in q or "wages" in q or "pay" in q:
         if any(w in q for w in ["fired", "terminated", "resign"]): 
             detected_issues.append("termination_dispute")
@@ -479,6 +482,7 @@ def compute_signal_strength(
         "builder_delay": ["builder", "stoppage", "payment", "delay_months", "documents"],
         "property_fraud": ["fraud_type", "amount", "complaint"],
         "wage_dispute": ["status", "months_unpaid", "amount", "proof"],
+        "termination_dispute": ["type", "notice", "contract", "reason", "dues"],
         "consumer_dispute": ["product", "issue", "timeline", "invoice"],
         "account_hacking": ["platform", "access_loss", "incident_date"],
         "online_fraud": ["amount", "financial_institution", "reported"],
