@@ -16,8 +16,10 @@ import {
   PlusIcon
 } from 'lucide-react';
 import type { GeneratorPrefillPayload } from '../types/generatorPrefill';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+
+function cn(...inputs: Array<string | false | null | undefined>) {
+    return inputs.filter(Boolean).join(' ');
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -1554,7 +1556,7 @@ export const LegalChat = ({
                 <div className="mx-auto max-w-6xl">
                     <div className="relative rounded-xl border border-neutral-800 bg-neutral-900 p-2 shadow-sm">
                         <div className="overflow-y-auto">
-                            <Textarea
+                            <textarea
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={(e) => {
