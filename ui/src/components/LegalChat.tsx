@@ -1547,32 +1547,34 @@ export const LegalChat = ({
 
             <div className="border-t border-outline-variant/70 bg-surface-variant px-4 py-5 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto max-w-6xl">
-                    <div className="app-shell-panel relative overflow-hidden p-3">
-                    <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSend();
-                            }
-                        }}
-                        placeholder={
-                            isComplete
-                                ? "Ask a follow-up or start a new matter..."
-                                : "Describe the matter fully. If anything important is missing, I will ask the next needed question..."
-                        }
-                        disabled={isLoading}
-                        className="text-field h-24 resize-none pr-20 disabled:opacity-70"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => handleSend()}
-                        disabled={isLoading || !input.trim()}
-                        className="primary-button absolute bottom-6 right-6 h-14 w-14 rounded-2xl px-0 py-0 disabled:scale-100"
-                    >
-                        <Send size={22} />
-                    </button>
+                    <div className="rounded-[2rem] border border-outline-variant/60 bg-surface p-4 shadow-sm">
+                        <div className="relative rounded-3xl border border-outline-variant/50 bg-surface-container-low px-5 py-4">
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder={
+                                    isComplete
+                                        ? "Ask a follow-up or start a new matter..."
+                                        : "Describe the matter fully. If anything important is missing, I will ask the next needed question..."
+                                }
+                                disabled={isLoading}
+                                className="h-24 w-full resize-none bg-transparent pr-20 text-base text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none disabled:opacity-70"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => handleSend()}
+                                disabled={isLoading || !input.trim()}
+                                className="absolute bottom-2 right-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#8CCFBF] text-white transition hover:brightness-95 disabled:opacity-60"
+                            >
+                                <Send size={22} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
