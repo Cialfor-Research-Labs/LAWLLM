@@ -74,7 +74,7 @@ ISSUE_ONTOLOGY = {
 QUESTION_DB = [
     # 1. Wage Dispute
     {"id": "wd_txn_1", "question": "Are you currently employed or have you been terminated?", "issue_type": "wage_dispute", "category": "transaction", "priority": 1, "required": True, "fact_key": "status"},
-    {"id": "wd_issue_1", "question": "How many months of salary are unpaid?", "issue_type": "wage_dispute", "category": "issue", "priority": 1, "required": True, "fact_key": "months"},
+    {"id": "wd_issue_1", "question": "How many months of salary are unpaid?", "issue_type": "wage_dispute", "category": "issue", "priority": 1, "required": True, "fact_key": "months_unpaid"},
     {"id": "wd_issue_2", "question": "What is the total amount due?", "issue_type": "wage_dispute", "category": "issue", "priority": 1, "required": True, "fact_key": "amount"},
     {"id": "wd_evd_1", "question": "Do you have proof of salary (slips, bank statements)?", "issue_type": "wage_dispute", "category": "evidence", "priority": 1, "required": True, "fact_key": "proof"},
     {"id": "wd_op_1", "question": "Has your employer responded to your requests for payment?", "issue_type": "wage_dispute", "category": "opposite_party", "priority": 2, "required": False, "fact_key": "response"},
@@ -261,7 +261,7 @@ EVIDENCE_CHECKLISTS = {
 
 # Phase 3 Thresholds (Full 10 Domains)
 REQUIRED_FACTS = {
-    "wage_dispute": ["status", "months", "amount", "proof"],
+    "wage_dispute": ["status", "months_unpaid", "amount", "proof"],
     "termination_dispute": ["type", "notice", "contract", "reason", "dues"],
     "consumer_dispute": ["product", "issue", "timeline", "invoice", "seller_contact"],
     "defamation": ["statement", "platform", "is_false", "proof"],
@@ -711,7 +711,7 @@ def classify_severity(issue_type: str, subtype: str, facts: dict) -> str:
 
     # 2. Wage
     if issue_type == "wage_dispute":
-        months = facts.get("months", 0)
+        months = facts.get("months_unpaid", 0)
         if isinstance(months, int) and months >= 2: return "high"
         return "low"
 
@@ -893,7 +893,8 @@ def generate_legal_output(issue: str, subtype: str, facts: dict, is_complete: bo
     else:
         # High Severity -> Full FIRAC (Fix 6)
         analysis = generate_firac_analysis(issue, facts, is_complete, llm_model)
-        notice = generate_notice_from_session(issue, facts, analysis, llm_model)
+        # Notice drafting/prefill is temporarily disabled while the generator contract is updated.
+        notice = None
         summary = "Full Case Assessment Generated."
 
     # 4. Strategy Enforcement (Refined Phase 22/23)
@@ -911,7 +912,7 @@ def generate_legal_output(issue: str, subtype: str, facts: dict, is_complete: bo
         "severity": severity,
         "applicable_laws": ALLOWED_LAWS.get(issue, []),
         "legal_options": ISSUE_ACTIONS.get(issue, []) if severity != "low" else ["Administrative Follow-up"],
-        "next_steps": ["Verify documents in the checklist", "Review drafted notice (if generated)"],
+        "next_steps": ["Verify documents in the checklist", "Review the legal strategy before drafting any notice"],
         "confidence": 1.0,
         "notice_draft": notice,
         "case_strategy": strategy,
