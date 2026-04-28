@@ -893,7 +893,8 @@ def generate_legal_output(issue: str, subtype: str, facts: dict, is_complete: bo
     else:
         # High Severity -> Full FIRAC (Fix 6)
         analysis = generate_firac_analysis(issue, facts, is_complete, llm_model)
-        notice = generate_notice_from_session(issue, facts, analysis, llm_model)
+        # Notice drafting/prefill is temporarily disabled while the generator contract is updated.
+        notice = None
         summary = "Full Case Assessment Generated."
 
     # 4. Strategy Enforcement (Refined Phase 22/23)
@@ -911,7 +912,7 @@ def generate_legal_output(issue: str, subtype: str, facts: dict, is_complete: bo
         "severity": severity,
         "applicable_laws": ALLOWED_LAWS.get(issue, []),
         "legal_options": ISSUE_ACTIONS.get(issue, []) if severity != "low" else ["Administrative Follow-up"],
-        "next_steps": ["Verify documents in the checklist", "Review drafted notice (if generated)"],
+        "next_steps": ["Verify documents in the checklist", "Review the legal strategy before drafting any notice"],
         "confidence": 1.0,
         "notice_draft": notice,
         "case_strategy": strategy,

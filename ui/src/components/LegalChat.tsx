@@ -139,6 +139,8 @@ const markdownComponents: Components = {
 const DEFAULT_GREETING =
     'Hello. I am Legal AI. Describe your legal situation in as much detail as you have. If the facts are already complete, I will answer directly. If something important is missing, I will ask only the next needed question.';
 
+const NOTICE_GENERATOR_PREFILL_ENABLED = false;
+
 interface LegalChatProps {
     authToken: string;
     openSessionRequest?: { sessionId: string; nonce: number } | null;
@@ -702,7 +704,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
         lines.push(data.questions[0]);
     }
 
-    if (data.is_complete && out.notice_draft) {
+    if (NOTICE_GENERATOR_PREFILL_ENABLED && data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
         lines.push('**Legal Notice Generator Prefill Ready**: You can transfer these facts into the "Legal Notice Generator" tab, review them, and generate the notice there.');
@@ -763,7 +765,7 @@ function formatInterviewResponseClean(data: InterviewChatResponse) {
         data.questions.forEach((question, index) => lines.push(`${index + 1}. ${question}`));
     }
 
-    if (data.is_complete && out.notice_draft) {
+    if (NOTICE_GENERATOR_PREFILL_ENABLED && data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
         lines.push('**Legal Notice Generator Prefill Ready**: You can transfer these facts into the "Legal Notice Generator" tab, review them, and generate the notice there.');
@@ -986,7 +988,8 @@ export const LegalChat = ({
         extractMeaningfulTranscriptLines(messages).length > 0;
 
     const isOutOfScope = status === 'out_of_scope';
-    const canPrefillDocumentGenerator = !isLoading && hasMeaningfulConversation && !isOutOfScope;
+    const canPrefillDocumentGenerator =
+        NOTICE_GENERATOR_PREFILL_ENABLED && !isLoading && hasMeaningfulConversation && !isOutOfScope;
     const showQuickStartChips = !hasMeaningfulConversation && !isLoading;
     const quickStartChips = [
         'Salary not paid',
