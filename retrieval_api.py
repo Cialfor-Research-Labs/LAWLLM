@@ -96,6 +96,7 @@ INTERACTION_LOG_PATH = os.path.join(BASE_DIR, "test", "interaction_logs.jsonl")
 MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
 MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
 MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
+MAX_PENDING_SIGNAL_RETRIES = int(os.getenv("MAX_PENDING_SIGNAL_RETRIES", "1"))
 
 # Auth / Access control settings
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
@@ -1774,16 +1775,99 @@ def _fresh_interview_session_state() -> Dict[str, Any]:
         "active_issues": [],
         "facts": {},
         "asked_questions": [],
+        "asked_gap_questions": [],
         "case_model": None,
         "signals": {},
         "pending_confirmation": None,
+        "pending_signal_question": None,
         "contradictions": [],
         "last_top_law": None,
         "interview_turns": 0,
         "stagnant_turns": 0,
         "pending_confirmation_retries": 0,
+        "pending_signal_retries": 0,
         "asked_contradiction_codes": [],
     }
+
+
+def _contains_any(text: str, tokens: Sequence[str]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _build_signal_answer_update(signal_name: str, value: Any, raw_text: str, confidence: float = 0.85) -> Dict[str, Dict[str, Any]]:
+    return {
+        signal_name: {
+            "value": value,
+            "source": "user_signal_answer",
+            "user_confidence": confidence,
+            "confirmed": True,
+            "raw_text": raw_text,
+        }
+    }
+
+
+def _coerce_pending_signal_answer(answer: str, pending_signal: Optional[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Map a direct answer to a previously asked signal-ranking question into signal state."""
+    if not pending_signal:
+        return {}
+
+    signal_name = str(pending_signal.get("signal_name") or "").strip()
+    if not signal_name:
+        return {}
+
+    raw = str(answer or "").strip()
+    low = raw.lower()
+    if not low:
+        return {}
+
+    if signal_name == "payment_type":
+        if _contains_any(low, ["monthly salary", "salary", "wage", "pay slip", "salary slip"]):
+            return _build_signal_answer_update(signal_name, "monthly_salary", raw)
+        if _contains_any(low, ["final settlement", "full and final", "fnf", "gratuity", "after leaving"]):
+            return _build_signal_answer_update(signal_name, "gratuity", raw)
+        if _contains_any(low, ["pf", "provident", "retirement", "uan"]):
+            return _build_signal_answer_update(signal_name, "retirement_benefit", raw)
+        if "bonus" in low or "incentive" in low:
+            return _build_signal_answer_update(signal_name, "bonus", raw)
+        if _contains_any(low, ["something else", "other", "different"]):
+            return _build_signal_answer_update(signal_name, "other", raw, 0.65)
+
+    if signal_name == "employment_end":
+        years_match = re.search(r"(\d+)\s*\+?\s*years?", low)
+        if _contains_any(low, ["still working", "currently employed", "not left", "still employed"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+        if _contains_any(low, ["less than 5", "less than five", "under 5", "under five"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+        if years_match:
+            return _build_signal_answer_update(signal_name, int(years_match.group(1)) >= 5, raw)
+        if _contains_any(low, ["yes", "completed", "more than 5", "more than five", "left", "ended"]):
+            return _build_signal_answer_update(signal_name, True, raw)
+        if _contains_any(low, ["no", "not completed"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+
+    if signal_name == "employer_contribution":
+        if _contains_any(low, ["contribution", "contribute", "not deposited", "did not deposit"]):
+            return _build_signal_answer_update(signal_name, "missing_contribution", raw)
+        if _contains_any(low, ["withdrawal", "withdraw", "claim rejected", "stopped"]):
+            return _build_signal_answer_update(signal_name, "withdrawal_blocked", raw)
+        if "uan" in low:
+            return _build_signal_answer_update(signal_name, "no_uan", raw)
+
+    if signal_name == "access_type":
+        if _contains_any(low, ["phishing", "otp", "one time password"]):
+            return _build_signal_answer_update(signal_name, "phishing_otp", raw)
+        if _contains_any(low, ["link", "malware", "hacked"]):
+            return _build_signal_answer_update(signal_name, "hacked_link", raw)
+        if _contains_any(low, ["former employee", "old login", "ex employee", "partner"]):
+            return _build_signal_answer_update(signal_name, "old_login_misuse", raw)
+
+    for option in pending_signal.get("options") or []:
+        option_text = str(option or "").strip().lower()
+        if option_text and (option_text in low or low in option_text):
+            value = re.sub(r"[^a-z0-9]+", "_", option_text).strip("_") or option_text
+            return _build_signal_answer_update(signal_name, value, raw, 0.75)
+
+    return {}
 
 
 def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) -> bool:
@@ -4815,9 +4899,15 @@ def interview_chat(
             session = INTERVIEW_SESSIONS[s_id]
             auto_session_reset = True
         # Backfill guard fields for old sessions.
+        session.setdefault("facts", {})
+        session.setdefault("signals", {})
+        session.setdefault("asked_questions", [])
         session.setdefault("interview_turns", 0)
         session.setdefault("stagnant_turns", 0)
         session.setdefault("pending_confirmation_retries", 0)
+        session.setdefault("pending_signal_question", None)
+        session.setdefault("pending_signal_retries", 0)
+        session.setdefault("asked_gap_questions", [])
         session.setdefault("asked_contradiction_codes", [])
         session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
 
@@ -4899,6 +4989,10 @@ def interview_chat(
             # Ignore stale employment-specific signal prompts for non-employment matters.
             for signal_name in ["work_relationship", "service_years", "employment_end", "payment_type"]:
                 session["signals"].pop(signal_name, None)
+            pending_signal = session.get("pending_signal_question")
+            if pending_signal and pending_signal.get("signal_name") in {"work_relationship", "service_years", "employment_end", "payment_type"}:
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
 
         pending_confirmation = session.get("pending_confirmation")
         confirmation_progress = False
@@ -4922,8 +5016,23 @@ def interview_chat(
                     session["pending_confirmation"] = None
                     session["pending_confirmation_retries"] = 0
 
+        pending_signal_question = session.get("pending_signal_question")
+        signal_answer_progress = False
+        if pending_signal_question:
+            interpreted_signal = _coerce_pending_signal_answer(payload.query, pending_signal_question)
+            if interpreted_signal:
+                signal_updates.update(interpreted_signal)
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
+                signal_answer_progress = True
+            else:
+                session["pending_signal_retries"] = int(session.get("pending_signal_retries", 0)) + 1
+                if signal_updates or session["pending_signal_retries"] >= MAX_PENDING_SIGNAL_RETRIES:
+                    session["pending_signal_question"] = None
+                    session["pending_signal_retries"] = 0
+
         session["signals"] = merge_signal_state(session.get("signals", {}), signal_updates)
-        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress)
+        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress or signal_answer_progress)
         if progress_this_turn:
             session["stagnant_turns"] = 0
         else:
@@ -4994,6 +5103,8 @@ def interview_chat(
             forced_assess = True
             session["pending_confirmation"] = None
             session["pending_confirmation_retries"] = 0
+            session["pending_signal_question"] = None
+            session["pending_signal_retries"] = 0
 
         if decision == "CLARIFY":
             response_payload = InterviewChatResponse(
@@ -5059,10 +5170,16 @@ def interview_chat(
                     signal_state=session["signals"],
                     contradictions=contradictions,
                 )
+                ranked_signal_questions = [
+                    q for q in ranked_signal_questions
+                    if q.get("id") not in session.get("asked_questions", [])
+                ]
                 if ranked_signal_questions:
                     chosen_signal_question = ranked_signal_questions[0]
                     if chosen_signal_question["id"] not in session["asked_questions"]:
                         session["asked_questions"].append(chosen_signal_question["id"])
+                    session["pending_signal_question"] = chosen_signal_question
+                    session["pending_signal_retries"] = 0
                     final_questions_text.append(chosen_signal_question["question"])
 
             # INTERVIEW Mode: Get targeted questions for ALL active issues
@@ -5098,6 +5215,17 @@ def interview_chat(
                         final_questions_text.append(gap_question)
                         asked_gap_questions.add(gap_question)
                 session["asked_gap_questions"] = list(asked_gap_questions)
+
+            if not final_questions_text:
+                # Nothing new remains to ask. Return the best assessment with the facts available
+                # instead of leaving the client in an interview state with an empty question set.
+                decision = "ASSESS"
+                is_complete = True
+                forced_assess = True
+                session["pending_confirmation"] = None
+                session["pending_confirmation_retries"] = 0
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
         
         # 7. Generate Output
         output_data = generate_legal_output(issue, subtype, session["facts"], is_complete, payload.llm_model)
@@ -5167,6 +5295,8 @@ def interview_chat(
                 "interview_turns": session.get("interview_turns", 0),
                 "stagnant_turns": session.get("stagnant_turns", 0),
                 "pending_confirmation_retries": session.get("pending_confirmation_retries", 0),
+                "pending_signal_retries": session.get("pending_signal_retries", 0),
+                "pending_signal_question": session.get("pending_signal_question"),
                 "signals": summarize_signal_state(session["signals"]),
                 "confirmed_tags": confirmed_tags,
                 "confirmed_tag_confidence": confirmed_tag_confidence,
