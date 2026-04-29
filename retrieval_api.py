@@ -5454,6 +5454,8 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})
 
