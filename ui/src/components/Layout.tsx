@@ -7,7 +7,6 @@ import {
   BarChart3,
   TrendingUp,
   ShieldCheck,
-  Gavel,
   Plus,
   Settings,
   KeyRound,
@@ -297,20 +296,11 @@ export const Sidebar = ({
   return (
     <>
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 shrink-0 border-r border-[color:var(--app-sidebar-border)] bg-[var(--app-sidebar-bg)] backdrop-blur-xl md:flex md:flex-col">
-        <div className="border-b border-[color:var(--app-sidebar-border)] px-6 py-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-container text-on-primary-container shadow-sm">
-              <Gavel className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-[15px] font-semibold text-[var(--app-sidebar-brand)]">Legal AI</h1>
-              <p className="mt-0.5 text-[11px] text-[var(--app-sidebar-muted)]">Jurisprudential engine</p>
-            </div>
-          </div>
-
-          <button type="button" className="primary-button mt-6 w-full justify-center" onClick={onStartNewSession}>
+        <div className="border-b border-[color:var(--app-sidebar-border)] px-5 py-4">
+          <h1 className="text-[34px] leading-none font-medium tracking-tight text-[var(--app-sidebar-brand)]">Claude</h1>
+          <button type="button" className="mt-5 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[23px] text-[var(--app-sidebar-fg)] hover:bg-[var(--app-sidebar-hover-bg)]" onClick={onStartNewSession}>
             <Plus size={16} />
-            New session
+            <span className="text-[29px]">New chat</span>
           </button>
         </div>
 
@@ -472,22 +462,16 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
   }, [isProfileMenuOpen]);
 
   return (
-    <header className="glass-panel sticky top-0 z-30 flex items-center justify-between border-b border-outline-variant/70 px-4 py-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-[#20201f] px-4 py-3 sm:px-6 lg:px-8">
       <div className="flex items-center gap-8">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-on-surface-variant">Legal AI</div>
-          <h2 className="mt-1 text-lg font-semibold text-on-surface">Developer Legal Workspace</h2>
-        </div>
-        <nav className="hidden items-center gap-5 text-sm text-on-surface-variant md:flex">
-          <a href="#docs" className="transition hover:text-on-surface">Docs</a>
-          <a href="#features" className="transition hover:text-on-surface">Features</a>
-          <a href="#pricing" className="transition hover:text-on-surface">Pricing</a>
-        </nav>
+        <button type="button" onClick={onStart} className="rounded-md px-2 py-1 text-sm font-medium text-zinc-200 hover:bg-white/5">
+          Vibe code with me
+        </button>
       </div>
 
       <div className="flex items-center gap-3">
-        <button type="button" className="primary-button hidden md:inline-flex" onClick={onStart}>
-          Start
+        <button type="button" className="hidden rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm text-zinc-300 md:inline-flex" onClick={onStart}>
+          Get Pro
         </button>
         <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
         <div className="relative" ref={profileMenuRef}>
@@ -495,12 +479,12 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
             type="button"
             aria-label="Open profile menu"
             onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-            className="neutral-button rounded-full px-2 py-1.5"
+            className="rounded-full border border-white/10 bg-black/20 px-2 py-1.5 text-zinc-100"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-100">
               {getInitials(currentUserName)}
             </div>
-            <span className="hidden text-sm text-on-surface md:inline">{currentUserName}</span>
+            <span className="hidden text-sm text-zinc-100 md:inline">{currentUserName}</span>
             <ChevronDown size={14} className={`transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
