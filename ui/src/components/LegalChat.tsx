@@ -4,6 +4,8 @@ import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import { 
   CheckCircle2, 
+  ChevronDown,
+  ChevronUp,
   Loader2, 
   Scale, 
   Sparkles, 
@@ -829,6 +831,7 @@ export const LegalChat = ({
     const [behavioralPrimitives, setBehavioralPrimitives] = useState<BehavioralPrimitive[]>([]);
     const [interpretations, setInterpretations] = useState<LegalInterpretation[]>([]);
     const [applicableLaws, setApplicableLaws] = useState<ApplicableLaw[]>([]);
+    const [isIntakeExpanded, setIsIntakeExpanded] = useState(false);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -1052,18 +1055,40 @@ export const LegalChat = ({
                     ? 'Gathering facts - Step 2 of 4'
                     : 'Case intake started - Step 1 of 4';
     const systemModeLabel = status.replace('_', ' ');
+    const IntakeToggleIcon = isIntakeExpanded ? ChevronUp : ChevronDown;
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
-                <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
-                    <div className="max-w-3xl">
-                        <p className="section-kicker">Adaptive legal intake</p>
-                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We answer directly when the facts are already strong.</h2>
+            <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-8">
+                <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-start">
+                    <div className={cn("min-w-0", isIntakeExpanded ? "py-2" : "py-1")}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="section-kicker">Adaptive legal intake</p>
+                                <h2
+                                    className={cn(
+                                        "mt-1 font-semibold text-secondary transition-all",
+                                        isIntakeExpanded ? "text-3xl leading-tight" : "text-2xl leading-tight sm:text-[1.7rem]",
+                                    )}
+                                >
+                                    Describe the issue. We answer directly when the facts are already strong.
+                                </h2>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsIntakeExpanded((prev) => !prev)}
+                                className="mt-0.5 inline-flex shrink-0 items-center gap-2 rounded-full border border-outline-variant/70 bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-primary/30 hover:text-on-surface"
+                                aria-expanded={isIntakeExpanded}
+                                aria-label={isIntakeExpanded ? 'Collapse intake details' : 'Expand intake details'}
+                            >
+                                <span>{isIntakeExpanded ? 'Collapse' : 'Expand'}</span>
+                                <IntakeToggleIcon size={14} />
+                            </button>
+                        </div>
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
-                        <p className="mt-2 text-base text-on-surface-variant">
+                        <p className={cn("text-on-surface-variant", isIntakeExpanded ? "mt-3 text-base" : "mt-2 truncate text-sm")}>
                             Unified Legal Case Engine · Adaptive Intake · FIRAC Analysis
                         </p>
                     </div>
@@ -1088,7 +1113,7 @@ export const LegalChat = ({
                              </span>
                         </div>
                     </div>
-                    <div className="flex min-w-[260px] items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3 lg:justify-end">
                         <div className="app-shell-panel flex flex-1 flex-col bg-surface-container-low px-5 py-4">
                             <div className="flex items-center justify-between gap-3">
                             <span className="text-sm font-medium text-on-surface">
@@ -1128,7 +1153,7 @@ export const LegalChat = ({
                 </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-6 no-scrollbar">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-6xl flex-col gap-5">
                 <AnimatePresence initial={false}>
                     {messages.map((msg, idx) => (
@@ -1550,8 +1575,8 @@ export const LegalChat = ({
             </div>
 
             <div className="border-t border-white/10 bg-[#1c1c1a] px-4 py-5 sm:px-6 lg:px-8">
-                <div className="mx-auto max-w-4xl">
-                    <div className="relative rounded-[24px] border border-white/10 bg-[#2a2a28] p-2 shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
+                <div className="mx-auto w-full max-w-6xl">
+                    <div className="relative w-full rounded-[24px] border border-white/10 bg-[#2a2a28] p-2 shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
                         <div className="overflow-y-auto">
                             <textarea
                                 value={input}
