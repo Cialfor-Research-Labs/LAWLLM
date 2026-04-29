@@ -1054,8 +1054,13 @@ export const LegalChat = ({
             <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
                     <div className="max-w-3xl">
+<<<<<<< HEAD
                         <p className="section-kicker">Adaptive legal intake</p>
                         <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We answer directly when the facts are already strong.</h2>
+=======
+                        <p className="section-kicker">Intelligent interviewer</p>
+                        <h2 className="mt-1 text-3xl font-semibold text-on-surface">Describe the issue. We will structure the legal facts.</h2>
+>>>>>>> 002101a (user manual readme file added)
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>

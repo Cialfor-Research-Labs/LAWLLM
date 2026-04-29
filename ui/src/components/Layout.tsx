@@ -474,7 +474,7 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
     <header className="glass-panel sticky top-0 z-30 flex items-center justify-between border-b border-outline-variant/70 px-4 py-4 sm:px-6 lg:px-8">
       <div>
         <div className="text-[12px] font-medium text-on-surface-variant">Legal AI workspace</div>
-        <h2 className="mt-1 text-xl font-semibold text-secondary">Calm, structured legal drafting</h2>
+        <h2 className="mt-1 text-xl font-semibold text-on-surface">Calm, structured legal drafting</h2>
       </div>
 
       <div className="flex items-center gap-3">
