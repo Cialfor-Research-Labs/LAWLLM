@@ -1059,6 +1059,12 @@ export const LegalChat = ({
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
+                <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
+                    <div className="max-w-3xl">
+                        <p className="section-kicker">Adaptive legal intake</p>
+                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We answer directly when the facts are already strong.</h2>
+
             <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-start">
                     <div className={cn("min-w-0", isIntakeExpanded ? "py-2" : "py-1")}>
@@ -1085,6 +1091,7 @@ export const LegalChat = ({
                                 <IntakeToggleIcon size={14} />
                             </button>
                         </div>
+
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
