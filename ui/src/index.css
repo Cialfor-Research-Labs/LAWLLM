@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-headline: "DM Sans", "Inter", "Segoe UI", sans-serif;
-  --font-body: "DM Sans", "Inter", "Segoe UI", sans-serif;
-  --font-label: "DM Sans", "Inter", "Segoe UI", sans-serif;
+  --font-headline: "Inter", "Geist", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Geist", "Segoe UI", sans-serif;
+  --font-label: "Inter", "Geist", "Segoe UI", sans-serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
 
   --color-primary: var(--app-color-primary);
@@ -43,20 +43,20 @@
 :root {
   color-scheme: light;
 
-  --app-color-primary: #1d9e75;
-  --app-color-primary-container: #d9f2e8;
+  --app-color-primary: #4f46e5;
+  --app-color-primary-container: #e0e7ff;
   --app-color-on-primary: #ffffff;
-  --app-color-on-primary-container: #0f4f3b;
+  --app-color-on-primary-container: #1e1b4b;
 
-  --app-color-secondary: #26215c;
-  --app-color-secondary-container: #ede9fb;
+  --app-color-secondary: #1d4ed8;
+  --app-color-secondary-container: #dbeafe;
   --app-color-on-secondary: #ffffff;
-  --app-color-on-secondary-container: #26215c;
+  --app-color-on-secondary-container: #1e3a8a;
 
-  --app-color-surface: #f8f9fb;
-  --app-color-on-surface: #1f2937;
+  --app-color-surface: #f5f7ff;
+  --app-color-on-surface: #0f172a;
   --app-color-surface-variant: rgba(255, 255, 255, 0.84);
-  --app-color-on-surface-variant: #6b7280;
+  --app-color-on-surface-variant: #64748b;
 
   --app-color-surface-container-lowest: #ffffff;
   --app-color-surface-container-low: #f4f7f8;
@@ -67,15 +67,15 @@
   --app-color-outline: rgba(107, 114, 128, 0.24);
   --app-color-outline-variant: rgba(107, 114, 128, 0.14);
 
-  --app-color-error: #e74c3c;
+  --app-color-error: #ef4444;
   --app-color-on-error: #ffffff;
   --app-color-error-container: #fff1ef;
   --app-color-on-error-container: #a93326;
 
-  --app-atmosphere-1: rgba(225, 245, 238, 0.95);
-  --app-atmosphere-2: rgba(237, 233, 251, 0.9);
-  --app-atmosphere-3: rgba(248, 249, 251, 0.98);
-  --app-atmosphere-glow: rgba(29, 158, 117, 0.12);
+  --app-atmosphere-1: rgba(99, 102, 241, 0.2);
+  --app-atmosphere-2: rgba(34, 211, 238, 0.16);
+  --app-atmosphere-3: rgba(255, 255, 255, 0.9);
+  --app-atmosphere-glow: rgba(79, 70, 229, 0.2);
   --app-panel-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
   --app-ambient-shadow: 0 10px 30px rgba(15, 23, 42, 0.06), 0 24px 60px rgba(15, 23, 42, 0.08);
   --app-input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -105,62 +105,62 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --app-color-primary: #5dcaa5;
-  --app-color-primary-container: #21463d;
-  --app-color-on-primary: #082018;
-  --app-color-on-primary-container: #e8f5f0;
+  --app-color-primary: #6366f1;
+  --app-color-primary-container: #312e81;
+  --app-color-on-primary: #eef2ff;
+  --app-color-on-primary-container: #e0e7ff;
 
-  --app-color-secondary: #4a3f86;
-  --app-color-secondary-container: #2d2552;
-  --app-color-on-secondary: #f2edff;
-  --app-color-on-secondary-container: #ddd3ff;
+  --app-color-secondary: #38bdf8;
+  --app-color-secondary-container: #082f49;
+  --app-color-on-secondary: #e0f2fe;
+  --app-color-on-secondary-container: #bae6fd;
 
-  --app-color-surface: #0f2720;
-  --app-color-on-surface: #e8f5f0;
-  --app-color-surface-variant: rgba(26, 46, 40, 0.88);
-  --app-color-on-surface-variant: #7bb5a5;
+  --app-color-surface: #0b0f19;
+  --app-color-on-surface: #f8fafc;
+  --app-color-surface-variant: rgba(13, 20, 34, 0.82);
+  --app-color-on-surface-variant: #cbd5e1;
 
-  --app-color-surface-container-lowest: #142922;
-  --app-color-surface-container-low: #1a2e28;
-  --app-color-surface-container: #223832;
-  --app-color-surface-container-high: #29423b;
-  --app-color-surface-container-highest: #325049;
+  --app-color-surface-container-lowest: #0d1422;
+  --app-color-surface-container-low: #121a2c;
+  --app-color-surface-container: #162038;
+  --app-color-surface-container-high: #1d2946;
+  --app-color-surface-container-highest: #233258;
 
-  --app-color-outline: rgba(123, 181, 165, 0.28);
-  --app-color-outline-variant: rgba(123, 181, 165, 0.16);
+  --app-color-outline: rgba(148, 163, 184, 0.35);
+  --app-color-outline-variant: rgba(148, 163, 184, 0.2);
 
   --app-color-error: #ffb4ab;
   --app-color-on-error: #690005;
   --app-color-error-container: #7c1d16;
   --app-color-on-error-container: #ffe8e5;
 
-  --app-atmosphere-1: rgba(17, 29, 26, 0.95);
-  --app-atmosphere-2: rgba(21, 58, 50, 0.9);
-  --app-atmosphere-3: rgba(15, 39, 32, 0.98);
-  --app-atmosphere-glow: rgba(93, 202, 165, 0.12);
+  --app-atmosphere-1: rgba(79, 70, 229, 0.18);
+  --app-atmosphere-2: rgba(6, 182, 212, 0.15);
+  --app-atmosphere-3: rgba(11, 15, 25, 0.98);
+  --app-atmosphere-glow: rgba(99, 102, 241, 0.2);
   --app-panel-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
   --app-ambient-shadow: 0 12px 36px rgba(0, 0, 0, 0.2), 0 24px 60px rgba(0, 0, 0, 0.28);
   --app-input-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 
-  --app-sidebar-bg: rgba(17, 29, 26, 0.94);
-  --app-sidebar-border: rgba(123, 181, 165, 0.12);
-  --app-sidebar-fg: #e8f5f0;
-  --app-sidebar-muted: #7bb5a5;
-  --app-sidebar-brand: #e8f5f0;
-  --app-sidebar-hover-bg: rgba(93, 202, 165, 0.08);
-  --app-sidebar-active-bg: rgba(93, 202, 165, 0.14);
-  --app-sidebar-active-text: #5dcaa5;
-  --app-sidebar-panel-bg: rgba(26, 46, 40, 0.84);
-  --app-sidebar-panel-border: rgba(123, 181, 165, 0.12);
-  --app-sidebar-panel-text: #e8f5f0;
-  --app-sidebar-panel-muted: #7bb5a5;
-  --app-sidebar-panel-active-bg: rgba(93, 202, 165, 0.12);
-  --app-sidebar-panel-active-border: rgba(93, 202, 165, 0.24);
-  --app-sidebar-panel-active-text: #5dcaa5;
-  --app-sidebar-panel-hover-bg: rgba(93, 202, 165, 0.08);
+  --app-sidebar-bg: rgba(8, 12, 22, 0.84);
+  --app-sidebar-border: rgba(99, 102, 241, 0.24);
+  --app-sidebar-fg: #f8fafc;
+  --app-sidebar-muted: #aab8cf;
+  --app-sidebar-brand: #f8fafc;
+  --app-sidebar-hover-bg: rgba(99, 102, 241, 0.12);
+  --app-sidebar-active-bg: rgba(99, 102, 241, 0.2);
+  --app-sidebar-active-text: #c7d2fe;
+  --app-sidebar-panel-bg: rgba(15, 23, 42, 0.74);
+  --app-sidebar-panel-border: rgba(148, 163, 184, 0.2);
+  --app-sidebar-panel-text: #f8fafc;
+  --app-sidebar-panel-muted: #cbd5e1;
+  --app-sidebar-panel-active-bg: rgba(56, 189, 248, 0.14);
+  --app-sidebar-panel-active-border: rgba(56, 189, 248, 0.24);
+  --app-sidebar-panel-active-text: #bae6fd;
+  --app-sidebar-panel-hover-bg: rgba(99, 102, 241, 0.08);
 
-  --app-chat-assistant-bubble-bg: rgba(26, 46, 40, 0.96);
-  --app-chat-assistant-bubble-border: rgba(93, 202, 165, 0.2);
+  --app-chat-assistant-bubble-bg: rgba(15, 23, 42, 0.95);
+  --app-chat-assistant-bubble-border: rgba(56, 189, 248, 0.25);
   --app-chat-assistant-bubble-shadow: 0 20px 42px rgba(0, 0, 0, 0.22);
 }
 
@@ -179,15 +179,15 @@
 
   body {
     background-image:
-      radial-gradient(circle at 12% 14%, rgba(225, 245, 238, 0.65), transparent 34%),
-      radial-gradient(circle at 88% 12%, rgba(237, 233, 251, 0.55), transparent 28%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 28%);
+      radial-gradient(circle at 12% 14%, rgba(99, 102, 241, 0.1), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(34, 211, 238, 0.1), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.15), transparent 28%);
   }
 
   :root[data-theme="dark"] body {
     background-image:
-      radial-gradient(circle at 12% 14%, rgba(29, 158, 117, 0.12), transparent 34%),
-      radial-gradient(circle at 88% 12%, rgba(93, 202, 165, 0.08), transparent 28%),
+      radial-gradient(circle at 12% 14%, rgba(99, 102, 241, 0.18), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(34, 211, 238, 0.14), transparent 28%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 28%);
   }
 
@@ -236,7 +236,7 @@
   }
 
   .glass-panel {
-    @apply border border-outline-variant/60 bg-surface-variant backdrop-blur-xl;
+    @apply border border-outline-variant/60 bg-surface-variant/80 backdrop-blur-xl;
     box-shadow: var(--app-panel-shadow);
   }
 
@@ -264,7 +264,7 @@
   }
 
   .primary-button {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-on-primary transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50;
     box-shadow: 0 16px 32px color-mix(in oklab, var(--app-color-primary) 22%, transparent);
   }
 
