@@ -366,8 +366,6 @@ export default function App() {
 
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-surface font-body text-on-surface">
-      <div className="atmosphere" />
-      <div className="atmosphere-glow" />
       {showSidebar ? (
         <Sidebar
           activeTab={activeTab}

@@ -6,14 +6,11 @@ import {
   CheckCircle2, 
   Loader2, 
   Scale, 
-  Send, 
   Sparkles, 
   User, 
   FileText, 
   TrendingUp,
-  ArrowUpIcon,
-  Paperclip,
-  PlusIcon
+  ArrowUpIcon
 } from 'lucide-react';
 import type { GeneratorPrefillPayload } from '../types/generatorPrefill';
 
@@ -1552,9 +1549,9 @@ export const LegalChat = ({
                 </div>
             </div>
 
-            <div className="border-t border-outline-variant/70 bg-surface-variant px-4 py-5 backdrop-blur-sm sm:px-6 lg:px-8">
-                <div className="mx-auto max-w-6xl">
-                    <div className="relative rounded-xl border border-neutral-800 bg-neutral-900 p-2 shadow-sm">
+            <div className="border-t border-white/10 bg-[#1c1c1a] px-4 py-5 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-4xl">
+                    <div className="relative rounded-[24px] border border-white/10 bg-[#2a2a28] p-2 shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
                         <div className="overflow-y-auto">
                             <textarea
                                 value={input}
@@ -1572,52 +1569,31 @@ export const LegalChat = ({
                                 }
                                 disabled={isLoading}
                                 className={cn(
-                                    "min-h-[72px] w-full resize-none border-none bg-transparent px-4 py-3 pr-20 text-sm text-white focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                                    "placeholder:text-neutral-500 disabled:opacity-70"
+                                    "min-h-[72px] w-full resize-none border-none bg-transparent px-4 py-3 pr-20 text-base text-zinc-100 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                                    "placeholder:text-zinc-500 disabled:opacity-70"
                                 )}
                                 style={{ overflow: 'hidden' }}
                             />
                         </div>
 
-                        <div className="flex items-center justify-between p-2">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    className="group flex items-center gap-1 rounded-lg p-2 transition-colors hover:bg-neutral-800"
-                                >
-                                    <Paperclip className="h-4 w-4 text-white" />
-                                    <span className="hidden text-xs text-zinc-400 transition-opacity group-hover:inline">
-                                        Attach
-                                    </span>
-                                </button>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    className="flex items-center justify-between gap-1 rounded-lg border border-dashed border-zinc-700 px-2 py-1 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:bg-zinc-800"
-                                >
-                                    <PlusIcon className="h-4 w-4" />
-                                    Project
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleSend()}
-                                    disabled={isLoading || !input.trim()}
+                        <div className="flex items-center justify-end p-2">
+                            <button
+                                type="button"
+                                onClick={() => handleSend()}
+                                disabled={isLoading || !input.trim()}
+                                className={cn(
+                                    "flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-sm transition-colors hover:border-white/25 hover:bg-black/20 disabled:opacity-60",
+                                    input.trim() ? "bg-zinc-100 text-black" : "text-zinc-400"
+                                )}
+                            >
+                                <ArrowUpIcon
                                     className={cn(
-                                        "flex items-center justify-between gap-1 rounded-lg border border-zinc-700 px-1.5 py-1.5 text-sm transition-colors hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-60",
-                                        input.trim() ? "bg-white text-black" : "text-zinc-400"
+                                        "h-4 w-4",
+                                        input.trim() ? "text-black" : "text-zinc-400"
                                     )}
-                                >
-                                    <ArrowUpIcon
-                                        className={cn(
-                                            "h-4 w-4",
-                                            input.trim() ? "text-black" : "text-zinc-400"
-                                        )}
-                                    />
-                                    <span className="sr-only">Send</span>
-                                </button>
-                            </div>
+                                />
+                                <span className="sr-only">Send</span>
+                            </button>
                         </div>
                     </div>
                 </div>
