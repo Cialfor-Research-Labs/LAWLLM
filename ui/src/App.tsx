@@ -12,6 +12,7 @@ import { LegalChat } from './components/LegalChat';
 import { DocumentGenerator } from './components/DocumentGenerator';
 import { WinPredictor } from './components/WinPredictor';
 import { SettingsPage } from './components/SettingsPage';
+import { LibraryLanding } from './components/LibraryLanding';
 import { LoginPage } from './components/auth/LoginPage';
 import { RequestAccessPage } from './components/auth/RequestAccessPage';
 import { SetPasswordPage } from './components/auth/SetPasswordPage';
@@ -89,7 +90,7 @@ function getInitialActiveChatSessionId(): string | null {
 
 function getInitialThemeMode(): ThemeMode {
   const stored = (localStorage.getItem(THEME_STORAGE_KEY) || '').trim().toLowerCase();
-  return stored === 'dark' ? 'dark' : 'light';
+  return stored === 'light' ? 'light' : 'dark';
 }
 
 function getApiBase(): string {
@@ -312,6 +313,7 @@ export default function App() {
   const toggleTheme = () => {
     setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
+  const showSidebar = activeTab !== 'library';
 
   if (authLoading) {
     return (
@@ -366,28 +368,31 @@ export default function App() {
     <div className="relative flex min-h-screen overflow-hidden bg-surface font-body text-on-surface">
       <div className="atmosphere" />
       <div className="atmosphere-glow" />
-      <Sidebar
-        activeTab={activeTab}
-        activeSettingsSection={activeSettingsSection}
-        setActiveTab={setActiveTab}
-        isAdmin={currentUser.role === 'admin'}
-        onStartNewSession={startNewSession}
-        chatHistory={chatHistory}
-        generatorHistory={generatorHistory}
-        activeChatSessionId={activeChatSessionId}
-        activeGeneratorHistoryId={activeGeneratorHistoryId}
-        onSelectChatHistory={openChatHistoryItem}
-        onSelectGeneratorHistory={openGeneratorHistoryItem}
-        onSelectSettingsSection={openSettingsSection}
-      />
+      {showSidebar ? (
+        <Sidebar
+          activeTab={activeTab}
+          activeSettingsSection={activeSettingsSection}
+          setActiveTab={setActiveTab}
+          isAdmin={currentUser.role === 'admin'}
+          onStartNewSession={startNewSession}
+          chatHistory={chatHistory}
+          generatorHistory={generatorHistory}
+          activeChatSessionId={activeChatSessionId}
+          activeGeneratorHistoryId={activeGeneratorHistoryId}
+          onSelectChatHistory={openChatHistoryItem}
+          onSelectGeneratorHistory={openGeneratorHistoryItem}
+          onSelectSettingsSection={openSettingsSection}
+        />
+      ) : null}
 
-      <main className="relative z-10 flex h-screen flex-1 flex-col pb-20 md:ml-72 md:pb-0">
+      <main className={`relative z-10 flex h-screen flex-1 flex-col pb-20 md:pb-0 ${showSidebar ? 'md:ml-72' : ''}`}>
         <Header
           currentUserName={currentUser.name}
           onLogout={onLogout}
           onOpenProfile={() => openSettingsSection('details')}
           themeMode={themeMode}
           onToggleTheme={toggleTheme}
+          onStart={startNewSession}
         />
         
         <AnimatePresence mode="wait">
@@ -472,6 +477,21 @@ export default function App() {
                 currentUser={currentUser}
                 onUserUpdated={setCurrentUser}
                 activeSection={activeSettingsSection}
+              />
+            </motion.div>
+          ) : activeTab === 'library' ? (
+            <motion.div
+              key="library"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col overflow-hidden"
+            >
+              <LibraryLanding
+                onOpenChat={() => setActiveTab('chat')}
+                onOpenGenerator={() => setActiveTab('generator')}
+                onOpenAnalyzer={() => setActiveTab('analyzer')}
+                trustedCount={chatHistory.length + generatorHistory.length}
               />
             </motion.div>
           ) : (

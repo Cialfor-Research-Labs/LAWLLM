@@ -56,6 +56,7 @@ interface HeaderProps {
   onOpenProfile: () => void;
   themeMode: ThemeMode;
   onToggleTheme: () => void;
+  onStart: () => void;
 }
 
 interface ThemeToggleProps {
@@ -454,7 +455,7 @@ export const Sidebar = ({
   );
 };
 
-export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, onToggleTheme }: HeaderProps) => {
+export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, onToggleTheme, onStart }: HeaderProps) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -472,12 +473,22 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
 
   return (
     <header className="glass-panel sticky top-0 z-30 flex items-center justify-between border-b border-outline-variant/70 px-4 py-4 sm:px-6 lg:px-8">
-      <div>
-        <div className="text-[12px] font-medium text-on-surface-variant">Legal AI workspace</div>
-        <h2 className="mt-1 text-xl font-semibold text-secondary">Calm, structured legal drafting</h2>
+      <div className="flex items-center gap-8">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.14em] text-on-surface-variant">Legal AI</div>
+          <h2 className="mt-1 text-lg font-semibold text-on-surface">Developer Legal Workspace</h2>
+        </div>
+        <nav className="hidden items-center gap-5 text-sm text-on-surface-variant md:flex">
+          <a href="#docs" className="transition hover:text-on-surface">Docs</a>
+          <a href="#features" className="transition hover:text-on-surface">Features</a>
+          <a href="#pricing" className="transition hover:text-on-surface">Pricing</a>
+        </nav>
       </div>
 
       <div className="flex items-center gap-3">
+        <button type="button" className="primary-button hidden md:inline-flex" onClick={onStart}>
+          Start
+        </button>
         <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
         <div className="relative" ref={profileMenuRef}>
           <button
