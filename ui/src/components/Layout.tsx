@@ -4,6 +4,7 @@ import {
   ChevronDown,
   MessageSquare,
   FileText,
+  Files,
   BarChart3,
   TrendingUp,
   ShieldCheck,
@@ -251,6 +252,7 @@ export const Sidebar = ({
   const libraryOptions: NavItem[] = [
     { id: 'chat', label: 'AI legal chat', icon: MessageSquare },
     { id: 'generator', label: 'Legal notice generator', icon: FileText },
+    { id: 'document-builder', label: 'Legal document generator', icon: Files },
     { id: 'analyzer', label: 'Document analyzer', icon: BarChart3 },
     { id: 'predictor', label: 'Win predictor', icon: TrendingUp },
   ];
@@ -267,6 +269,7 @@ export const Sidebar = ({
     ? [
         { id: 'chat', label: 'Chat', icon: MessageSquare },
         { id: 'generator', label: 'Notices', icon: FileText },
+        { id: 'document-builder', label: 'Drafts', icon: Files },
         { id: 'library', label: 'Library', icon: LibraryIcon },
         { id: 'admin', label: 'Admin', icon: ShieldCheck },
         { id: 'settings', label: 'Settings', icon: Settings },
@@ -274,6 +277,7 @@ export const Sidebar = ({
     : [
         { id: 'chat', label: 'Chat', icon: MessageSquare },
         { id: 'generator', label: 'Notices', icon: FileText },
+        { id: 'document-builder', label: 'Drafts', icon: Files },
         { id: 'library', label: 'Library', icon: LibraryIcon },
         { id: 'settings', label: 'Settings', icon: Settings },
       ];
@@ -405,7 +409,7 @@ export const Sidebar = ({
       </aside>
 
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-outline-variant/70 bg-surface-variant px-3 py-2 backdrop-blur-xl md:hidden">
-        <div className={`grid gap-2 ${mobileItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <div className={`grid gap-2 ${mobileItems.length === 6 ? 'grid-cols-6' : mobileItems.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
           {mobileItems.map((item) => {
             const isActive =
               item.id === 'settings'

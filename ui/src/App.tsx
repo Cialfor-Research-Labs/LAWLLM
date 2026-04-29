@@ -12,7 +12,7 @@ import { LegalChat } from './components/LegalChat';
 import { DocumentGenerator } from './components/DocumentGenerator';
 import { WinPredictor } from './components/WinPredictor';
 import { SettingsPage } from './components/SettingsPage';
-import { LibraryLanding } from './components/LibraryLanding';
+import { LegalDocumentGenerator } from './pages/LegalDocumentGenerator';
 import { LoginPage } from './components/auth/LoginPage';
 import { RequestAccessPage } from './components/auth/RequestAccessPage';
 import { SetPasswordPage } from './components/auth/SetPasswordPage';
@@ -53,7 +53,7 @@ const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
 const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const THEME_STORAGE_KEY = 'vidhi_theme_mode';
-const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
+const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'document-builder', 'analyzer', 'predictor', 'admin', 'settings']);
 
 function loadGeneratorHistoryFromStorage(): GeneratorHistoryItem[] {
   try {
@@ -101,8 +101,21 @@ function getApiBase(): string {
   return '/api';
 }
 
+function shouldUseDocumentBuilderDemoMode(): boolean {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('demo') === 'document-builder') {
+      return true;
+    }
+  } catch {
+    // ignore URL parsing issues
+  }
+  return Boolean(import.meta.env.DEV);
+}
+
 export default function App() {
   const apiBase = useMemo(() => getApiBase(), []);
+  const documentBuilderDemoMode = useMemo(() => shouldUseDocumentBuilderDemoMode(), []);
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('vidhi_auth_token'));
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(Boolean(localStorage.getItem('vidhi_auth_token')));
@@ -124,6 +137,7 @@ export default function App() {
   const [generatorOpenRequest, setGeneratorOpenRequest] = useState<{ id: string; nonce: number } | null>(null);
   const [chatNewSessionRequest, setChatNewSessionRequest] = useState<number | null>(null);
   const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
+  const [documentBuilderNewSessionRequest, setDocumentBuilderNewSessionRequest] = useState<number | null>(null);
   const [generatorPrefillRequest, setGeneratorPrefillRequest] = useState<GeneratorPrefillRequest | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getInitialThemeMode());
 
@@ -245,6 +259,7 @@ export default function App() {
     setGeneratorOpenRequest(null);
     setChatNewSessionRequest(null);
     setGeneratorNewSessionRequest(null);
+    setDocumentBuilderNewSessionRequest(null);
     setGeneratorPrefillRequest(null);
     setAuthView('login');
   };
@@ -270,6 +285,10 @@ export default function App() {
       setGeneratorOpenRequest(null);
       setGeneratorNewSessionRequest(Date.now());
       setGeneratorPrefillRequest(null);
+      return;
+    }
+    if (activeTab === 'document-builder') {
+      setDocumentBuilderNewSessionRequest(Date.now());
       return;
     }
     if (activeTab === 'chat') {
@@ -330,6 +349,21 @@ export default function App() {
   }
 
   if (!authToken || !currentUser) {
+    if (documentBuilderDemoMode) {
+      return (
+        <div className="relative flex min-h-screen overflow-hidden bg-surface font-body text-on-surface">
+          <div className="atmosphere" />
+          <div className="atmosphere-glow" />
+          <div className="fixed right-4 top-4 z-50">
+            <ThemeToggle themeMode={themeMode} onToggleTheme={toggleTheme} />
+          </div>
+          <div className="fixed left-4 top-4 z-50 max-w-sm rounded-2xl border border-sky-200/80 bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-ambient backdrop-blur-xl dark:border-sky-400/20 dark:bg-slate-950/80 dark:text-slate-200">
+            Demo mode is active for the frontend-only Legal Document Generator. Open <code>?demo=document-builder</code> anytime to jump here directly.
+          </div>
+          <LegalDocumentGenerator newSessionRequest={documentBuilderNewSessionRequest} />
+        </div>
+      );
+    }
     if (authView === 'request') {
       return (
         <>
@@ -440,6 +474,16 @@ export default function App() {
                 onHistoryChange={setGeneratorHistory}
                 onActiveHistoryChange={setActiveGeneratorHistoryId}
               />
+            </motion.div>
+          ) : activeTab === 'document-builder' ? (
+            <motion.div
+              key="document-builder"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col overflow-hidden"
+            >
+              <LegalDocumentGenerator newSessionRequest={documentBuilderNewSessionRequest} />
             </motion.div>
           ) : activeTab === 'admin' && currentUser.role === 'admin' ? (
             <motion.div
