@@ -2175,6 +2175,15 @@ def _retry_prompt_for_general_info(user_query: str) -> str:
     )
 
 
+def _retry_prompt_for_notice_generation(original_prompt: str) -> str:
+    return (
+        "You are drafting a legal notice document for India.\n"
+        "Do not return any refusal, scope-guardrail, or assistant-policy message.\n"
+        "Return only the legal notice content in professional format.\n\n"
+        f"{original_prompt}"
+    )
+
+
 def extract_structured_query(user_query: str, model_name: str) -> Dict[str, Any]:
     prompt = (
         "Convert the user's legal query into JSON.\n"
@@ -6259,6 +6268,12 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             prompt=prompt,
             timeout_sec=payload.llm_timeout_sec,
         )
+        if _is_scope_guardrail_response(draft_notice) or _is_legal_advice_refusal(draft_notice):
+            draft_notice = call_llm(
+                model_name=payload.llm_model,
+                prompt=_retry_prompt_for_notice_generation(prompt),
+                timeout_sec=payload.llm_timeout_sec,
+            )
 
         # STEP 6: Refine (Pass 2 — mandatory)
         refine_prompt = build_notice_refinement_prompt(draft_notice, tone=payload.tone)
@@ -6267,6 +6282,17 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             prompt=refine_prompt,
             timeout_sec=payload.llm_timeout_sec,
         )
+        if _is_scope_guardrail_response(refined_notice) or _is_legal_advice_refusal(refined_notice):
+            refined_notice = call_llm(
+                model_name=payload.llm_model,
+                prompt=_retry_prompt_for_notice_generation(refine_prompt),
+                timeout_sec=payload.llm_timeout_sec,
+            )
+        if _is_scope_guardrail_response(refined_notice) or _is_legal_advice_refusal(refined_notice):
+            raise HTTPException(
+                status_code=502,
+                detail="Notice generation failed due to a model guardrail response. Please retry.",
+            )
 
         # STEP 7: Append authority section
         laws_used = config["laws"][:]
