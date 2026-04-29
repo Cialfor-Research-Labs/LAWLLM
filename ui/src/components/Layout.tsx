@@ -467,8 +467,6 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
         <h2 className="mt-1 text-xl font-semibold text-on-surface">Calm, structured legal drafting</h2>
       </div>
 
-      <div className="flex items-center gap-3">
-    <header className="sticky top-0 z-30 flex items-center justify-end border-b border-white/10 bg-[#20201f] px-4 py-3 sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
         <div className="relative" ref={profileMenuRef}>
