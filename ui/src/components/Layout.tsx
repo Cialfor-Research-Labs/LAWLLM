@@ -7,7 +7,6 @@ import {
   BarChart3,
   TrendingUp,
   ShieldCheck,
-  Gavel,
   Plus,
   Settings,
   KeyRound,
@@ -296,20 +295,11 @@ export const Sidebar = ({
   return (
     <>
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 shrink-0 border-r border-[color:var(--app-sidebar-border)] bg-[var(--app-sidebar-bg)] backdrop-blur-xl md:flex md:flex-col">
-        <div className="border-b border-[color:var(--app-sidebar-border)] px-6 py-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-container text-on-primary-container shadow-sm">
-              <Gavel className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-[15px] font-semibold text-[var(--app-sidebar-brand)]">Legal AI</h1>
-              <p className="mt-0.5 text-[11px] text-[var(--app-sidebar-muted)]">Jurisprudential engine</p>
-            </div>
-          </div>
-
-          <button type="button" className="primary-button mt-6 w-full justify-center" onClick={onStartNewSession}>
+        <div className="border-b border-[color:var(--app-sidebar-border)] px-5 py-4">
+          <h1 className="text-[34px] leading-none font-medium tracking-tight text-[var(--app-sidebar-brand)]">Claude</h1>
+          <button type="button" className="mt-5 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[23px] text-[var(--app-sidebar-fg)] hover:bg-[var(--app-sidebar-hover-bg)]" onClick={onStartNewSession}>
             <Plus size={16} />
-            New session
+            <span className="text-[29px]">New chat</span>
           </button>
         </div>
 
@@ -478,19 +468,23 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
       </div>
 
       <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 flex items-center justify-end border-b border-white/10 bg-[#20201f] px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex min-w-0 items-center gap-3">
         <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
         <div className="relative" ref={profileMenuRef}>
           <button
             type="button"
             aria-label="Open profile menu"
             onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-            className="neutral-button rounded-full px-2 py-1.5"
+            className="flex max-w-[min(15rem,calc(100vw-7rem))] items-center gap-3 rounded-full border border-white/10 bg-black/20 px-2 py-2 text-zinc-100 transition hover:border-white/15 hover:bg-black/30 sm:max-w-[16rem]"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-100">
               {getInitials(currentUserName)}
             </div>
-            <span className="hidden text-sm text-on-surface md:inline">{currentUserName}</span>
-            <ChevronDown size={14} className={`transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+            <div className="hidden min-w-0 flex-1 text-left md:block">
+              <span className="block truncate text-sm font-medium text-zinc-100">{currentUserName}</span>
+            </div>
+            <ChevronDown size={14} className={`shrink-0 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isProfileMenuOpen ? (
