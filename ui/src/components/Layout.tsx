@@ -55,7 +55,6 @@ interface HeaderProps {
   onOpenProfile: () => void;
   themeMode: ThemeMode;
   onToggleTheme: () => void;
-  onStart: () => void;
 }
 
 interface ThemeToggleProps {
@@ -445,7 +444,7 @@ export const Sidebar = ({
   );
 };
 
-export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, onToggleTheme, onStart }: HeaderProps) => {
+export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, onToggleTheme }: HeaderProps) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -462,30 +461,23 @@ export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, on
   }, [isProfileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-[#20201f] px-4 py-3 sm:px-6 lg:px-8">
-      <div className="flex items-center gap-8">
-        <button type="button" onClick={onStart} className="rounded-md px-2 py-1 text-sm font-medium text-zinc-200 hover:bg-white/5">
-          Vibe code with me
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button type="button" className="hidden rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm text-zinc-300 md:inline-flex" onClick={onStart}>
-          Get Pro
-        </button>
+    <header className="sticky top-0 z-30 flex items-center justify-end border-b border-white/10 bg-[#20201f] px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex min-w-0 items-center gap-3">
         <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
         <div className="relative" ref={profileMenuRef}>
           <button
             type="button"
             aria-label="Open profile menu"
             onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-            className="rounded-full border border-white/10 bg-black/20 px-2 py-1.5 text-zinc-100"
+            className="flex max-w-[min(15rem,calc(100vw-7rem))] items-center gap-3 rounded-full border border-white/10 bg-black/20 px-2 py-2 text-zinc-100 transition hover:border-white/15 hover:bg-black/30 sm:max-w-[16rem]"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-100">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-100">
               {getInitials(currentUserName)}
             </div>
-            <span className="hidden text-sm text-zinc-100 md:inline">{currentUserName}</span>
-            <ChevronDown size={14} className={`transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+            <div className="hidden min-w-0 flex-1 text-left md:block">
+              <span className="block truncate text-sm font-medium text-zinc-100">{currentUserName}</span>
+            </div>
+            <ChevronDown size={14} className={`shrink-0 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isProfileMenuOpen ? (

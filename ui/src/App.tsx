@@ -390,7 +390,6 @@ export default function App() {
           onOpenProfile={() => openSettingsSection('details')}
           themeMode={themeMode}
           onToggleTheme={toggleTheme}
-          onStart={startNewSession}
         />
         
         <AnimatePresence mode="wait">
