@@ -10,9 +10,16 @@ import {
   Sparkles, 
   User, 
   FileText, 
-  TrendingUp 
+  TrendingUp,
+  ArrowUpIcon,
+  Paperclip,
+  PlusIcon
 } from 'lucide-react';
 import type { GeneratorPrefillPayload } from '../types/generatorPrefill';
+
+function cn(...inputs: Array<string | false | null | undefined>) {
+    return inputs.filter(Boolean).join(' ');
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -116,7 +123,7 @@ interface InterviewChatResponse {
     issue: string;
     secondary_issues: string[];
     confidence: number;
-    status: string; // "interviewing", "clarification_required", "complete", "review_required"
+    status: string; // "interviewing", "clarification_required", "complete", "review_required", "out_of_scope"
     is_complete: boolean;
     questions: string[];
     legal_output?: LegalOutput | null;
@@ -137,7 +144,9 @@ const markdownComponents: Components = {
 };
 
 const DEFAULT_GREETING =
-    'Hello. I am Legal AI. Describe your legal situation first. I will interview you for the missing facts, build the case map, and only then provide the final legal assessment.';
+    'Hello. I am Legal AI. Describe your legal situation in as much detail as you have. If the facts are already complete, I will answer directly. If something important is missing, I will ask only the next needed question.';
+
+const NOTICE_GENERATOR_PREFILL_ENABLED = false;
 
 interface LegalChatProps {
     authToken: string;
@@ -702,7 +711,7 @@ function formatInterviewResponse(data: InterviewChatResponse) {
         lines.push(data.questions[0]);
     }
 
-    if (data.is_complete && out.notice_draft) {
+    if (NOTICE_GENERATOR_PREFILL_ENABLED && data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
         lines.push('**Legal Notice Generator Prefill Ready**: You can transfer these facts into the "Legal Notice Generator" tab, review them, and generate the notice there.');
@@ -712,6 +721,10 @@ function formatInterviewResponse(data: InterviewChatResponse) {
 }
 
 function formatInterviewResponseClean(data: InterviewChatResponse) {
+    if (data.status === 'out_of_scope') {
+        return data.questions[0] || 'I can only assist with Indian legal queries. Please ask a question related to Indian law.';
+    }
+
     const out = data.legal_output;
     const statusLabel = data.is_complete ? 'Case Complete' : data.status.replace('_', ' ').toUpperCase();
 
@@ -753,13 +766,27 @@ function formatInterviewResponseClean(data: InterviewChatResponse) {
         out.evidence_checklist.forEach((item) => lines.push(`- [ ] ${item}`));
     }
 
+    const ragDebug = data.state_debug?.rag as { citations?: unknown[] } | undefined;
+    const ragCitations = Array.isArray(ragDebug?.citations) ? ragDebug.citations : [];
+    if (data.is_complete && ragCitations.length > 0) {
+        lines.push('');
+        lines.push('**Retrieved Sources**');
+        ragCitations.slice(0, 5).forEach((raw) => {
+            const citation = raw as Record<string, unknown>;
+            const title = String(citation.title || citation.source || citation.document || 'Retrieved legal source');
+            const section = citation.section_number ? `Section ${String(citation.section_number)}` : '';
+            const corpus = citation.corpus ? String(citation.corpus) : '';
+            lines.push(`- ${[title, section, corpus].filter(Boolean).join(' | ')}`);
+        });
+    }
+
     if (data.questions.length > 0 && !data.is_complete) {
         lines.push('');
         lines.push('**Questions to answer:**');
         data.questions.forEach((question, index) => lines.push(`${index + 1}. ${question}`));
     }
 
-    if (data.is_complete && out.notice_draft) {
+    if (NOTICE_GENERATOR_PREFILL_ENABLED && data.is_complete && out.notice_draft) {
         lines.push('');
         lines.push('---');
         lines.push('**Legal Notice Generator Prefill Ready**: You can transfer these facts into the "Legal Notice Generator" tab, review them, and generate the notice there.');
@@ -981,7 +1008,9 @@ export const LegalChat = ({
         ) &&
         extractMeaningfulTranscriptLines(messages).length > 0;
 
-    const canPrefillDocumentGenerator = !isLoading && hasMeaningfulConversation;
+    const isOutOfScope = status === 'out_of_scope';
+    const canPrefillDocumentGenerator =
+        NOTICE_GENERATOR_PREFILL_ENABLED && !isLoading && hasMeaningfulConversation && !isOutOfScope;
     const showQuickStartChips = !hasMeaningfulConversation && !isLoading;
     const quickStartChips = [
         'Salary not paid',
@@ -1005,7 +1034,9 @@ export const LegalChat = ({
     };
 
     const completedSteps =
-        status === 'complete'
+        isOutOfScope
+            ? 1
+            : status === 'complete'
             ? 4
             : status === 'clarification_required' || status === 'review_required'
                 ? 3
@@ -1014,7 +1045,9 @@ export const LegalChat = ({
                     : 1;
     const progressValue = completedSteps * 25;
     const progressLabel =
-        completedSteps === 4
+        isOutOfScope
+            ? 'Legal question needed - Step 1 of 4'
+            : completedSteps === 4
             ? 'FIRAC analysis ready - Step 4 of 4'
             : completedSteps === 3
                 ? 'Clarifying missing facts - Step 3 of 4'
@@ -1028,13 +1061,13 @@ export const LegalChat = ({
             <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
                     <div className="max-w-3xl">
-                        <p className="section-kicker">Intelligent interviewer</p>
-                        <h2 className="mt-1 text-3xl font-semibold text-on-surface">Describe the issue. We will structure the legal facts.</h2>
+                        <p className="section-kicker">Adaptive legal intake</p>
+                        <h2 className="mt-1 text-3xl font-semibold text-secondary">Describe the issue. We answer directly when the facts are already strong.</h2>
                         <p className="hidden text-sm text-on-surface-variant">
                             Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
                         </p>
                         <p className="mt-2 text-base text-on-surface-variant">
-                            Unified Legal Case Engine · Factual Extraction · FIRAC Analysis
+                            Unified Legal Case Engine · Adaptive Intake · FIRAC Analysis
                         </p>
                     </div>
                     <div className="hidden items-center gap-3">
@@ -1085,7 +1118,7 @@ export const LegalChat = ({
                                 ))}
                             </div>
                             <p className="mt-2 text-[12px] text-on-surface-variant">
-                                We keep asking focused follow-ups only until the facts are strong enough for a confident summary.
+                                We only ask follow-up questions when your first description still leaves important gaps.
                             </p>
                         </div>
                         <div className="hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 shadow-sm">
@@ -1165,13 +1198,13 @@ export const LegalChat = ({
                         <div className="chat-assistant-bubble flex items-center gap-4 rounded-[24px] border px-5 py-4">
                             <Loader2 size={18} className="animate-spin text-primary" />
                             <div className="text-sm font-medium text-on-surface">
-                                Analyzing the facts and preparing the next legal question...
+                                Reviewing the facts and deciding whether we can answer now or need one more detail...
                             </div>
                         </div>
                     </div>
                 )}
 
-                {status === 'review_required' && caseModel && (
+                {status === 'review_required' && caseModel && !isComplete && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1179,11 +1212,11 @@ export const LegalChat = ({
                     >
                         <div className="flex items-center gap-2 text-amber-700 font-bold uppercase tracking-wider text-xs mb-4">
                             <FileText size={16} />
-                            Case Model Review Required
+                            Case Model Review
                         </div>
                         
                         <p className="text-sm text-amber-900 mb-6">
-                            I've reconstructed the timeline and parties involved. Please confirm if this is correct before we proceed to legal analysis.
+                            I reconstructed the likely timeline and parties from your description. If anything looks off, you can correct it. Otherwise, confirm and continue.
                         </p>
 
                         <div className="grid gap-6 md:grid-cols-2">
@@ -1254,7 +1287,7 @@ export const LegalChat = ({
                                 }}
                                 className="flex-1 bg-primary text-on-primary py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/20"
                             >
-                                Confirm & Proceed
+                                Confirm Timeline
                             </button>
                             <button className="px-6 py-3 border border-outline-variant rounded-xl text-xs font-bold text-on-surface hover:bg-surface-container">
                                 Edit
@@ -1521,32 +1554,71 @@ export const LegalChat = ({
 
             <div className="border-t border-outline-variant/70 bg-surface-variant px-4 py-5 backdrop-blur-sm sm:px-6 lg:px-8">
                 <div className="mx-auto max-w-6xl">
-                    <div className="app-shell-panel relative overflow-hidden p-3">
-                    <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSend();
-                            }
-                        }}
-                        placeholder={
-                            isComplete
-                                ? "Ask a follow-up or start a new matter..."
-                                : "Describe the matter or answer the interview questions..."
-                        }
-                        disabled={isLoading}
-                        className="text-field h-24 resize-none pr-20 disabled:opacity-70"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => handleSend()}
-                        disabled={isLoading || !input.trim()}
-                        className="primary-button absolute bottom-6 right-6 h-14 w-14 rounded-2xl px-0 py-0 disabled:scale-100"
-                    >
-                        <Send size={22} />
-                    </button>
+                    <div className="relative rounded-xl border border-neutral-800 bg-neutral-900 p-2 shadow-sm">
+                        <div className="overflow-y-auto">
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder={
+                                    isComplete
+                                        ? "Ask a follow-up or start a new matter..."
+                                        : "Describe the matter fully. If anything important is missing, I will ask the next needed question..."
+                                }
+                                disabled={isLoading}
+                                className={cn(
+                                    "min-h-[72px] w-full resize-none border-none bg-transparent px-4 py-3 pr-20 text-sm text-white focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                                    "placeholder:text-neutral-500 disabled:opacity-70"
+                                )}
+                                style={{ overflow: 'hidden' }}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between p-2">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="group flex items-center gap-1 rounded-lg p-2 transition-colors hover:bg-neutral-800"
+                                >
+                                    <Paperclip className="h-4 w-4 text-white" />
+                                    <span className="hidden text-xs text-zinc-400 transition-opacity group-hover:inline">
+                                        Attach
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="flex items-center justify-between gap-1 rounded-lg border border-dashed border-zinc-700 px-2 py-1 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:bg-zinc-800"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
+                                    Project
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSend()}
+                                    disabled={isLoading || !input.trim()}
+                                    className={cn(
+                                        "flex items-center justify-between gap-1 rounded-lg border border-zinc-700 px-1.5 py-1.5 text-sm transition-colors hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-60",
+                                        input.trim() ? "bg-white text-black" : "text-zinc-400"
+                                    )}
+                                >
+                                    <ArrowUpIcon
+                                        className={cn(
+                                            "h-4 w-4",
+                                            input.trim() ? "text-black" : "text-zinc-400"
+                                        )}
+                                    />
+                                    <span className="sr-only">Send</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
