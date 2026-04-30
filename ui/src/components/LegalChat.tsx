@@ -1510,7 +1510,7 @@ export const LegalChat = ({
                                     <div className="space-y-2">
                                         {legalOutput.applicable_laws.map(law => (
                                             <div key={law} className="text-xs text-on-surface-variant bg-surface-container-low p-2 rounded-lg border border-outline-variant/10">
-                                                âš–ï¸ {law}
+                                                {law}
                                             </div>
                                         ))}
                                     </div>
