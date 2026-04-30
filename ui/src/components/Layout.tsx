@@ -55,14 +55,6 @@ interface HeaderProps {
   onOpenProfile: () => void;
   themeMode: ThemeMode;
   onToggleTheme: () => void;
-  statusSummary?: HeaderStatusSummary | null;
-}
-
-export interface HeaderStatusSummary {
-  label: string;
-  progressValue: number;
-  completedSteps: number;
-  helperText: string;
 }
 
 interface ThemeToggleProps {
@@ -452,14 +444,7 @@ export const Sidebar = ({
   );
 };
 
-export const Header = ({
-  currentUserName,
-  onLogout,
-  onOpenProfile,
-  themeMode,
-  onToggleTheme,
-  statusSummary,
-}: HeaderProps) => {
+export const Header = ({ currentUserName, onLogout, onOpenProfile, themeMode, onToggleTheme }: HeaderProps) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -476,93 +461,60 @@ export const Header = ({
   }, [isProfileMenuOpen]);
 
   return (
-    <header className="glass-panel sticky top-0 z-30 border-b border-outline-variant/70 px-4 py-4 sm:px-6 lg:px-8">
-      <div
-        className={`w-full gap-4 ${
-          statusSummary
-            ? 'grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(340px,520px)_auto] xl:items-center'
-            : 'flex flex-col sm:flex-row sm:items-center sm:justify-between'
-        }`}
-      >
-        <div className="min-w-0">
-          <div className="text-[12px] font-medium text-on-surface-variant">Legal AI workspace</div>
-          <h2 className="mt-1 text-xl font-semibold text-on-surface">Calm, structured legal drafting</h2>
-        </div>
+    <header className="glass-panel sticky top-0 z-30 flex items-center justify-between border-b border-outline-variant/70 px-4 py-4 sm:px-6 lg:px-8">
+      <div>
+        <div className="text-[12px] font-medium text-on-surface-variant">Legal AI workspace</div>
+        <h2 className="mt-1 text-xl font-semibold text-on-surface">Calm, structured legal drafting</h2>
+      </div>
 
-        {statusSummary ? (
-          <div className="min-w-0 xl:px-2">
-            <div className="app-shell-panel mx-auto flex w-full max-w-[32rem] flex-col bg-surface-container-low px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="truncate text-sm font-medium text-on-surface">{statusSummary.label}</span>
-                <span className="status-pill shrink-0">{statusSummary.progressValue}%</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${statusSummary.progressValue}%` }}
-                />
-              </div>
-              <div className="mt-2 grid grid-cols-4 items-center text-[10px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant/80">
-                {[1, 2, 3, 4].map((step) => (
-                  <span key={step} className={`text-center ${statusSummary.completedSteps >= step ? 'text-primary' : ''}`}>
-                    Step {step}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 hidden text-[12px] text-on-surface-variant sm:block">{statusSummary.helperText}</p>
+      <div className="flex min-w-0 items-center gap-3">
+        <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
+        <div className="relative" ref={profileMenuRef}>
+          <button
+            type="button"
+            aria-label="Open profile menu"
+            onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+            className="flex max-w-[min(15rem,calc(100vw-7rem))] items-center gap-3 rounded-full border border-white/10 bg-black/20 px-2 py-2 text-zinc-100 transition hover:border-white/15 hover:bg-black/30 sm:max-w-[16rem]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-100">
+              {getInitials(currentUserName)}
             </div>
-          </div>
-        ) : null}
+            <div className="hidden min-w-0 flex-1 text-left md:block">
+              <span className="block truncate text-sm font-medium text-zinc-100">{currentUserName}</span>
+            </div>
+            <ChevronDown size={14} className={`shrink-0 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-        <div className="flex min-w-0 items-center justify-self-end gap-3">
-          <ThemeToggle themeMode={themeMode} onToggleTheme={onToggleTheme} compact />
-          <div className="relative" ref={profileMenuRef}>
-            <button
-              type="button"
-              aria-label="Open profile menu"
-              onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-              className="flex max-w-[min(15rem,calc(100vw-7rem))] items-center gap-3 rounded-full border border-white/10 bg-black/20 px-2 py-2 text-zinc-100 transition hover:border-white/15 hover:bg-black/30 sm:max-w-[16rem]"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-zinc-100">
-                {getInitials(currentUserName)}
+          {isProfileMenuOpen ? (
+            <div className="app-shell-panel absolute right-0 top-[calc(100%+0.6rem)] z-50 w-60 overflow-hidden">
+              <div className="border-b border-outline-variant/70 px-4 py-3">
+                <div className="text-[11px] text-on-surface-variant">Signed in as</div>
+                <div className="mt-1 text-sm font-medium text-on-surface">{currentUserName}</div>
               </div>
-              <div className="hidden min-w-0 flex-1 text-left md:block">
-                <span className="block truncate text-sm font-medium text-zinc-100">{currentUserName}</span>
-              </div>
-              <ChevronDown size={14} className={`shrink-0 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isProfileMenuOpen ? (
-              <div className="app-shell-panel absolute right-0 top-[calc(100%+0.6rem)] z-50 w-60 overflow-hidden">
-                <div className="border-b border-outline-variant/70 px-4 py-3">
-                  <div className="text-[11px] text-on-surface-variant">Signed in as</div>
-                  <div className="mt-1 text-sm font-medium text-on-surface">{currentUserName}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    onOpenProfile();
-                  }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
-                >
-                  <Settings size={16} />
-                  Profile details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileMenuOpen(false);
-                    onLogout();
-                  }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
-                >
-                  <LogOut size={16} />
-                  Logout
-                </button>
-              </div>
-            ) : null}
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  onOpenProfile();
+                }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-sm text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+              >
+                <Settings size={16} />
+                Profile details
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  onLogout();
+                }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-sm text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </header>
