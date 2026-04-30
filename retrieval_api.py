@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import traceback
 import uuid
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple
@@ -69,6 +70,8 @@ from phase65_engine import (
 
 app = FastAPI(title="Legal AI API", version="2.5")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -79,7 +82,7 @@ app.add_middleware(
 
 # 🧠 Session Storage
 SESSIONS: Dict[str, List[Dict[str, str]]] = {}
-LOG_PATH = os.path.join("logs", "query_logs.json")
+LOG_PATH = os.path.join(BASE_DIR, "logs", "query_logs.json")
 DISABLE_EMBEDDING_RETRIEVAL = os.getenv("DISABLE_EMBEDDING_RETRIEVAL", "true").strip().lower() == "true"
 USE_JUDGEMENT_EMBEDDINGS = os.getenv("USE_JUDGEMENT_EMBEDDINGS", "true").strip().lower() == "true"
 # PHASE 1: Score thresholds disabled — no chunk is rejected due to score.
@@ -89,10 +92,15 @@ MAX_RETRIEVAL_QUERIES = int(os.getenv("MAX_RETRIEVAL_QUERIES", "5"))
 DEFAULT_ALLOWED_DOCS = {"acts", "judgements"}
 LAWYER_SESSIONS: Dict[str, Dict[str, Any]] = {}
 INTERVIEW_SESSIONS: Dict[str, Dict[str, Any]] = {}
-INTERACTION_LOG_PATH = os.path.join("test", "interaction_logs.jsonl")
+INTERACTION_LOG_PATH = os.path.join(BASE_DIR, "test", "interaction_logs.jsonl")
 MAX_INTERVIEW_TURNS = int(os.getenv("MAX_INTERVIEW_TURNS", "6"))
 MAX_STAGNANT_TURNS = int(os.getenv("MAX_STAGNANT_TURNS", "2"))
 MAX_PENDING_CONFIRMATION_RETRIES = int(os.getenv("MAX_PENDING_CONFIRMATION_RETRIES", "2"))
+MAX_PENDING_SIGNAL_RETRIES = int(os.getenv("MAX_PENDING_SIGNAL_RETRIES", "1"))
+LEGAL_GUARDRAIL_RESPONSE = (
+    "I can only assist with Indian legal queries such as laws, cases, legal documents, "
+    "notices, complaints, disputes, and legal concepts. Please ask a question related to Indian law."
+)
 
 # Auth / Access control settings
 SESSION_TTL_HOURS = int(os.getenv("SESSION_TTL_HOURS", "24"))
@@ -100,7 +108,7 @@ PASSWORD_SETUP_TOKEN_TTL_HOURS = int(os.getenv("PASSWORD_SETUP_TOKEN_TTL_HOURS",
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000").rstrip("/")
 PASSWORD_HASH_ITERATIONS = 120_000
 MAILER_NODE_BIN = os.getenv("MAILER_NODE_BIN", "node")
-MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join("ui", "scripts", "send_setup_email.cjs"))
+MAILER_SCRIPT_PATH = os.getenv("MAILER_SCRIPT_PATH", os.path.join(BASE_DIR, "ui", "scripts", "send_setup_email.cjs"))
 CHAT_HISTORY_PROMPT_LIMIT = int(os.getenv("CHAT_HISTORY_PROMPT_LIMIT", "24"))
 CHAT_HISTORY_DETAIL_LIMIT = int(os.getenv("CHAT_HISTORY_DETAIL_LIMIT", "200"))
 CHAT_HISTORY_LIST_LIMIT = int(os.getenv("CHAT_HISTORY_LIST_LIMIT", "50"))
@@ -117,7 +125,7 @@ def _load_dotenv_cache() -> Dict[str, str]:
         return _DOTENV_CACHE
 
     parsed: Dict[str, str] = {}
-    env_path = ".env"
+    env_path = os.path.join(BASE_DIR, ".env")
     if os.path.exists(env_path):
         try:
             with open(env_path, "r", encoding="utf-8") as fh:
@@ -375,6 +383,8 @@ class AdminAccessListResponse(BaseModel):
     ok: bool
     users: List[Dict[str, Any]]
     requests: List[Dict[str, Any]]
+    query_category_summary: Dict[str, Any] = Field(default_factory=dict)
+    recent_queries: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AdminAccessUpdateResponse(BaseModel):
@@ -501,7 +511,7 @@ class InterviewChatResponse(BaseModel):
     issue: str
     secondary_issues: List[str] = []
     confidence: float
-    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required"
+    status: str = "interviewing" # "interviewing", "clarification_required", "complete", "review_required", "out_of_scope"
     is_complete: bool
     questions: List[str]
     legal_output: Optional[LegalOutput] = None
@@ -527,8 +537,10 @@ def _utc_iso_days_ago(days: int) -> str:
 AuthRow = Mapping[str, Any]
 
 
-def _translate_auth_sql(query: str) -> str:
-    return query.replace("?", "%s")
+def _translate_auth_sql(query: str, backend: str) -> str:
+    if backend == "postgres":
+        return query.replace("?", "%s")
+    return query
 
 
 class _AuthCursor:
@@ -558,8 +570,9 @@ class _AuthCursorResult:
 
 
 class _AuthConnection:
-    def __init__(self, conn: Any) -> None:
+    def __init__(self, conn: Any, backend: str) -> None:
         self._conn = conn
+        self.backend = backend
 
     def __enter__(self) -> "_AuthConnection":
         self._conn.__enter__()
@@ -569,23 +582,41 @@ class _AuthConnection:
         return bool(self._conn.__exit__(exc_type, exc, tb))
 
     def execute(self, query: str, params: Sequence[Any] = ()) -> _AuthCursor:
-        return _AuthCursor(self._conn.execute(_translate_auth_sql(query), params))
+        return _AuthCursor(self._conn.execute(_translate_auth_sql(query, self.backend), params))
 
     def executemany(self, query: str, params_seq: Sequence[Sequence[Any]]) -> _AuthCursor:
-        translated = _translate_auth_sql(query)
-        with self._conn.cursor() as cur:
+        translated = _translate_auth_sql(query, self.backend)
+        if self.backend == "postgres":
+            with self._conn.cursor() as cur:
+                cur.executemany(translated, params_seq)
+                rowcount = int(cur.rowcount or 0)
+            return _AuthCursor(_AuthCursorResult(rowcount))
+
+        cur = self._conn.cursor()
+        try:
             cur.executemany(translated, params_seq)
             rowcount = int(cur.rowcount or 0)
+        finally:
+            cur.close()
         return _AuthCursor(_AuthCursorResult(rowcount))
 
     def commit(self) -> None:
         self._conn.commit()
 
 
+def _get_sqlite_auth_db_path() -> str:
+    raw = (_get_env_with_dotenv_fallback("SQLITE_AUTH_DB_PATH", "auth_access.db") or "auth_access.db").strip()
+    if not raw:
+        raw = "auth_access.db"
+    if os.path.isabs(raw):
+        return raw
+    return os.path.join(BASE_DIR, raw)
+
+
 def _db_conn() -> _AuthConnection:
     dsn = (_get_env_with_dotenv_fallback("AUTH_DB_DSN", "") or "").strip()
     if dsn:
-        return _AuthConnection(psycopg.connect(dsn, row_factory=dict_row))
+        return _AuthConnection(psycopg.connect(dsn, row_factory=dict_row), backend="postgres")
 
     host = (_get_env_with_dotenv_fallback("AUTH_DB_HOST", "") or "").strip()
     port = (_get_env_with_dotenv_fallback("AUTH_DB_PORT", "5432") or "5432").strip()
@@ -593,6 +624,14 @@ def _db_conn() -> _AuthConnection:
     user = (_get_env_with_dotenv_fallback("AUTH_DB_USER", "") or "").strip()
     password = _get_env_with_dotenv_fallback("AUTH_DB_PASSWORD", "")
     sslmode = (_get_env_with_dotenv_fallback("AUTH_DB_SSLMODE", "prefer") or "prefer").strip()
+
+    pg_values = (host, dbname, user, password)
+    if not any(str(value or "").strip() for value in pg_values):
+        sqlite_path = _get_sqlite_auth_db_path()
+        sqlite_conn = sqlite3.connect(sqlite_path)
+        sqlite_conn.row_factory = sqlite3.Row
+        sqlite_conn.execute("PRAGMA foreign_keys = ON")
+        return _AuthConnection(sqlite_conn, backend="sqlite")
 
     missing = [
         key
@@ -606,9 +645,9 @@ def _db_conn() -> _AuthConnection:
     ]
     if missing:
         raise RuntimeError(
-            "Missing PostgreSQL auth DB config. Set AUTH_DB_DSN or "
-            + ", ".join(missing)
-            + "."
+            "Incomplete PostgreSQL auth DB config. Set AUTH_DB_DSN or provide all AUTH_DB_HOST, "
+            "AUTH_DB_NAME, AUTH_DB_USER, and AUTH_DB_PASSWORD values. To use local SQLite for auth, "
+            "leave all AUTH_DB_* values empty and set SQLITE_AUTH_DB_PATH."
         )
 
     return _AuthConnection(
@@ -620,7 +659,8 @@ def _db_conn() -> _AuthConnection:
             password=password,
             sslmode=sslmode,
             row_factory=dict_row,
-        )
+        ),
+        backend="postgres",
     )
 
 
@@ -668,9 +708,14 @@ def _row_to_user_view(row: AuthRow) -> Dict[str, Any]:
     }
 
 
+def _sqlite_column_exists(conn: _AuthConnection, table_name: str, column_name: str) -> bool:
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return any(str(row["name"]) == column_name for row in rows)
+
+
 def _ensure_auth_schema() -> None:
     with _db_conn() as conn:
-        for statement in (
+        postgres_statements = (
             """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -812,8 +857,156 @@ def _ensure_auth_schema() -> None:
             """,
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS advocate_address TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS advocate_mobile TEXT NOT NULL DEFAULT ''",
-        ):
+        )
+        sqlite_statements = (
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                organization TEXT NOT NULL DEFAULT '',
+                use_case TEXT NOT NULL DEFAULT '',
+                advocate_address TEXT NOT NULL DEFAULT '',
+                advocate_mobile TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
+                access_granted INTEGER NOT NULL DEFAULT 0,
+                password_hash TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_single_admin_role
+            ON users(role) WHERE role = 'admin'
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS access_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                organization TEXT NOT NULL DEFAULT '',
+                use_case TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL CHECK (status IN ('pending', 'granted', 'denied')),
+                reviewed_by INTEGER,
+                review_notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS password_setup_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                created_by_admin_id INTEGER,
+                created_at TEXT NOT NULL,
+                used_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                revoked INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                revoked_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_message_at TEXT NOT NULL,
+                archived INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_last
+            ON chat_sessions(user_id, last_message_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id
+            ON chat_messages(session_id, id)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS access_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                occurred_at TEXT NOT NULL,
+                ip_address TEXT NOT NULL DEFAULT '',
+                forwarded_for TEXT NOT NULL DEFAULT '',
+                real_ip TEXT NOT NULL DEFAULT '',
+                method TEXT NOT NULL,
+                path TEXT NOT NULL,
+                status_code INTEGER NOT NULL,
+                outcome TEXT NOT NULL CHECK (outcome IN ('success', 'client_error', 'server_error')),
+                user_agent TEXT NOT NULL DEFAULT '',
+                referer TEXT NOT NULL DEFAULT '',
+                origin TEXT NOT NULL DEFAULT '',
+                query_string_present INTEGER NOT NULL DEFAULT 0,
+                user_id INTEGER,
+                user_email TEXT NOT NULL DEFAULT '',
+                user_role TEXT NOT NULL DEFAULT '',
+                session_id INTEGER,
+                is_authenticated INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_occurred_at_desc
+            ON access_events(occurred_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_ip_address
+            ON access_events(ip_address)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_user_id
+            ON access_events(user_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_path
+            ON access_events(path)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_access_events_status_occurred
+            ON access_events(status_code, occurred_at DESC)
+            """,
+        )
+
+        for statement in postgres_statements if conn.backend == "postgres" else sqlite_statements:
             conn.execute(statement)
+        if conn.backend == "sqlite":
+            if not _sqlite_column_exists(conn, "users", "advocate_address"):
+                conn.execute("ALTER TABLE users ADD COLUMN advocate_address TEXT NOT NULL DEFAULT ''")
+            if not _sqlite_column_exists(conn, "users", "advocate_mobile"):
+                conn.execute("ALTER TABLE users ADD COLUMN advocate_mobile TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -838,16 +1031,18 @@ def _bootstrap_single_admin() -> None:
         now = _utc_now_iso()
         if not admins:
             password_hash = _hash_password(admin_password) if admin_password else None
-            cur = conn.execute(
+            conn.execute(
                 """
                 INSERT INTO users
                 (name, email, organization, use_case, role, status, access_granted, password_hash, created_at, updated_at)
                 VALUES (?, ?, '', 'Seeded admin account', 'admin', 'granted', TRUE, ?, ?, ?)
-                RETURNING id
                 """,
                 (admin_name, admin_email, password_hash, now, now),
             )
-            admin_row = cur.fetchone()
+            admin_row = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                (admin_email,),
+            ).fetchone()
             if not admin_row:
                 raise RuntimeError("Failed to create seeded admin account.")
             admin_id = int(admin_row["id"])
@@ -1584,16 +1779,172 @@ def _fresh_interview_session_state() -> Dict[str, Any]:
         "active_issues": [],
         "facts": {},
         "asked_questions": [],
+        "asked_gap_questions": [],
+        "user_turns": [],
         "case_model": None,
         "signals": {},
         "pending_confirmation": None,
+        "pending_signal_question": None,
         "contradictions": [],
         "last_top_law": None,
         "interview_turns": 0,
         "stagnant_turns": 0,
         "pending_confirmation_retries": 0,
+        "pending_signal_retries": 0,
         "asked_contradiction_codes": [],
     }
+
+
+def _contains_any(text: str, tokens: Sequence[str]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _build_signal_answer_update(signal_name: str, value: Any, raw_text: str, confidence: float = 0.85) -> Dict[str, Dict[str, Any]]:
+    return {
+        signal_name: {
+            "value": value,
+            "source": "user_signal_answer",
+            "user_confidence": confidence,
+            "confirmed": True,
+            "raw_text": raw_text,
+        }
+    }
+
+
+def _coerce_pending_signal_answer(answer: str, pending_signal: Optional[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Map a direct answer to a previously asked signal-ranking question into signal state."""
+    if not pending_signal:
+        return {}
+
+    signal_name = str(pending_signal.get("signal_name") or "").strip()
+    if not signal_name:
+        return {}
+
+    raw = str(answer or "").strip()
+    low = raw.lower()
+    if not low:
+        return {}
+
+    if signal_name == "payment_type":
+        if _contains_any(low, ["monthly salary", "salary", "wage", "pay slip", "salary slip"]):
+            return _build_signal_answer_update(signal_name, "monthly_salary", raw)
+        if _contains_any(low, ["final settlement", "full and final", "fnf", "gratuity", "after leaving"]):
+            return _build_signal_answer_update(signal_name, "gratuity", raw)
+        if _contains_any(low, ["pf", "provident", "retirement", "uan"]):
+            return _build_signal_answer_update(signal_name, "retirement_benefit", raw)
+        if "bonus" in low or "incentive" in low:
+            return _build_signal_answer_update(signal_name, "bonus", raw)
+        if _contains_any(low, ["something else", "other", "different"]):
+            return _build_signal_answer_update(signal_name, "other", raw, 0.65)
+
+    if signal_name == "employment_end":
+        years_match = re.search(r"(\d+)\s*\+?\s*years?", low)
+        if _contains_any(low, ["still working", "currently employed", "not left", "still employed"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+        if _contains_any(low, ["less than 5", "less than five", "under 5", "under five"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+        if years_match:
+            return _build_signal_answer_update(signal_name, int(years_match.group(1)) >= 5, raw)
+        if _contains_any(low, ["yes", "completed", "more than 5", "more than five", "left", "ended"]):
+            return _build_signal_answer_update(signal_name, True, raw)
+        if _contains_any(low, ["no", "not completed"]):
+            return _build_signal_answer_update(signal_name, False, raw)
+
+    if signal_name == "employer_contribution":
+        if _contains_any(low, ["contribution", "contribute", "not deposited", "did not deposit"]):
+            return _build_signal_answer_update(signal_name, "missing_contribution", raw)
+        if _contains_any(low, ["withdrawal", "withdraw", "claim rejected", "stopped"]):
+            return _build_signal_answer_update(signal_name, "withdrawal_blocked", raw)
+        if "uan" in low:
+            return _build_signal_answer_update(signal_name, "no_uan", raw)
+
+    if signal_name == "access_type":
+        if _contains_any(low, ["phishing", "otp", "one time password"]):
+            return _build_signal_answer_update(signal_name, "phishing_otp", raw)
+        if _contains_any(low, ["link", "malware", "hacked"]):
+            return _build_signal_answer_update(signal_name, "hacked_link", raw)
+        if _contains_any(low, ["former employee", "old login", "ex employee", "partner"]):
+            return _build_signal_answer_update(signal_name, "old_login_misuse", raw)
+
+    for option in pending_signal.get("options") or []:
+        option_text = str(option or "").strip().lower()
+        if option_text and (option_text in low or low in option_text):
+            value = re.sub(r"[^a-z0-9]+", "_", option_text).strip("_") or option_text
+            return _build_signal_answer_update(signal_name, value, raw, 0.75)
+
+    return {}
+
+
+LEGAL_INTERVIEW_ANCHOR_TERMS = {
+    "act", "advocate", "agreement", "arbitration", "bail", "case", "cheating", "claim",
+    "company", "compensation", "complaint", "consumer", "contract", "court", "crime",
+    "criminal", "damages", "defamation", "defect", "defective", "dismissed", "dispute",
+    "employee", "employer", "employment", "evict", "eviction", "fir", "fired", "fraud",
+    "gratuity", "harassment", "hr", "illegal", "injury", "job", "judge", "judgment",
+    "landlord", "law", "lawsuit", "lawyer", "lease", "legal", "liability", "manager",
+    "notice", "police", "property", "refund", "rent", "rights", "salary", "section",
+    "sue", "tenant", "terminated", "termination", "theft", "wages", "warranty", "workplace",
+}
+
+INTERVIEW_PROFANITY_TERMS = {
+    "fuck", "fucks", "fucked", "fucking", "shit", "bullshit", "damn", "bastard",
+    "asshole", "idiot", "stupid", "chutiya", "madarchod", "bhenchod", "bc", "mc",
+}
+
+NON_LEGAL_INTERVIEW_PATTERNS = [
+    r"\bhow\s+to\s+(make|cook|prepare|boil|fry|bake)\b",
+    r"\b(recipe|ingredients|cooking|maggi|noodles|pasta|tea|coffee|snack|dish)\b",
+    r"\b(weather|joke|poem|song|movie|cricket|sports score|horoscope)\b",
+]
+
+
+def _has_legal_interview_anchor(text: str) -> bool:
+    low = str(text or "").strip().lower()
+    return any(re.search(rf"\b{re.escape(term)}\b", low) for term in LEGAL_INTERVIEW_ANCHOR_TERMS)
+
+
+def _is_noise_only_interview_text(text: str) -> bool:
+    low = str(text or "").strip().lower()
+    if not low:
+        return True
+    if _has_legal_interview_anchor(low):
+        return False
+    words = re.findall(r"[a-z0-9]+", low)
+    if not words:
+        return True
+    if len(words) <= 6 and any(word in INTERVIEW_PROFANITY_TERMS for word in words):
+        return True
+    return False
+
+
+def _is_clearly_non_legal_interview_query(query: str) -> bool:
+    low = str(query or "").strip().lower()
+    if not low:
+        return False
+    if _has_legal_interview_anchor(low):
+        return False
+    if _is_noise_only_interview_text(low):
+        return True
+    return any(re.search(pattern, low) for pattern in NON_LEGAL_INTERVIEW_PATTERNS)
+
+
+def _build_out_of_scope_interview_response(session_id: str) -> InterviewChatResponse:
+    return InterviewChatResponse(
+        ok=True,
+        session_id=session_id,
+        issue="out_of_scope",
+        secondary_issues=[],
+        confidence=0.0,
+        status="out_of_scope",
+        is_complete=False,
+        questions=[LEGAL_GUARDRAIL_RESPONSE],
+        legal_output=None,
+        case_model=None,
+        behavioral_primitives=[],
+        interpretations=[],
+        applicable_laws=[],
+        state_debug={"guardrail": "non_legal_interview_query"},
+    )
 
 
 def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) -> bool:
@@ -1601,6 +1952,15 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
     if not session:
         return False
     prior_turns = int(session.get("interview_turns", 0))
+    current = str(session.get("issue") or "unknown")
+    if (
+        prior_turns >= 1
+        and current in {"unknown", "out_of_scope", ""}
+        and _has_legal_interview_anchor(query)
+        and not session.get("facts")
+    ):
+        return True
+
     if prior_turns < 2:
         return False
 
@@ -1619,7 +1979,6 @@ def _should_auto_reset_interview_session(session: Dict[str, Any], query: str) ->
         return False
 
     hinted = str((detect_issues(q) or {}).get("primary") or "unknown")
-    current = str(session.get("issue") or "unknown")
     issue_shift = hinted not in {"unknown", ""} and current not in {"unknown", ""} and hinted != current
 
     return issue_shift or bool(session.get("signals")) or len(session.get("asked_questions", [])) >= 3
@@ -1788,7 +2147,16 @@ def _is_legal_advice_refusal(answer: str) -> bool:
         "not able to provide legal advice",
         "i am not a lawyer so i cannot",
     ]
-    return any(p in text for p in patterns)
+    return any(p in text for p in patterns) or _is_scope_guardrail_response(text)
+
+
+def _is_scope_guardrail_response(answer: str) -> bool:
+    text = (answer or "").strip().lower()
+    return (
+        "i can only assist with indian legal queries" in text
+        or "please ask a question related to indian law" in text
+        or "i can only assist with indian legal" in text
+    )
 
 
 def _retry_prompt_for_general_info(user_query: str) -> str:
@@ -1804,6 +2172,15 @@ def _retry_prompt_for_general_info(user_query: str) -> str:
         "Disclaimer.\n"
         "Give general legal information and practical procedural guidance. Do not assist wrongdoing.\n\n"
         f"User question:\n{user_query}\n"
+    )
+
+
+def _retry_prompt_for_notice_generation(original_prompt: str) -> str:
+    return (
+        "You are drafting a legal notice document for India.\n"
+        "Do not return any refusal, scope-guardrail, or assistant-policy message.\n"
+        "Return only the legal notice content in professional format.\n\n"
+        f"{original_prompt}"
     )
 
 
@@ -2384,6 +2761,147 @@ def generate_relevant_laws(
     }
 
 
+def analyze_query_for_retrieval(
+    user_query: str,
+    dense_query: str,
+    model_name: str,
+    timeout_sec: int = 20,
+) -> Dict[str, Any]:
+    prompt = (
+        "Analyze the following Indian legal query and return ONLY valid JSON with this schema:\n"
+        "{\n"
+        '  "domain": "consumer|criminal|contract|property|labour|general",\n'
+        '  "intent": "legal_notice|legal_query",\n'
+        '  "facts": ["fact 1", "fact 2"],\n'
+        '  "relevant_laws": ["law 1", "law 2"],\n'
+        '  "preferred_laws": ["law 1"],\n'
+        '  "disallowed_law_hints": ["irrelevant law hint"],\n'
+        '  "rewritten_query": "dense legal keywords",\n'
+        '  "retrieval_queries": ["query 1", "query 2", "query 3"]\n'
+        "}\n"
+        "Rules:\n"
+        "- 'facts': Extract atomic facts. Do not rely on punctuation splitting alone.\n"
+        "- 'relevant_laws', 'preferred_laws', 'disallowed_law_hints': Keep lists short. Focus on Indian laws only. Prefer central laws if state is not mentioned.\n"
+        "- 'rewritten_query': Precise legal search query for INDIA. Do NOT include foreign laws.\n"
+        "- 'retrieval_queries': Generate at most 5 highly relevant queries. Avoid unrelated laws or noisy expansion.\n"
+        "- Return ONLY a valid JSON object. No markdown formatting.\n\n"
+        f"User query:\n{user_query}\n"
+    )
+
+    raw = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec)
+    parsed: Dict[str, Any] = {}
+    if raw and not raw.startswith("[ERROR]"):
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start >= 0 and end > start:
+                parsed = json.loads(raw[start : end + 1])
+        except Exception:
+            parsed = {}
+
+    # 1. Structured query
+    structured_query = {
+        "domain": parsed.get("domain", classify_legal_issue(user_query)),
+        "intent": parsed.get("intent", "legal_query"),
+        "facts": parsed.get("facts", [])
+    }
+    facts = structured_query["facts"]
+    if not isinstance(facts, list) or not facts:
+        facts = [
+            frag.strip(" .")
+            for frag in re.split(r"\b(?:and|but|because|after|when|while)\b|[.;!?]", user_query, flags=re.IGNORECASE)
+            if frag.strip()
+        ]
+    structured_query["facts"] = [str(f).strip() for f in facts if str(f).strip()][:5]
+
+    # 2. Relevant Laws
+    relevant_laws = [str(x).strip() for x in parsed.get("relevant_laws", []) if str(x).strip()]
+    preferred_laws = [str(x).strip() for x in parsed.get("preferred_laws", []) if str(x).strip()]
+    disallowed_law_hints = [str(x).strip() for x in parsed.get("disallowed_law_hints", []) if str(x).strip()]
+    relevant_laws = [_clean_law_name(x) for x in relevant_laws if _clean_law_name(x)]
+    preferred_laws = [_clean_law_name(x) for x in preferred_laws if _clean_law_name(x)]
+    disallowed_law_hints = [_clean_law_name(x) for x in disallowed_law_hints if _clean_law_name(x)]
+
+    q = (user_query or "").lower()
+    if structured_query.get("domain") == "property" and any(
+        term in q for term in ["landlord", "tenant", "lease", "rent", "deposit", "security deposit", "vacated"]
+    ):
+        relevant_keys = [_canonical_law_key(x) for x in relevant_laws]
+        preferred_keys = [_canonical_law_key(x) for x in preferred_laws]
+        for law in ["transfer of property act", "indian contract act", "specific relief act"]:
+            if law not in relevant_keys:
+                relevant_laws.append(law)
+                relevant_keys.append(law)
+        for law in ["transfer of property act", "indian contract act", "specific relief act"]:
+            if law not in preferred_keys:
+                preferred_laws.append(law)
+                preferred_keys.append(law)
+        preferred_laws = [x for x in preferred_laws if "consumer protection act" not in _canonical_law_key(x)]
+        if not _query_mentions_specific_state(user_query):
+            for hint in GENERIC_STATE_RENT_HINTS:
+                if hint not in [x.lower() for x in disallowed_law_hints]:
+                    disallowed_law_hints.append(hint)
+
+    if _is_cyber_it_act_query(user_query, structured_query):
+        relevant_keys = [_canonical_law_key(x) for x in relevant_laws]
+        preferred_keys = [_canonical_law_key(x) for x in preferred_laws]
+        cyber_laws = ["information technology act", "bharatiya nyaya sanhita", "bharatiya nagrik suraksha sanhita"]
+        for law in cyber_laws:
+            if law not in relevant_keys:
+                relevant_laws.append(law)
+                relevant_keys.append(law)
+        if "information technology act" not in preferred_keys:
+            preferred_laws.insert(0, "information technology act")
+            preferred_keys.insert(0, "information technology act")
+        for hint in ["transfer of property act", "specific relief act", "consumer protection act"]:
+            if hint not in [x.lower() for x in disallowed_law_hints]:
+                disallowed_law_hints.append(hint)
+
+    law_focus = {
+        "relevant_laws": relevant_laws[:8],
+        "preferred_laws": preferred_laws[:5],
+        "disallowed_law_hints": disallowed_law_hints[:8],
+    }
+
+    # 3. Rewritten query
+    llm_query = str(parsed.get("rewritten_query") or user_query).strip()
+    foreign_markers = ["u.s.", "united states", "cfaa", "gdpr", "wiretap act", "ecpa", "eu law", "uk law"]
+    if any(tok in llm_query.lower() for tok in foreign_markers):
+        llm_query = user_query
+
+    # 4. Retrieval queries
+    raw_retrieval_queries = parsed.get("retrieval_queries", [])
+    deterministic = _deterministic_retrieval_queries(user_query, structured_query)
+    if deterministic:
+        retrieval_queries = deterministic
+    else:
+        fallback = [llm_query, dense_query, user_query] + structured_query["facts"][:2]
+        cleaned: List[str] = []
+        seen = set()
+        for candidate in raw_retrieval_queries + fallback:
+            candidate = " ".join(str(candidate or "").replace("\n", " ").split()).strip()
+            if not candidate:
+                continue
+            bad_markers = ["triple the security deposit", "rental agreement act", "section 11 of the transfer of property act"]
+            lowered_candidate = candidate.lower()
+            if any(marker in lowered_candidate for marker in bad_markers):
+                continue
+            if lowered_candidate in seen:
+                continue
+            seen.add(lowered_candidate)
+            cleaned.append(candidate)
+            if len(cleaned) >= MAX_RETRIEVAL_QUERIES:
+                break
+        retrieval_queries = cleaned[:MAX_RETRIEVAL_QUERIES]
+
+    return {
+        "structured_query": structured_query,
+        "law_focus": law_focus,
+        "llm_query": llm_query,
+        "retrieval_queries": retrieval_queries
+    }
+
+
 def _result_score(item: Dict[str, Any]) -> float:
     return float(item.get("final_score", item.get("hybrid_score", 0.0)) or 0.0)
 
@@ -2746,6 +3264,356 @@ def _generate_lawyer_final_analysis(
             for block in context_blocks[:6]
         ],
     }
+
+
+INTERVIEW_ISSUE_DOMAIN_MAP = {
+    "wage_dispute": "labour",
+    "termination_dispute": "labour",
+    "consumer_dispute": "consumer",
+    "builder_delay": "consumer",
+    "rent_dispute": "property",
+    "eviction_issue": "property",
+    "ownership_dispute": "property",
+    "property_fraud": "property",
+    "contract_dispute": "contract",
+    "cheque_bounce": "contract",
+    "fraud": "criminal",
+    "criminal_complaint": "criminal",
+    "harassment": "criminal",
+    "defamation": "criminal",
+    "account_hacking": "criminal",
+    "online_fraud": "criminal",
+    "identity_theft": "criminal",
+    "data_breach": "criminal",
+    "harassment_cyber": "criminal",
+}
+
+CASE_MODEL_DOMAIN_MAP = {
+    "cyber": "criminal",
+    "employment": "labour",
+    "financial": "contract",
+    "consumer": "consumer",
+    "property": "property",
+    "contract": "contract",
+}
+
+
+def _interview_retrieval_domain(issue: str, case_obj: CaseModel) -> str:
+    case_domain = str(case_obj.domain or "").strip().lower()
+    if case_domain in CASE_MODEL_DOMAIN_MAP:
+        return CASE_MODEL_DOMAIN_MAP[case_domain]
+    return INTERVIEW_ISSUE_DOMAIN_MAP.get(str(issue or "").strip().lower(), "general")
+
+
+def _build_interview_case_text(
+    *,
+    issue: str,
+    active_issues: Sequence[str],
+    case_obj: CaseModel,
+    facts: Dict[str, Any],
+    user_turns: Sequence[str],
+) -> str:
+    lines = [
+        f"Primary issue: {str(issue or 'unknown').replace('_', ' ')}",
+        f"Related issues: {', '.join(str(i).replace('_', ' ') for i in active_issues if i) or 'none'}",
+    ]
+
+    if user_turns:
+        narrative_lines: List[str] = []
+        for turn in user_turns[-8:]:
+            cleaned = " ".join(str(turn or "").split()).strip()
+            if cleaned and not _is_noise_only_interview_text(cleaned):
+                narrative_lines.append(f"- {cleaned}")
+        if narrative_lines:
+            lines.append("User narrative:")
+            lines.extend(narrative_lines)
+
+    if facts:
+        lines.append("Extracted facts:")
+        for key, value in list(facts.items())[:12]:
+            if value is not None and str(value).strip() != "":
+                lines.append(f"- {str(key).replace('_', ' ')}: {value}")
+
+    if case_obj.detected_relationship:
+        lines.append(f"Detected relationship: {case_obj.detected_relationship}")
+
+    if case_obj.events:
+        event_lines: List[str] = []
+        for event in case_obj.events[:10]:
+            event_text = " ".join([str(event.action or ""), str(event.description or "")]).strip()
+            if _is_noise_only_interview_text(event_text):
+                continue
+            parts = [
+                f"event {event.sequence}",
+                event.action,
+                event.description,
+            ]
+            if event.timestamp:
+                parts.append(f"date/time: {event.timestamp}")
+            if event.location:
+                parts.append(f"location: {event.location}")
+            event_lines.append("- " + " | ".join(str(part) for part in parts if part))
+        if event_lines:
+            lines.append("Timeline/events:")
+            lines.extend(event_lines)
+
+    if case_obj.financials:
+        lines.append("Financials:")
+        for item in case_obj.financials[:5]:
+            lines.append(f"- {item.currency} {item.amount}: {item.context} ({item.status})")
+
+    if case_obj.documents:
+        lines.append("Documents/evidence:")
+        for doc in case_obj.documents[:8]:
+            lines.append(f"- {doc.type}: {doc.description} ({doc.status})")
+
+    if case_obj.meta.intents or case_obj.meta.claims:
+        lines.append("Intent/claims:")
+        for item in list(case_obj.meta.intents + case_obj.meta.claims)[:8]:
+            cleaned = " ".join(str(item or "").split()).strip()
+            if cleaned and not _is_noise_only_interview_text(cleaned):
+                lines.append(f"- {cleaned}")
+
+    return "\n".join(lines).strip()
+
+
+def _law_focus_from_law_engine(laws_response: Any) -> Dict[str, List[str]]:
+    laws: List[str] = []
+    for item in getattr(laws_response, "applicable_laws", []) or []:
+        law = _display_law_name(str(getattr(item, "law", "") or ""))
+        if law and law not in laws:
+            laws.append(law)
+    return {
+        "relevant_laws": laws[:6],
+        "preferred_laws": laws[:3],
+        "disallowed_law_hints": [],
+    }
+
+
+def _build_interview_context_grounded_fallback(
+    *,
+    case_text: str,
+    issue: str,
+    facts: Dict[str, Any],
+    context_blocks: List[Dict[str, Any]],
+) -> str:
+    law_lines = _extract_applicable_law_lines(context_blocks, limit=6)
+    facts_lines = [
+        f"- {str(key).replace('_', ' ')}: {value}"
+        for key, value in list((facts or {}).items())[:8]
+        if value is not None and str(value).strip() != ""
+    ]
+    if not facts_lines:
+        facts_lines = [
+            line for line in case_text.splitlines()
+            if line.startswith("- ") and not _is_noise_only_interview_text(line[2:])
+        ][:8]
+
+    lines = [
+        "### Facts",
+        *(facts_lines or ["- The interview indicates a potential legal dispute, but the extracted facts are limited."]),
+        "",
+        "### Legal Issues",
+        f"- {str(issue or 'legal issue').replace('_', ' ').capitalize()} under Indian law.",
+        "",
+        "### Applicable Law",
+    ]
+    if law_lines:
+        lines.extend(f"- {law}" for law in law_lines)
+    else:
+        lines.append("- Retrieved legal context was not strong enough to name specific provisions safely.")
+
+    lines.extend(
+        [
+            "",
+            "### Application",
+            "- Based on the interview facts, preserve all written communications, termination messages, notices, contracts, salary records, and witness details.",
+            "- The exact remedy depends on employment status, contract terms, notice period, reason for termination, and proof of what was said or done.",
+            "",
+            "### Remedies / Next Steps",
+            "- Ask the employer for the termination reason and final settlement details in writing.",
+            "- Collect appointment letter, employment contract, salary slips, emails/messages, and any termination communication.",
+            "- Consider a formal legal notice or labour/employment forum route after reviewing the documents.",
+            "",
+            "### Remaining Gaps",
+            "- Confirm employment type, length of service, notice-period clause, pending dues, and available proof.",
+        ]
+    )
+    return "\n".join(lines).strip()
+
+
+def _generate_interview_rag_answer(
+    *,
+    case_text: str,
+    issue: str,
+    active_issues: Sequence[str],
+    facts: Dict[str, Any],
+    context_blocks: List[Dict[str, Any]],
+    existing_analysis: str,
+    model_name: str,
+    timeout_sec: int = 45,
+) -> str:
+    context_text = build_context_text(context_blocks)
+    authority_summary = build_authority_summary(context_blocks)
+    if authority_summary:
+        context_text = f"{authority_summary}\n\n{context_text}".strip()
+
+    prompt = (
+        "You are an Indian legal assistant producing the final answer after a structured interview.\n"
+        "Use the retrieved legal context below as the authority base. Do not cite or rely on laws that are not in the retrieved context.\n"
+        "If retrieval is incomplete, say what is uncertain instead of inventing sections.\n"
+        "Return a concise professional assessment in markdown with these headings:\n"
+        "Facts, Legal Issues, Applicable Law, Application, Remedies / Next Steps, Remaining Gaps.\n\n"
+        f"Interview issue: {issue}\n"
+        f"Related issues: {json.dumps(list(active_issues), ensure_ascii=False)}\n"
+        f"Extracted facts: {json.dumps(facts, ensure_ascii=False, default=str)}\n"
+        f"Interview case narrative:\n{case_text}\n\n"
+        f"Existing non-RAG draft, for factual orientation only:\n{existing_analysis}\n\n"
+        f"Retrieved legal context:\n{context_text}\n"
+    )
+    fallback_answer = _build_interview_context_grounded_fallback(
+        case_text=case_text,
+        issue=issue,
+        facts=facts,
+        context_blocks=context_blocks,
+    )
+    answer = call_llm(model_name=model_name, prompt=prompt, timeout_sec=timeout_sec, max_tokens=2200)
+    if _is_legal_advice_refusal(answer):
+        answer = call_llm(
+            model_name=model_name,
+            prompt=(
+                f"{prompt}\n\n"
+                "The user is asking a legal/employment question even if a quoted abusive phrase appears in the facts. "
+                "Do not return the legal-domain guardrail. Provide general legal information grounded only in the retrieved Indian legal context."
+            ),
+            timeout_sec=timeout_sec,
+            max_tokens=2200,
+        )
+    if not answer or str(answer).startswith("[ERROR]") or _is_scope_guardrail_response(str(answer)):
+        if existing_analysis and not _is_scope_guardrail_response(existing_analysis):
+            return existing_analysis
+        return fallback_answer
+    return str(answer).strip()
+
+
+def _apply_interview_rag_final_answer(
+    *,
+    session: Dict[str, Any],
+    issue: str,
+    active_issues: Sequence[str],
+    case_obj: CaseModel,
+    laws_response: Any,
+    output_data: Dict[str, Any],
+    model_name: str,
+) -> Dict[str, Any]:
+    case_text = _build_interview_case_text(
+        issue=issue,
+        active_issues=active_issues,
+        case_obj=case_obj,
+        facts=session.get("facts", {}),
+        user_turns=session.get("user_turns", []),
+    )
+    domain = _interview_retrieval_domain(issue, case_obj)
+    structured_query = {
+        "domain": domain,
+        "intent": "legal_query",
+        "facts": [
+            line[2:] for line in case_text.splitlines()
+            if line.startswith("- ") and len(line) > 2
+        ][:8],
+    }
+    law_focus = _law_focus_from_law_engine(laws_response)
+    retrieval_seed = case_text or str(issue or "")
+    dense_query = build_query(retrieval_seed).expanded_query
+    retrieval_queries = generate_retrieval_queries(
+        user_query=retrieval_seed,
+        structured_query=structured_query,
+        dense_query=dense_query,
+        rewritten_query=retrieval_seed,
+        model_name=model_name,
+        timeout_sec=20,
+    )
+    intent_route = build_intent_route(retrieval_seed, forced_domain=domain)
+    retrieval_args = SimpleNamespace(
+        q=retrieval_seed,
+        mode="understand_case",
+        corpus="all" if USE_JUDGEMENT_EMBEDDINGS else "acts",
+        top_k=6,
+        dense_k=20,
+        bm25_k=20,
+        dense_weight=0.7,
+        bm25_weight=0.3,
+        rerank=True,
+        rerank_top_n=20,
+        rerank_model="cross-encoder/ms-marco-MiniLM-L-2-v2",
+        rerank_batch_size=16,
+        domain_filter=domain if domain == "criminal" else None,
+        legal_domain=domain,
+        act_filter=None,
+        section_filter=None,
+        era_filter=_infer_era_filter(retrieval_seed, structured_query),
+        intent_route=intent_route,
+        relevant_laws=law_focus.get("relevant_laws", []),
+        preferred_laws=law_focus.get("preferred_laws", []),
+        disallowed_law_hints=law_focus.get("disallowed_law_hints", []),
+    )
+
+    results, retrieval_debug = retrieve_for_queries(retrieval_queries, retrieval_args, allowed_docs=DEFAULT_ALLOWED_DOCS)
+    if not _query_mentions_specific_state(retrieval_seed):
+        results = _filter_state_specific_results(retrieval_seed, results)
+    if not results:
+        fallback_results, fallback_debug = retrieve_with_keyword_fallback(
+            user_query=retrieval_seed,
+            base_args=retrieval_args,
+            allowed_docs=DEFAULT_ALLOWED_DOCS,
+        )
+        if fallback_results:
+            results = fallback_results
+            retrieval_debug["keyword_fallback"] = fallback_debug
+
+    acts_lookup = load_acts_chunk_lookup("JSON_acts")
+    pack = build_context_pack(query=retrieval_seed, results=results, acts_lookup=acts_lookup, max_chars=12000)
+    context_blocks = pack.get("context_blocks", [])
+    rag_debug = {
+        "enabled": True,
+        "domain": domain,
+        "queries": retrieval_queries,
+        "retrieval": retrieval_debug,
+        "citations": pack.get("citations", []),
+        "context_count": len(context_blocks),
+    }
+    if not context_blocks:
+        rag_debug["answer_grounded"] = False
+        if _is_scope_guardrail_response(str(output_data.get("analysis") or "")):
+            output_data = dict(output_data)
+            output_data["analysis"] = _build_interview_context_grounded_fallback(
+                case_text=case_text,
+                issue=issue,
+                facts=session.get("facts", {}),
+                context_blocks=[],
+            )
+        return {"output_data": output_data, "rag_debug": rag_debug}
+
+    output_data = dict(output_data)
+    output_data["analysis"] = _generate_interview_rag_answer(
+        case_text=case_text,
+        issue=issue,
+        active_issues=active_issues,
+        facts=session.get("facts", {}),
+        context_blocks=context_blocks,
+        existing_analysis=str(output_data.get("analysis") or ""),
+        model_name=model_name,
+    )
+    retrieved_laws = _extract_applicable_law_lines(
+        context_blocks,
+        fallback_laws=output_data.get("applicable_laws", []),
+    )
+    if retrieved_laws:
+        output_data["applicable_laws"] = retrieved_laws
+    output_data["summary"] = "RAG-grounded case assessment generated."
+    output_data["confidence"] = max(float(output_data.get("confidence", 0.0) or 0.0), 0.75)
+    rag_debug["answer_grounded"] = True
+    return {"output_data": output_data, "rag_debug": rag_debug}
 
 
 def append_query_log(entry: Dict[str, Any]) -> None:
@@ -3202,6 +4070,87 @@ def _enforce_firac_layout(answer: str) -> str:
     if not normalized:
         return normalized
 
+
+def _humanize_query_category(category: str) -> str:
+    cleaned = str(category or "unknown").strip().lower()
+    if cleaned in {"", "unknown"}:
+        return "General / Unclear"
+    return cleaned.replace("_", " ").title()
+
+
+def _build_query_category_summary(user_rows: Sequence[AuthRow], query_rows: Sequence[AuthRow]) -> Dict[str, Any]:
+    per_user_counter: Dict[int, Counter[str]] = defaultdict(Counter)
+    overall_counter: Counter[str] = Counter()
+    user_lookup: Dict[int, Dict[str, str]] = {
+        int(row["id"]): {
+            "name": str(row["name"] or "").strip(),
+            "email": str(row["email"] or "").strip(),
+        }
+        for row in user_rows
+    }
+    recent_queries: List[Dict[str, Any]] = []
+
+    for row in query_rows:
+        user_id = int(row["user_id"])
+        content = str(row["content"] or "").strip()
+        if not content:
+            continue
+        detected = detect_issues(content) or {}
+        primary = str(detected.get("primary") or "unknown").strip().lower() or "unknown"
+        per_user_counter[user_id][primary] += 1
+        overall_counter[primary] += 1
+        if len(recent_queries) < 100:
+            user_meta = user_lookup.get(user_id, {})
+            recent_queries.append(
+                {
+                    "user_id": user_id,
+                    "user_name": user_meta.get("name", ""),
+                    "user_email": user_meta.get("email", ""),
+                    "session_id": str(row["session_id"] or "").strip(),
+                    "content": content,
+                    "created_at": str(row["created_at"] or ""),
+                    "category": primary,
+                    "label": _humanize_query_category(primary),
+                }
+            )
+
+    per_user_payload: Dict[int, Dict[str, Any]] = {}
+    for row in user_rows:
+        user_id = int(row["id"])
+        counts = per_user_counter.get(user_id, Counter())
+        top_category, top_count = counts.most_common(1)[0] if counts else ("unknown", 0)
+        per_user_payload[user_id] = {
+            "top_category": top_category,
+            "top_category_label": _humanize_query_category(top_category),
+            "top_category_count": int(top_count),
+            "query_count": int(sum(counts.values())),
+            "category_breakdown": [
+                {
+                    "category": category,
+                    "label": _humanize_query_category(category),
+                    "count": int(count),
+                }
+                for category, count in counts.most_common(5)
+            ],
+        }
+
+    overall_payload = [
+        {
+            "category": category,
+            "label": _humanize_query_category(category),
+            "count": int(count),
+        }
+        for category, count in overall_counter.most_common(5)
+    ]
+
+    return {
+        "overall": overall_payload,
+        "total_queries": int(sum(overall_counter.values())),
+        "users_with_queries": int(sum(1 for item in per_user_payload.values() if item["query_count"] > 0)),
+        "per_user": per_user_payload,
+        "recent_queries": recent_queries,
+    }
+
     # Ensure Part headings start on their own line even if the model emits inline prose.
     heading_token = r"(?:\*\*)?Part\s*[1-6]\s*-\s*(?:Facts|Issue|Rule|Application|Conclusion|Disclaimer)(?:\*\*)?"
     normalized = re.sub(rf"(?<!\n)(?={heading_token})", "\n\n", normalized, flags=re.IGNORECASE)
@@ -3404,12 +4353,11 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
             final_status = target_status
             has_access = bool(target_access)
         else:
-            cur = conn.execute(
+            conn.execute(
                 """
                 INSERT INTO users
                 (name, email, organization, use_case, role, status, access_granted, password_hash, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'user', 'pending', FALSE, NULL, ?, ?)
-                RETURNING id
                 """,
                 (
                     full_name,
@@ -3420,7 +4368,10 @@ def auth_request_access(payload: RequestAccessRequest) -> RequestAccessResponse:
                     now,
                 ),
             )
-            user_row = cur.fetchone()
+            user_row = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                (email,),
+            ).fetchone()
             if not user_row:
                 raise HTTPException(status_code=500, detail="Failed to create user record.")
             user_id = int(user_row["id"])
@@ -3697,16 +4648,38 @@ def admin_access_requests(authorization: Optional[str] = Header(default=None)) -
             LIMIT 500
             """
         ).fetchall()
+        query_rows = conn.execute(
+            """
+            SELECT user_id, session_id, content, created_at
+            FROM chat_messages
+            WHERE role = 'user'
+            ORDER BY id DESC
+            LIMIT 5000
+            """
+        ).fetchall()
 
     users_payload = []
+    query_category_summary = _build_query_category_summary(user_rows, query_rows)
     for row in user_rows:
         item = dict(row)
+        user_query_summary = query_category_summary["per_user"].get(int(item["id"]), {})
         item["access_granted"] = bool(item.get("access_granted"))
         item["has_password"] = bool(item.get("has_password"))
+        item["top_query_category"] = user_query_summary.get("top_category", "unknown")
+        item["top_query_category_label"] = user_query_summary.get("top_category_label", "General / Unclear")
+        item["top_query_category_count"] = int(user_query_summary.get("top_category_count", 0))
+        item["query_count"] = int(user_query_summary.get("query_count", 0))
+        item["query_category_breakdown"] = user_query_summary.get("category_breakdown", [])
         users_payload.append(item)
 
     requests_payload = [dict(row) for row in request_rows]
-    return AdminAccessListResponse(ok=True, users=users_payload, requests=requests_payload)
+    return AdminAccessListResponse(
+        ok=True,
+        users=users_payload,
+        requests=requests_payload,
+        query_category_summary=query_category_summary,
+        recent_queries=query_category_summary.get("recent_queries", []),
+    )
 
 
 @app.get("/admin/monitoring/access-events", response_model=AdminAccessMonitoringResponse)
@@ -4003,7 +4976,18 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
         history = _load_chat_history_for_prompt(user_id, s_id, limit=CHAT_HISTORY_PROMPT_LIMIT)
         SESSIONS[s_id] = list(history)
 
-        structured_query = extract_structured_query(user_query, payload.llm_model)
+        expanded_obj = build_query(user_query)
+        dense_keywords = expanded_obj.expanded_query
+        precise_statute_query = bool(expanded_obj.filters.get("section_number") and expanded_obj.filters.get("act"))
+
+        unified_analysis = analyze_query_for_retrieval(
+            user_query=user_query,
+            dense_query=dense_keywords,
+            model_name=payload.llm_model,
+            timeout_sec=min(payload.llm_timeout_sec, 20),
+        )
+        
+        structured_query = unified_analysis["structured_query"]
         debug_trace["structured_query"] = structured_query
         reasoning.append(
             "Understanding facts: "
@@ -4012,44 +4996,30 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             else "Understanding facts from the user query."
         )
 
-        expanded_obj = build_query(user_query)
         intent_route = build_intent_route(user_query, forced_domain=structured_query.get("domain", ""))
         debug_trace["intent_route"] = intent_route
-        law_focus = generate_relevant_laws(
-            user_query=user_query,
-            structured_query=structured_query,
-            model_name=payload.llm_model,
-            timeout_sec=min(payload.llm_timeout_sec, 20),
-        )
+
+        law_focus = unified_analysis["law_focus"]
         debug_trace["law_focus"] = law_focus
         if law_focus.get("preferred_laws"):
             reasoning.append("Preferred laws: " + ", ".join(law_focus["preferred_laws"]))
         law_candidates = _law_focus_candidates(law_focus)
-        precise_statute_query = bool(expanded_obj.filters.get("section_number") and expanded_obj.filters.get("act"))
 
-        # --- STEP 1: Query Rewriter ---
         reasoning.append("Step 1: Rewriting query to dense legal keywords...")
-        dense_keywords = expanded_obj.expanded_query
 
         if precise_statute_query:
             llm_query = user_query
             legal_query = dense_keywords
             reasoning.append("Detected direct act-section lookup; skipped free-form rewrite.")
+            retrieval_queries = [legal_query]
         else:
-            llm_query = rewrite_query(user_query, payload.llm_model, timeout_sec=15)
+            llm_query = unified_analysis["llm_query"]
             llm_query = " ".join((llm_query or "").splitlines()[:1]).strip() or user_query
             legal_query = " ".join(part for part in [llm_query, dense_keywords] if part).strip()
+            retrieval_queries = unified_analysis["retrieval_queries"]
 
         reasoning.append(f"Rewritten Query: {llm_query}")
         reasoning.append(f"Dense Expansion: {dense_keywords}")
-        retrieval_queries = [legal_query] if precise_statute_query else generate_retrieval_queries(
-            user_query=user_query,
-            structured_query=structured_query,
-            dense_query=dense_keywords,
-            rewritten_query=llm_query,
-            model_name=payload.llm_model,
-            timeout_sec=min(payload.llm_timeout_sec, 20),
-        )
         reasoning.append(f"Retrieval Queries ({len(retrieval_queries)} max {MAX_RETRIEVAL_QUERIES}): " + " | ".join(retrieval_queries))
         debug_trace["expanded_queries"] = retrieval_queries
 
@@ -4484,6 +5454,8 @@ def query(payload: QueryRequest, authorization: Optional[str] = Header(default=N
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail={"error": str(exc), "traceback": traceback.format_exc()})
 
@@ -4509,6 +5481,10 @@ def interview_chat(
     user_id = int(user_row["id"])
     try:
         s_id = _sanitize_chat_session_id(payload.session_id)
+        if _is_clearly_non_legal_interview_query(payload.query):
+            response_payload = _build_out_of_scope_interview_response(s_id)
+            _record_chat_turn(user_id, s_id, payload.query, LEGAL_GUARDRAIL_RESPONSE)
+            return response_payload
         
         # 0. Initialize/Load Case Model from Session
         if s_id not in INTERVIEW_SESSIONS:
@@ -4520,14 +5496,22 @@ def interview_chat(
             session = INTERVIEW_SESSIONS[s_id]
             auto_session_reset = True
         # Backfill guard fields for old sessions.
+        session.setdefault("facts", {})
+        session.setdefault("signals", {})
+        session.setdefault("asked_questions", [])
+        session.setdefault("user_turns", [])
         session.setdefault("interview_turns", 0)
         session.setdefault("stagnant_turns", 0)
         session.setdefault("pending_confirmation_retries", 0)
+        session.setdefault("pending_signal_question", None)
+        session.setdefault("pending_signal_retries", 0)
+        session.setdefault("asked_gap_questions", [])
         session.setdefault("asked_contradiction_codes", [])
         session["interview_turns"] = int(session.get("interview_turns", 0)) + 1
+        session["user_turns"] = (session.get("user_turns", []) + [payload.query])[-12:]
 
-        status = "interviewing"
         fact_progress = False
+        case_model_changed = False
         forced_assess = False
         user_confidence = None
         previous_top_law = session.get("last_top_law")
@@ -4536,7 +5520,6 @@ def interview_chat(
         # If the user is providing a confirmed/edited model from the UI
         if payload.case_model_update:
             session["case_model"] = payload.case_model_update.dict()
-            status = "interviewing" # User confirmed, proceed to analysis
             fact_progress = True
         else:
             # Run the new multi-step pipeline
@@ -4547,6 +5530,7 @@ def interview_chat(
                 session["case_model"] = new_case.dict()
                 if new_case.events or new_case.parties:
                     fact_progress = True
+                    case_model_changed = True
             else:
                 current_model = CaseModel(**session["case_model"])
                 prev_event_count = len(current_model.events)
@@ -4555,11 +5539,13 @@ def interview_chat(
                     if not any(cp.id == p.id for cp in current_model.parties):
                         current_model.parties.append(p)
                         fact_progress = True
+                        case_model_changed = True
                 
                 new_events = [e for e in new_case.events if e.sequence > prev_event_count]
                 if new_events:
                     current_model.events.extend(new_events)
                     fact_progress = True
+                    case_model_changed = True
 
                 current_model.financials.extend(new_case.financials)
                 current_model.documents.extend(new_case.documents)
@@ -4568,10 +5554,6 @@ def interview_chat(
                 current_model.missing_information = new_case.missing_information
                 session["case_model"] = current_model.dict()
 
-            # Detection of 'review_required' (New events/parties found)
-            if fact_progress:
-                status = "review_required"
-
         case_obj = CaseModel(**session["case_model"])
         
         # 2. Incident Classification (Keep existing for issue tracking)
@@ -4579,10 +5561,17 @@ def interview_chat(
         candidates = sorted(extracted_data.incident_type_candidates, key=lambda x: x.confidence, reverse=True)
         top_incident = candidates[0].type if candidates else "unknown"
         top_confidence = candidates[0].confidence if candidates else 0.0
+        heuristic_issue = detect_issues(payload.query) or {}
+        heuristic_primary = str(heuristic_issue.get("primary") or "unknown")
+        if heuristic_primary not in {"unknown", ""} and (top_incident in {"unknown", "general", "labour"} or top_confidence < 0.6):
+            top_incident = heuristic_primary
+            top_confidence = max(top_confidence, 0.65)
         
         # Update issues
         if session["issue"] == "unknown" or top_confidence > 0.8:
             session["issue"] = top_incident
+        if heuristic_primary not in {"unknown", ""} and heuristic_primary not in session["active_issues"]:
+            session["active_issues"].append(heuristic_primary)
         for c in candidates:
             if c.confidence >= 0.7 and c.type not in session["active_issues"]:
                 session["active_issues"].append(c.type)
@@ -4606,6 +5595,10 @@ def interview_chat(
             # Ignore stale employment-specific signal prompts for non-employment matters.
             for signal_name in ["work_relationship", "service_years", "employment_end", "payment_type"]:
                 session["signals"].pop(signal_name, None)
+            pending_signal = session.get("pending_signal_question")
+            if pending_signal and pending_signal.get("signal_name") in {"work_relationship", "service_years", "employment_end", "payment_type"}:
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
 
         pending_confirmation = session.get("pending_confirmation")
         confirmation_progress = False
@@ -4629,8 +5622,23 @@ def interview_chat(
                     session["pending_confirmation"] = None
                     session["pending_confirmation_retries"] = 0
 
+        pending_signal_question = session.get("pending_signal_question")
+        signal_answer_progress = False
+        if pending_signal_question:
+            interpreted_signal = _coerce_pending_signal_answer(payload.query, pending_signal_question)
+            if interpreted_signal:
+                signal_updates.update(interpreted_signal)
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
+                signal_answer_progress = True
+            else:
+                session["pending_signal_retries"] = int(session.get("pending_signal_retries", 0)) + 1
+                if signal_updates or session["pending_signal_retries"] >= MAX_PENDING_SIGNAL_RETRIES:
+                    session["pending_signal_question"] = None
+                    session["pending_signal_retries"] = 0
+
         session["signals"] = merge_signal_state(session.get("signals", {}), signal_updates)
-        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress)
+        progress_this_turn = bool(fact_progress or signal_updates or confirmation_progress or signal_answer_progress)
         if progress_this_turn:
             session["stagnant_turns"] = 0
         else:
@@ -4701,6 +5709,8 @@ def interview_chat(
             forced_assess = True
             session["pending_confirmation"] = None
             session["pending_confirmation_retries"] = 0
+            session["pending_signal_question"] = None
+            session["pending_signal_retries"] = 0
 
         if decision == "CLARIFY":
             response_payload = InterviewChatResponse(
@@ -4766,10 +5776,16 @@ def interview_chat(
                     signal_state=session["signals"],
                     contradictions=contradictions,
                 )
+                ranked_signal_questions = [
+                    q for q in ranked_signal_questions
+                    if q.get("id") not in session.get("asked_questions", [])
+                ]
                 if ranked_signal_questions:
                     chosen_signal_question = ranked_signal_questions[0]
                     if chosen_signal_question["id"] not in session["asked_questions"]:
                         session["asked_questions"].append(chosen_signal_question["id"])
+                    session["pending_signal_question"] = chosen_signal_question
+                    session["pending_signal_retries"] = 0
                     final_questions_text.append(chosen_signal_question["question"])
 
             # INTERVIEW Mode: Get targeted questions for ALL active issues
@@ -4805,18 +5821,59 @@ def interview_chat(
                         final_questions_text.append(gap_question)
                         asked_gap_questions.add(gap_question)
                 session["asked_gap_questions"] = list(asked_gap_questions)
+
+            if not final_questions_text:
+                # Nothing new remains to ask. Return the best assessment with the facts available
+                # instead of leaving the client in an interview state with an empty question set.
+                decision = "ASSESS"
+                is_complete = True
+                forced_assess = True
+                session["pending_confirmation"] = None
+                session["pending_confirmation_retries"] = 0
+                session["pending_signal_question"] = None
+                session["pending_signal_retries"] = 0
         
         # 7. Generate Output
         output_data = generate_legal_output(issue, subtype, session["facts"], is_complete, payload.llm_model)
-        output_data["confidence"] = strength 
+        interview_rag_debug: Dict[str, Any] = {"enabled": False}
+        if is_complete:
+            try:
+                rag_payload = _apply_interview_rag_final_answer(
+                    session=session,
+                    issue=issue,
+                    active_issues=active_issues,
+                    case_obj=case_obj,
+                    laws_response=laws_response,
+                    output_data=output_data,
+                    model_name=payload.llm_model,
+                )
+                output_data = rag_payload["output_data"]
+                interview_rag_debug = rag_payload["rag_debug"]
+            except Exception as rag_exc:
+                interview_rag_debug = {
+                    "enabled": True,
+                    "answer_grounded": False,
+                    "error": str(rag_exc),
+                }
+        output_data["confidence"] = max(float(output_data.get("confidence", 0.0) or 0.0), strength)
         legal_output = LegalOutput(**output_data)
+
+        should_review_case_model = (
+            not is_complete
+            and not payload.case_model_update
+            and case_model_changed
+            and not contradictions_present
+            and not session.get("pending_confirmation")
+            and not final_questions_text
+            and bool(case_obj.events or case_obj.parties)
+        )
 
         # Final Status determination
         if is_complete:
             final_status = "complete"
         elif contradictions_present or session.get("pending_confirmation"):
             final_status = "clarification_required"
-        elif status == "review_required":
+        elif should_review_case_model:
             final_status = "review_required"
         else:
             final_status = "interviewing"
@@ -4855,6 +5912,8 @@ def interview_chat(
                 "decision": decision,
                 "forced_assess": forced_assess,
                 "auto_session_reset": auto_session_reset,
+                "case_model_changed": case_model_changed,
+                "case_model_review_recommended": should_review_case_model,
                 "behavioral_count": len(brain_response.behavioral_primitives),
                 "interpretation_count": len(brain_response.interpretations),
                 "law_count": len(laws_response.applicable_laws),
@@ -4862,6 +5921,8 @@ def interview_chat(
                 "interview_turns": session.get("interview_turns", 0),
                 "stagnant_turns": session.get("stagnant_turns", 0),
                 "pending_confirmation_retries": session.get("pending_confirmation_retries", 0),
+                "pending_signal_retries": session.get("pending_signal_retries", 0),
+                "pending_signal_question": session.get("pending_signal_question"),
                 "signals": summarize_signal_state(session["signals"]),
                 "confirmed_tags": confirmed_tags,
                 "confirmed_tag_confidence": confirmed_tag_confidence,
@@ -4869,6 +5930,7 @@ def interview_chat(
                 "contradiction_penalty": contradiction_penalty,
                 "last_top_law": session.get("last_top_law"),
                 "dashboard_summary": dashboard_summary,
+                "rag": interview_rag_debug,
             }
         )
         _record_chat_turn(
@@ -4893,13 +5955,16 @@ def query_lawyer_init(payload: LawyerInitRequest, authorization: Optional[str] =
     session_id = payload.session_id or str(uuid.uuid4())
     LAWYER_SESSIONS[session_id] = {}
 
-    structured_query = extract_structured_query(user_query, payload.llm_model)
-    law_focus = generate_relevant_laws(
+    expanded_obj = build_query(user_query)
+    dense_keywords = expanded_obj.expanded_query
+    unified_analysis = analyze_query_for_retrieval(
         user_query=user_query,
-        structured_query=structured_query,
+        dense_query=dense_keywords,
         model_name=payload.llm_model,
         timeout_sec=min(payload.llm_timeout_sec, 20),
     )
+    structured_query = unified_analysis["structured_query"]
+    law_focus = unified_analysis["law_focus"]
     init_payload = _generate_lawyer_init_payload(
         user_query=user_query,
         structured_query=structured_query,
@@ -5346,6 +6411,12 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             prompt=prompt,
             timeout_sec=payload.llm_timeout_sec,
         )
+        if _is_scope_guardrail_response(draft_notice) or _is_legal_advice_refusal(draft_notice):
+            draft_notice = call_llm(
+                model_name=payload.llm_model,
+                prompt=_retry_prompt_for_notice_generation(prompt),
+                timeout_sec=payload.llm_timeout_sec,
+            )
 
         # STEP 6: Refine (Pass 2 — mandatory)
         refine_prompt = build_notice_refinement_prompt(draft_notice, tone=payload.tone)
@@ -5354,6 +6425,17 @@ def generate_notice(payload: NoticeRequest, authorization: Optional[str] = Heade
             prompt=refine_prompt,
             timeout_sec=payload.llm_timeout_sec,
         )
+        if _is_scope_guardrail_response(refined_notice) or _is_legal_advice_refusal(refined_notice):
+            refined_notice = call_llm(
+                model_name=payload.llm_model,
+                prompt=_retry_prompt_for_notice_generation(refine_prompt),
+                timeout_sec=payload.llm_timeout_sec,
+            )
+        if _is_scope_guardrail_response(refined_notice) or _is_legal_advice_refusal(refined_notice):
+            raise HTTPException(
+                status_code=502,
+                detail="Notice generation failed due to a model guardrail response. Please retry.",
+            )
 
         # STEP 7: Append authority section
         laws_used = config["laws"][:]

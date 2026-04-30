@@ -140,7 +140,7 @@ export const LoginPage = ({ apiBase, onLoginSuccess, onShowRequestAccess }: Logi
         <div className="bg-surface-container-lowest px-8 py-10 sm:px-10 lg:px-12">
           <div className="mx-auto max-w-md">
             <p className="section-kicker">Sign in</p>
-            <h2 className="mt-1 text-3xl font-semibold text-secondary">Access your workspace</h2>
+            <h2 className="mt-1 text-3xl font-semibold text-on-surface">Access your workspace</h2>
             <p className="mt-2 text-sm leading-7 text-on-surface-variant">
               Use the email address approved for your account.
             </p>
