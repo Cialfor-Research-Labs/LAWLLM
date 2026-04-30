@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sidebar, Header, ThemeToggle, type ThemeMode } from './components/Layout';
+import { Sidebar, Header, ThemeToggle, type HeaderStatusSummary, type ThemeMode } from './components/Layout';
 import { DocumentAnalyzer } from './components/DocumentAnalyzer';
 import { LegalChat } from './components/LegalChat';
 import { DocumentGenerator } from './components/DocumentGenerator';
@@ -126,6 +126,7 @@ export default function App() {
   const [generatorNewSessionRequest, setGeneratorNewSessionRequest] = useState<number | null>(null);
   const [generatorPrefillRequest, setGeneratorPrefillRequest] = useState<GeneratorPrefillRequest | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getInitialThemeMode());
+  const [chatHeaderStatus, setChatHeaderStatus] = useState<HeaderStatusSummary | null>(null);
 
   useEffect(() => {
     if (!authToken) {
@@ -390,6 +391,7 @@ export default function App() {
           onOpenProfile={() => openSettingsSection('details')}
           themeMode={themeMode}
           onToggleTheme={toggleTheme}
+          statusSummary={activeTab === 'chat' ? chatHeaderStatus : null}
         />
         
         <AnimatePresence mode="wait">
@@ -418,6 +420,7 @@ export default function App() {
                 onChatSessionsChange={setChatHistory}
                 onActiveSessionChange={setActiveChatSessionId}
                 onPrefillDocumentGenerator={prefillDocumentGeneratorFromChat}
+                onHeaderStatusChange={setChatHeaderStatus}
               />
             </motion.div>
           ) : activeTab === 'generator' ? (
