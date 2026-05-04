@@ -13,6 +13,7 @@ import { DocumentGenerator } from './components/DocumentGenerator';
 import { WinPredictor } from './components/WinPredictor';
 import { SettingsPage } from './components/SettingsPage';
 import { LibraryLanding } from './components/LibraryLanding';
+import { ChatPage as TrainedChat } from './experimental-chat/ChatPage';
 import { LoginPage } from './components/auth/LoginPage';
 import { RequestAccessPage } from './components/auth/RequestAccessPage';
 import { SetPasswordPage } from './components/auth/SetPasswordPage';
@@ -53,7 +54,7 @@ const ACTIVE_TAB_STORAGE_KEY = 'vidhi_active_tab';
 const ACTIVE_CHAT_SESSION_STORAGE_KEY = 'vidhi_active_chat_session';
 const GENERATOR_HISTORY_KEY = 'vidhi_generator_history_v1';
 const THEME_STORAGE_KEY = 'vidhi_theme_mode';
-const ALLOWED_TABS = new Set(['library', 'chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
+const ALLOWED_TABS = new Set(['library', 'chat', 'trained_chat', 'generator', 'analyzer', 'predictor', 'admin', 'settings']);
 
 function loadGeneratorHistoryFromStorage(): GeneratorHistoryItem[] {
   try {
@@ -113,6 +114,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>(() => getInitialActiveTab());
   const [setupToken, setSetupToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get('setup_token'));
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
+  const [trainedChatHistory, setTrainedChatHistory] = useState<any[]>([]);
   const [generatorHistory, setGeneratorHistory] = useState<GeneratorHistoryItem[]>([]);
   const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(() => getInitialActiveChatSessionId());
   const [activeGeneratorHistoryId, setActiveGeneratorHistoryId] = useState<string | null>(null);
@@ -155,6 +157,7 @@ export default function App() {
   useEffect(() => {
     if (!authToken || !currentUser) {
       setChatHistory([]);
+      setTrainedChatHistory([]);
       setGeneratorHistory([]);
       return;
     }
@@ -238,6 +241,7 @@ export default function App() {
     setCurrentUser(null);
     setActiveTab('library');
     setChatHistory([]);
+    setTrainedChatHistory([]);
     setGeneratorHistory([]);
     setActiveChatSessionId(null);
     setActiveGeneratorHistoryId(null);
@@ -276,6 +280,11 @@ export default function App() {
       setActiveChatSessionId(null);
       setChatOpenRequest(null);
       setChatNewSessionRequest(Date.now());
+      return;
+    }
+    if (activeTab === 'trained_chat') {
+      // For now, let the component handle its own new session or just reset state
+      // If we want to force a new session from outside, we'd need more props
       return;
     }
     // Fallback: start a new chat session when current module has no session concept.
@@ -367,20 +376,20 @@ export default function App() {
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-surface font-body text-on-surface">
       {showSidebar ? (
-        <Sidebar
-          activeTab={activeTab}
-          activeSettingsSection={activeSettingsSection}
-          setActiveTab={setActiveTab}
-          isAdmin={currentUser.role === 'admin'}
-          onStartNewSession={startNewSession}
-          chatHistory={chatHistory}
-          generatorHistory={generatorHistory}
-          activeChatSessionId={activeChatSessionId}
-          activeGeneratorHistoryId={activeGeneratorHistoryId}
-          onSelectChatHistory={openChatHistoryItem}
-          onSelectGeneratorHistory={openGeneratorHistoryItem}
-          onSelectSettingsSection={openSettingsSection}
-        />
+          <Sidebar
+            activeTab={activeTab}
+            activeSettingsSection={activeSettingsSection}
+            setActiveTab={setActiveTab}
+            isAdmin={currentUser.role === 'admin'}
+            onStartNewSession={startNewSession}
+            chatHistory={activeTab === 'trained_chat' ? trainedChatHistory : chatHistory}
+            generatorHistory={generatorHistory}
+            activeChatSessionId={activeChatSessionId}
+            activeGeneratorHistoryId={activeGeneratorHistoryId}
+            onSelectChatHistory={openChatHistoryItem}
+            onSelectGeneratorHistory={openGeneratorHistoryItem}
+            onSelectSettingsSection={openSettingsSection}
+          />
       ) : null}
 
       <main className={`relative z-10 flex h-screen flex-1 flex-col pb-20 md:pb-0 ${showSidebar ? 'md:ml-72' : ''}`}>
@@ -418,6 +427,19 @@ export default function App() {
                 onChatSessionsChange={setChatHistory}
                 onActiveSessionChange={setActiveChatSessionId}
                 onPrefillDocumentGenerator={prefillDocumentGeneratorFromChat}
+              />
+            </motion.div>
+          ) : activeTab === 'trained_chat' ? (
+            <motion.div 
+              key="trained_chat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col overflow-hidden"
+            >
+              <TrainedChat 
+                embedded 
+                onHistoryChange={setTrainedChatHistory} 
               />
             </motion.div>
           ) : activeTab === 'generator' ? (
@@ -488,6 +510,7 @@ export default function App() {
                 onOpenChat={() => setActiveTab('chat')}
                 onOpenGenerator={() => setActiveTab('generator')}
                 onOpenAnalyzer={() => setActiveTab('analyzer')}
+                onOpenTrainedChat={() => setActiveTab('trained_chat')}
                 trustedCount={chatHistory.length + generatorHistory.length}
               />
             </motion.div>

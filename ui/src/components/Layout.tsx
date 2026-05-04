@@ -250,6 +250,7 @@ export const Sidebar = ({
 
   const libraryOptions: NavItem[] = [
     { id: 'chat', label: 'AI legal chat', icon: MessageSquare },
+    { id: 'trained_chat', label: 'Trained legal AI Chat', icon: MessageSquare },
     { id: 'generator', label: 'Legal notice generator', icon: FileText },
     { id: 'analyzer', label: 'Document analyzer', icon: BarChart3 },
     { id: 'predictor', label: 'Win predictor', icon: TrendingUp },
@@ -362,6 +363,16 @@ export const Sidebar = ({
                 items={chatHistory as Array<Record<string, string | number | undefined>>}
                 activeId={activeChatSessionId}
                 emptyLabel="Your conversations will appear here once you start asking questions."
+                onSelect={onSelectChatHistory}
+                dateField="last_message_at"
+              />
+            ) : activeTab === 'trained_chat' ? (
+              <HistoryPanel
+                heading="Trained AI history"
+                count={chatHistory.length}
+                items={chatHistory as Array<Record<string, string | number | undefined>>}
+                activeId={activeChatSessionId}
+                emptyLabel="Your trained AI conversations will appear here."
                 onSelect={onSelectChatHistory}
                 dateField="last_message_at"
               />
