@@ -4,6 +4,8 @@ import { ChatContainer } from './components/ChatContainer';
 import { Message } from './components/ChatMessage';
 import { getMockResponse } from './mock/mockLLM';
 
+const TLLAC_API_URL = 'http://localhost:9001/chat';
+
 interface ChatPageProps {
   embedded?: boolean;
   onHistoryChange?: (history: any[]) => void;
@@ -14,7 +16,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ embedded = false, onHistoryC
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ id: string; title: string; date: string; last_message_at: string }[]>([]);
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = async (content: string) => {
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -29,7 +31,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ embedded = false, onHistoryC
     if (messages.length === 0) {
       const newHistoryItem = { 
         id: Date.now().toString(), 
-        session_id: Date.now().toString(), // added for compatibility with HistoryPanel
+        session_id: Date.now().toString(),
         title: content.slice(0, 30) + (content.length > 30 ? '...' : ''), 
         date: new Date().toISOString(),
         last_message_at: new Date().toISOString()
@@ -39,16 +41,34 @@ export const ChatPage: React.FC<ChatPageProps> = ({ embedded = false, onHistoryC
       onHistoryChange?.(newHistory);
     }
 
-    // Simulate typing and network delay
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: getMockResponse(content)
-      };
-      setMessages(prev => [...prev, botMessage]);
-      setIsLoading(false);
-    }, 1200);
+    let responseText: string;
+
+    try {
+      // Call the isolated tllac backend
+      const res = await fetch(TLLAC_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: content }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Backend error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      responseText = data.response;
+    } catch {
+      // Fallback to mock if backend is unreachable
+      responseText = getMockResponse(content);
+    }
+
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: responseText,
+    };
+    setMessages(prev => [...prev, botMessage]);
+    setIsLoading(false);
   };
 
   const handleNewChat = () => {
