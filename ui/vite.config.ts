@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => {
   const apiProxyTarget =
     env.VITE_API_PROXY_TARGET ||
     env.VITE_API_BASE_URL
+  const tllacProxyTarget =
+    env.VITE_TLLAC_API_PROXY_TARGET ||
+    env.VITE_TLLAC_API_URL ||
+    'http://localhost:9001'
 
   console.log('Vite config loaded')
 
@@ -30,6 +34,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
           rewrite: (p) => p.replace(/^\/api/, ''),
+        },
+        '/tllac-api': {
+          target: tllacProxyTarget,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (p) => p.replace(/^\/tllac-api/, ''),
         },
       },
     },
