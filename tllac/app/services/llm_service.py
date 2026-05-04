@@ -1,88 +1,94 @@
 """
-LLM Service
-=============
-Generates structured legal responses from matched trained data.
+Response generation for the trained Indian legal chat backend.
 
-Currently uses local template-based generation.
-Can be extended to call a controlled LLM (e.g. via Ollama or Bedrock)
-by injecting the system prompt + context as messages.
+Responses are built strictly from the matched dataset entry.
 """
 
-from typing import Dict
+from typing import Dict, List
 import logging
+import re
 
 from ..utils.prompt_builder import get_system_prompt
 
 logger = logging.getLogger("tllac.services.llm")
 
-# ──────────────────────────────────────────────
-# Response Formatter (Template-based)
-# ──────────────────────────────────────────────
-def _format_template_response(matched_data: Dict) -> str:
-    """
-    Build a structured response following the system prompt format:
-      - Title
-      - Short Summary
-      - Key Legal Points
-      - (Optional) Relevant Act / Section
-    """
-    title = matched_data.get("title", "Legal Overview")
-    summary = matched_data.get("summary", "No summary available.")
-    points = matched_data.get("points", [])
-    law = matched_data.get("law", "")
-    case_refs = matched_data.get("case_references", [])
-    practical = matched_data.get("practical_notes", "")
 
-    # Build the response
+def _extract_section_numbers(query: str) -> List[str]:
+    return re.findall(r"\b\d+[a-z]?\b", query.lower())
+
+
+def _pick_relevant_points(query: str, points: List[str]) -> List[str]:
+    if not points:
+        return []
+
+    section_numbers = _extract_section_numbers(query)
+    if section_numbers:
+        matched = [
+            point for point in points
+            if any(number in point.lower() or f"section {number}" in point.lower() for number in section_numbers)
+        ]
+        if matched:
+            return matched[:3]
+
+    query_words = set(re.findall(r"[a-z0-9]+", query.lower()))
+    scored_points = []
+    for point in points:
+        point_words = set(re.findall(r"[a-z0-9]+", point.lower()))
+        overlap = len(query_words & point_words)
+        scored_points.append((overlap, point))
+
+    scored_points.sort(key=lambda item: item[0], reverse=True)
+    best = [point for score, point in scored_points if score > 0][:3]
+    return best or points[:4]
+
+
+def _format_template_response(query: str, matched_data: Dict) -> str:
+    title = matched_data.get("title", "Indian Legal Overview")
+    summary = matched_data.get("summary", "No summary available in trained data.")
+    points = matched_data.get("points", []) or []
+    law = matched_data.get("law", "")
+    case_refs = matched_data.get("case_references", []) or []
+    practical = matched_data.get("practical_notes", "")
+    relevant_points = _pick_relevant_points(query, points)
+
     lines = [
-        f"🔎 {title}",
+        f"Indian Legal Context: {title}",
         "",
-        "**Summary:**",
-        summary,
-        "",
-        "**Key Legal Points:**",
+        f"Summary: {summary}",
     ]
 
-    for point in points:
-        lines.append(f"• {point}")
+    if relevant_points:
+        lines.append("")
+        lines.append("Key Points:")
+        for point in relevant_points:
+            lines.append(f"- {point}")
 
     if law:
         lines.append("")
-        lines.append("**Relevant Law:**")
-        lines.append(f"• {law}")
+        lines.append(f"Relevant Law: {law}")
 
     if case_refs:
         lines.append("")
-        lines.append("**Landmark Cases:**")
-        for case in case_refs:
-            lines.append(f"• {case}")
+        lines.append("Relevant Cases:")
+        for case in case_refs[:2]:
+            lines.append(f"- {case}")
 
     if practical:
         lines.append("")
-        lines.append("**Practical Note:**")
-        lines.append(practical)
+        lines.append(f"Practical Note: {practical}")
 
     return "\n".join(lines)
 
 
-# ──────────────────────────────────────────────
-# Public API
-# ──────────────────────────────────────────────
 def generate_response(query: str, matched_data: Dict) -> str:
     """
-    Generate a response for the given query using matched trained data.
-
-    The system prompt is loaded (for future LLM integration) and the
-    matched data is formatted into a structured answer.
+    Generate a response using only the matched trained-data record.
     """
-    # Load system prompt (ready for future LLM call)
     _system_prompt = get_system_prompt()
-
-    # Currently: template-based generation
-    response = _format_template_response(matched_data)
+    response = _format_template_response(query, matched_data)
 
     logger.info(
-        "Generated response for topic '%s' (%d chars).",
+        "Generated trained-data response for '%s' (%d chars).",
         matched_data.get("matched_key", "unknown"),
         len(response),
     )
