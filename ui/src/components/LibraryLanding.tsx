@@ -6,12 +6,13 @@ interface LibraryLandingProps {
   onOpenChat: () => void;
   onOpenGenerator: () => void;
   onOpenAnalyzer: () => void;
+  onOpenTrainedChat: () => void;
   trustedCount: number;
 }
 
 const TABS = ['JSON', 'Preview', 'Logs'] as const;
 
-export const LibraryLanding = ({ onOpenChat, onOpenGenerator, onOpenAnalyzer, trustedCount }: LibraryLandingProps) => {
+export const LibraryLanding = ({ onOpenChat, onOpenGenerator, onOpenAnalyzer, onOpenTrainedChat, trustedCount }: LibraryLandingProps) => {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('JSON');
   const sampleOutput = useMemo(() => {
     if (activeTab === 'Preview') {
@@ -46,6 +47,9 @@ export const LibraryLanding = ({ onOpenChat, onOpenGenerator, onOpenAnalyzer, tr
               </button>
               <button type="button" className="secondary-button" onClick={onOpenGenerator}>
                 Open Notice Generator
+              </button>
+              <button type="button" className="neutral-button" onClick={onOpenTrainedChat}>
+                Open Trained AI Chat
               </button>
             </div>
           </div>
