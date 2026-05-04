@@ -1107,52 +1107,56 @@ export const LegalChat = ({
                                 >
                                     {msg.role === 'user' ? <User size={18} /> : <Sparkles size={18} />}
                                 </div>
-                                <div
-                                    className={cn(
-                                        "group relative rounded-[28px] border px-6 py-5 shadow-sm",
-                                        msg.role === 'user'
-                                            ? 'border-primary/20 bg-primary text-on-primary'
-                                            : 'chat-assistant-bubble',
-                                    )}
-                                >
-                                    {msg.role === 'user' && editingMessageIndex === idx ? (
-                                        <div className="space-y-3">
-                                            <textarea
-                                                value={editingDraft}
-                                                onChange={(event) => setEditingDraft(event.target.value)}
-                                                className="min-h-[88px] w-full resize-y rounded-2xl border border-white/25 bg-black/10 px-4 py-3 text-sm text-on-primary placeholder:text-on-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
-                                            />
-                                            <div className="flex justify-end gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={cancelEditingMessage}
-                                                    className="rounded-full border border-white/25 px-3 py-1.5 text-xs font-medium text-on-primary/90 transition hover:bg-black/15 hover:text-on-primary"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => saveEditedMessage(idx)}
-                                                    className="rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-xs font-semibold text-on-primary transition hover:bg-white/25"
-                                                >
-                                                    Save
-                                                </button>
+                                <div className={cn("flex w-full flex-col", msg.role === 'user' ? 'items-end' : 'items-start')}>
+                                    <div
+                                        className={cn(
+                                            "group rounded-[28px] border px-6 py-5 shadow-sm",
+                                            msg.role === 'user'
+                                                ? 'border-primary/20 bg-primary text-on-primary'
+                                                : 'chat-assistant-bubble',
+                                        )}
+                                    >
+                                        {msg.role === 'user' && editingMessageIndex === idx ? (
+                                            <div className="space-y-3">
+                                                <textarea
+                                                    value={editingDraft}
+                                                    onChange={(event) => setEditingDraft(event.target.value)}
+                                                    className="min-h-[88px] w-full resize-y rounded-2xl border border-white/25 bg-black/10 px-4 py-3 text-sm text-on-primary placeholder:text-on-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={cancelEditingMessage}
+                                                        className="rounded-full border border-white/25 px-3 py-1.5 text-xs font-medium text-on-primary/90 transition hover:bg-black/15 hover:text-on-primary"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => saveEditedMessage(idx)}
+                                                        className="rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-xs font-semibold text-on-primary transition hover:bg-white/25"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <>
+                                        ) : (
                                             <Markdown components={markdownComponents}>{msg.content}</Markdown>
-                                            {msg.role === 'user' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startEditingMessage(idx, msg.content)}
-                                                    className="absolute bottom-2 right-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-black/10 text-on-primary/75 opacity-60 transition hover:bg-black/20 hover:text-on-primary hover:opacity-100 group-hover:opacity-90"
-                                                    aria-label="Edit message"
-                                                >
-                                                    <Pencil className="h-3.5 w-3.5" />
-                                                </button>
-                                            )}
-                                        </>
+                                        )}
+                                    </div>
+
+                                    {msg.role === 'user' && editingMessageIndex !== idx && (
+                                        <div className="mt-1.5 flex w-full justify-end pr-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => startEditingMessage(idx, msg.content)}
+                                                className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-on-surface-variant/65 opacity-70 transition hover:bg-white/5 hover:text-on-surface-variant hover:opacity-100"
+                                                aria-label="Edit message"
+                                            >
+                                                <Pencil className="h-3 w-3" />
+                                                <span>Edit</span>
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -1549,9 +1553,9 @@ export const LegalChat = ({
                 </div>
             </div>
 
-            <div className="border-t border-white/10 bg-[#1c1c1a] px-4 py-5 sm:px-6 lg:px-8">
-                <div className="mx-auto w-full max-w-6xl">
-                    <div className="relative w-full rounded-[22px] border border-white/10 bg-[#2a2a28] p-2 shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
+            <div className="border-t border-white/10 bg-[#1c1c1a] px-4 py-6 sm:px-6 lg:px-8">
+                <div className="mx-auto w-full max-w-4xl">
+                    <div className="relative w-full rounded-2xl border border-white/12 bg-[#2a2a28] p-2.5 shadow-[0_16px_36px_rgba(0,0,0,0.35)] transition-colors duration-200">
                         <div className="overflow-y-auto">
                             <textarea
                                 ref={textareaRef}
@@ -1574,7 +1578,7 @@ export const LegalChat = ({
                                 }
                                 disabled={isLoading}
                                 className={cn(
-                                    "h-24 min-h-[96px] max-h-[200px] w-full resize-none border-none bg-transparent px-4 py-3 pr-28 text-base text-zinc-100 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                                    "h-[88px] min-h-[88px] max-h-[176px] w-full resize-none rounded-xl border-none bg-transparent px-4 py-3 pr-28 text-base text-zinc-100 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                                     "placeholder:text-zinc-500 disabled:opacity-70"
                                 )}
                                 style={{ overflowY: 'hidden' }}
