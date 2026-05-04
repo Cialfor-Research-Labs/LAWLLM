@@ -1553,7 +1553,7 @@ export const LegalChat = ({
                 </div>
             </div>
 
-            <div className="border-t border-white/10 bg-[#1c1c1a] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="bg-transparent px-4 py-6 sm:px-6 lg:px-8">
                 <div className="mx-auto w-full max-w-4xl">
                     <div className="relative w-full rounded-2xl border border-white/12 bg-[#2a2a28] p-2.5 shadow-[0_16px_36px_rgba(0,0,0,0.35)] transition-colors duration-200">
                         <div className="overflow-y-auto">
