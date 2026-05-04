@@ -16,7 +16,7 @@ jobs:
         cd /home/lawllm/Test_Server/LAWLLM
         git fetch origin dev
         git checkout dev
-        git pull origin dev
+        git reset --hard origin/dev
         source .venv/bin/activate
         pip install -r requirements.txt
         cd ui
