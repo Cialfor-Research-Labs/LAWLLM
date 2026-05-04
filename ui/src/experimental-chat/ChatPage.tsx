@@ -4,7 +4,13 @@ import { ChatContainer } from './components/ChatContainer';
 import { Message } from './components/ChatMessage';
 import { getMockResponse } from './mock/mockLLM';
 
-const TLLAC_API_URL = 'http://localhost:9001/chat';
+function getTllacApiUrl(): string {
+  const configured = import.meta.env.VITE_TLLAC_API_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  return '/tllac-api/chat';
+}
 
 interface ChatPageProps {
   embedded?: boolean;
@@ -12,6 +18,7 @@ interface ChatPageProps {
 }
 
 export const ChatPage: React.FC<ChatPageProps> = ({ embedded = false, onHistoryChange }) => {
+  const tllacApiUrl = getTllacApiUrl();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ id: string; title: string; date: string; last_message_at: string }[]>([]);
@@ -44,8 +51,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ embedded = false, onHistoryC
     let responseText: string;
 
     try {
-      // Call the isolated tllac backend
-      const res = await fetch(TLLAC_API_URL, {
+      // Route through a configurable same-origin endpoint by default so
+      // the trained chat works on localhost and LAN-hosted dev sessions.
+      const res = await fetch(tllacApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: content }),
