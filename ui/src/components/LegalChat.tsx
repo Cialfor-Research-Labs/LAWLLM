@@ -4,15 +4,14 @@ import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import { 
   CheckCircle2, 
-  ChevronDown,
-  ChevronUp,
   Loader2, 
   Scale, 
   Sparkles, 
   User, 
   FileText, 
   TrendingUp,
-  ArrowUpIcon
+  ArrowUpIcon,
+  Pencil
 } from 'lucide-react';
 import type { GeneratorPrefillPayload } from '../types/generatorPrefill';
 
@@ -812,6 +811,8 @@ export const LegalChat = ({
         [authToken],
     );
     const scrollRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const activeRequestControllerRef = useRef<AbortController | null>(null);
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
@@ -831,7 +832,8 @@ export const LegalChat = ({
     const [behavioralPrimitives, setBehavioralPrimitives] = useState<BehavioralPrimitive[]>([]);
     const [interpretations, setInterpretations] = useState<LegalInterpretation[]>([]);
     const [applicableLaws, setApplicableLaws] = useState<ApplicableLaw[]>([]);
-    const [isIntakeExpanded, setIsIntakeExpanded] = useState(false);
+    const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+    const [editingDraft, setEditingDraft] = useState('');
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -869,6 +871,8 @@ export const LegalChat = ({
     }, [sessionId, onActiveSessionChange]);
 
     const resetConversation = () => {
+        activeRequestControllerRef.current?.abort();
+        activeRequestControllerRef.current = null;
         setMessages([
             {
                 role: 'assistant',
@@ -969,11 +973,14 @@ export const LegalChat = ({
         setInput('');
         setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
         setIsLoading(true);
+        const abortController = new AbortController();
+        activeRequestControllerRef.current = abortController;
 
         try {
             const response = await fetch(`${apiBase}/query/interview/chat`, {
                 method: 'POST',
                 headers: authHeaders,
+                signal: abortController.signal,
                 body: JSON.stringify({
                     query: userMessage,
                     session_id: sessionId,
@@ -989,15 +996,62 @@ export const LegalChat = ({
             applyInterviewResponse(data);
             
         } catch (error: any) {
+            if (error?.name === 'AbortError') {
+                return;
+            }
             console.error('Chat Error:', error);
             setMessages((prev) => [
                 ...prev,
                 { role: 'assistant', content: `Error: ${error.message || 'Technical glitch. Try again.'}` },
             ]);
         } finally {
+            activeRequestControllerRef.current = null;
             setIsLoading(false);
         }
     };
+
+    const startEditingMessage = (index: number, content: string) => {
+        setEditingMessageIndex(index);
+        setEditingDraft(content);
+    };
+
+    const cancelEditingMessage = () => {
+        setEditingMessageIndex(null);
+        setEditingDraft('');
+    };
+
+    const saveEditedMessage = (index: number) => {
+        const nextContent = editingDraft.trim();
+        if (!nextContent) {
+            cancelEditingMessage();
+            return;
+        }
+        setMessages((prev) =>
+            prev.map((message, messageIndex) =>
+                messageIndex === index ? { ...message, content: nextContent } : message,
+            ),
+        );
+        cancelEditingMessage();
+    };
+
+    const handleStopGeneration = () => {
+        if (!isLoading) return;
+        activeRequestControllerRef.current?.abort();
+        activeRequestControllerRef.current = null;
+        setIsLoading(false);
+    };
+
+    const autoResizeTextarea = (target: HTMLTextAreaElement) => {
+        target.style.height = '96px';
+        target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+        target.style.overflowY = target.scrollHeight > 200 ? 'auto' : 'hidden';
+    };
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            autoResizeTextarea(textareaRef.current);
+        }
+    }, [input]);
 
     const hasMeaningfulConversation =
         messages.some(
@@ -1033,127 +1087,8 @@ export const LegalChat = ({
         );
     };
 
-    const completedSteps =
-        isOutOfScope
-            ? 1
-            : status === 'complete'
-            ? 4
-            : status === 'clarification_required' || status === 'review_required'
-                ? 3
-                : hasMeaningfulConversation
-                    ? 2
-                    : 1;
-    const progressValue = completedSteps * 25;
-    const progressLabel =
-        isOutOfScope
-            ? 'Legal question needed - Step 1 of 4'
-            : completedSteps === 4
-            ? 'FIRAC analysis ready - Step 4 of 4'
-            : completedSteps === 3
-                ? 'Clarifying missing facts - Step 3 of 4'
-                : completedSteps === 2
-                    ? 'Gathering facts - Step 2 of 4'
-                    : 'Case intake started - Step 1 of 4';
-    const systemModeLabel = status.replace('_', ' ');
-    const IntakeToggleIcon = isIntakeExpanded ? ChevronUp : ChevronDown;
-
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <div className="border-b border-outline-variant/70 bg-surface-variant px-4 py-4 backdrop-blur-sm sm:px-6 lg:px-8">
-                <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-start">
-                    <div className={cn("min-w-0", isIntakeExpanded ? "py-2" : "py-1")}>
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="section-kicker">Adaptive legal intake</p>
-                                <h2
-                                    className={cn(
-                                        "mt-1 font-semibold text-secondary transition-all",
-                                        isIntakeExpanded ? "text-3xl leading-tight" : "text-2xl leading-tight sm:text-[1.7rem]",
-                                    )}
-                                >
-                                    Describe the issue. We answer directly when the facts are already strong.
-                                </h2>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsIntakeExpanded((prev) => !prev)}
-                                className="mt-0.5 inline-flex shrink-0 items-center gap-2 rounded-full border border-outline-variant/70 bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-primary/30 hover:text-on-surface"
-                                aria-expanded={isIntakeExpanded}
-                                aria-label={isIntakeExpanded ? 'Collapse intake details' : 'Expand intake details'}
-                            >
-                                <span>{isIntakeExpanded ? 'Collapse' : 'Expand'}</span>
-                                <IntakeToggleIcon size={14} />
-                            </button>
-                        </div>
-
-                        <p className="hidden text-sm text-on-surface-variant">
-                            Unified Legal Case Engine Â· Factual Extraction Â· FIRAC Analysis
-                        </p>
-                        <p className={cn("text-on-surface-variant", isIntakeExpanded ? "mt-3 text-base" : "mt-2 truncate text-sm")}>
-                            Unified Legal Case Engine · Adaptive Intake · FIRAC Analysis
-                        </p>
-                    </div>
-                    <div className="hidden items-center gap-3">
-                        <div className="flex flex-col items-end mr-4">
-                            <span className="text-[10px] font-bold uppercase text-on-surface-variant">
-                                {status === "clarification_required" ? "âš ï¸ Signal Low" : status === "complete" ? "âœ… Factual Certainty" : "ðŸ” Analyzing Situation"}
-                            </span>
-                            <div className="w-32 h-1.5 bg-surface-container rounded-full mt-1 overflow-hidden shadow-inner">
-                                <motion.div 
-                                    className={`h-full ${confidence < 0.4 ? 'bg-amber-500' : confidence < 0.7 ? 'bg-primary' : 'bg-emerald-500'}`}
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${confidence * 100}%` }}
-                                    transition={{ duration: 0.5 }}
-                                />
-                            </div>
-                        </div>
-                        <div className="hidden sm:flex flex-col items-start px-3 py-1.5 bg-surface-container-low border border-outline-variant/20 rounded-xl mr-2">
-                             <span className="text-[9px] font-black uppercase text-on-surface-variant/70 leading-none">System Mode</span>
-                             <span className={`text-[11px] font-bold uppercase tracking-tight leading-normal ${status === 'complete' ? 'text-emerald-600' : status === 'clarification_required' ? 'text-amber-600' : 'text-primary'}`}>
-                                {status.replace('_', ' ')}
-                             </span>
-                        </div>
-                    </div>
-                    <div className="flex min-w-0 items-center gap-3 lg:justify-end">
-                        <div className="app-shell-panel flex flex-1 flex-col bg-surface-container-low px-5 py-4">
-                            <div className="flex items-center justify-between gap-3">
-                            <span className="text-sm font-medium text-on-surface">
-                                {progressLabel}
-                            </span>
-                            <span className="status-pill">{progressValue}%</span>
-                            </div>
-                            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-surface-container-high shadow-inner">
-                                <motion.div
-                                    className={`h-full ${confidence < 0.4 ? 'bg-amber-500' : confidence < 0.7 ? 'bg-primary' : 'bg-emerald-500'}`}
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${progressValue}%` }}
-                                    transition={{ duration: 0.5 }}
-                                />
-                            </div>
-                            <div className="mt-2 grid grid-cols-4 items-center text-[10px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant/80">
-                                {[1, 2, 3, 4].map((step) => (
-                                    <span
-                                        key={step}
-                                        className={`text-center ${completedSteps >= step ? 'text-primary' : ''}`}
-                                    >
-                                        Step {step}
-                                    </span>
-                                ))}
-                            </div>
-                            <p className="mt-2 text-[12px] text-on-surface-variant">
-                                We only ask follow-up questions when your first description still leaves important gaps.
-                            </p>
-                        </div>
-                        <div className="hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low px-4 py-3 shadow-sm">
-                            <span className="text-[9px] font-black uppercase tracking-[0.12em] text-on-surface-variant/70 leading-none">System Mode</span>
-                            <span className={`mt-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-normal ${status === 'complete' ? 'text-emerald-600' : status === 'clarification_required' ? 'text-amber-600' : 'text-primary'}`}>
-                                {systemModeLabel}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-6xl flex-col gap-5">
                 <AnimatePresence initial={false}>
@@ -1173,13 +1108,52 @@ export const LegalChat = ({
                                     {msg.role === 'user' ? <User size={18} /> : <Sparkles size={18} />}
                                 </div>
                                 <div
-                                    className={`rounded-[28px] border px-6 py-5 shadow-sm ${
+                                    className={cn(
+                                        "group relative rounded-[28px] border px-6 py-5 shadow-sm",
                                         msg.role === 'user'
                                             ? 'border-primary/20 bg-primary text-on-primary'
-                                            : 'chat-assistant-bubble'
-                                    }`}
+                                            : 'chat-assistant-bubble',
+                                    )}
                                 >
-                                    <Markdown components={markdownComponents}>{msg.content}</Markdown>
+                                    {msg.role === 'user' && editingMessageIndex === idx ? (
+                                        <div className="space-y-3">
+                                            <textarea
+                                                value={editingDraft}
+                                                onChange={(event) => setEditingDraft(event.target.value)}
+                                                className="min-h-[88px] w-full resize-y rounded-2xl border border-white/25 bg-black/10 px-4 py-3 text-sm text-on-primary placeholder:text-on-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+                                            />
+                                            <div className="flex justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelEditingMessage}
+                                                    className="rounded-full border border-white/25 px-3 py-1.5 text-xs font-medium text-on-primary/90 transition hover:bg-black/15 hover:text-on-primary"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => saveEditedMessage(idx)}
+                                                    className="rounded-full border border-white/40 bg-white/15 px-3 py-1.5 text-xs font-semibold text-on-primary transition hover:bg-white/25"
+                                                >
+                                                    Save
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <Markdown components={markdownComponents}>{msg.content}</Markdown>
+                                            {msg.role === 'user' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startEditingMessage(idx, msg.content)}
+                                                    className="absolute bottom-2 right-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-black/10 text-on-primary/75 opacity-60 transition hover:bg-black/20 hover:text-on-primary hover:opacity-100 group-hover:opacity-90"
+                                                    aria-label="Edit message"
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>
@@ -1577,17 +1551,22 @@ export const LegalChat = ({
 
             <div className="border-t border-white/10 bg-[#1c1c1a] px-4 py-5 sm:px-6 lg:px-8">
                 <div className="mx-auto w-full max-w-6xl">
-                    <div className="relative w-full rounded-[24px] border border-white/10 bg-[#2a2a28] p-2 shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
+                    <div className="relative w-full rounded-[22px] border border-white/10 bg-[#2a2a28] p-2 shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
                         <div className="overflow-y-auto">
                             <textarea
+                                ref={textareaRef}
                                 value={input}
-                                onChange={(e) => setInput(e.target.value)}
+                                onChange={(e) => {
+                                    setInput(e.target.value);
+                                    autoResizeTextarea(e.currentTarget);
+                                }}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
                                         e.preventDefault();
                                         handleSend();
                                     }
                                 }}
+                                onInput={(e) => autoResizeTextarea(e.currentTarget)}
                                 placeholder={
                                     isComplete
                                         ? "Ask a follow-up or start a new matter..."
@@ -1595,14 +1574,24 @@ export const LegalChat = ({
                                 }
                                 disabled={isLoading}
                                 className={cn(
-                                    "min-h-[72px] w-full resize-none border-none bg-transparent px-4 py-3 pr-20 text-base text-zinc-100 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                                    "h-24 min-h-[96px] max-h-[200px] w-full resize-none border-none bg-transparent px-4 py-3 pr-28 text-base text-zinc-100 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                                     "placeholder:text-zinc-500 disabled:opacity-70"
                                 )}
-                                style={{ overflow: 'hidden' }}
+                                style={{ overflowY: 'hidden' }}
                             />
                         </div>
 
-                        <div className="flex items-center justify-end p-2">
+                        <div className="flex items-center justify-end gap-2 p-2">
+                            {isLoading && (
+                                <button
+                                    type="button"
+                                    onClick={handleStopGeneration}
+                                    className="inline-flex h-10 items-center gap-1.5 rounded-full border border-white/20 bg-black/20 px-3 text-xs font-medium text-zinc-100 transition-colors hover:border-white/30 hover:bg-black/35"
+                                >
+                                    <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-zinc-100" />
+                                    Stop
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => handleSend()}
