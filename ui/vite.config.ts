@@ -7,8 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode,path.resolve(__dirname, '..'), '')
   const apiProxyTarget =
     env.VITE_API_PROXY_TARGET ||
-    env.VITE_API_BASE_URL ||
-    'http://localhost:8000'
+    env.VITE_API_BASE_URL
 
   console.log('Vite config loaded')
 
