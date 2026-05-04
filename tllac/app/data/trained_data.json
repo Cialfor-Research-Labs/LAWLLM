@@ -1,0 +1,288 @@
+{
+  "adverse possession": {
+    "title": "Adverse Possession (India)",
+    "summary": "Adverse possession is a legal doctrine under Indian law that allows a person to claim ownership of land if they have possessed it openly, continuously, and hostilely for a statutory period. The principle is based on the maxim 'Vigilantibus non dormientibus jura subveniunt' — the law assists those who are vigilant, not those who sleep over their rights.",
+    "points": [
+      "Continuous and uninterrupted possession for 12 years (private property) or 30 years (government property)",
+      "Possession must be hostile — without the owner's permission or consent",
+      "Possession must be open, notorious, and visible to the world",
+      "The possessor must have the intention to possess the property as their own (animus possidendi)",
+      "The burden of proof lies on the person claiming adverse possession",
+      "Once the limitation period expires, the original owner's right to sue is extinguished"
+    ],
+    "law": "Limitation Act, 1963 (Article 64, 65)",
+    "case_references": [
+      "State of Haryana v. Mukesh Kumar (2011) — SC clarified adverse possession as a 'law of the rich against the poor'",
+      "Hemaji Waghaji Jat v. Bhikhabhai Khengarbhai Harijan (2009) — SC recommended Parliament to reconsider the law"
+    ],
+    "practical_notes": "Courts in India have increasingly criticised adverse possession, noting it rewards a trespasser. Legislative reform has been recommended but not yet enacted."
+  },
+
+  "contract law": {
+    "title": "Contract Law Overview (India)",
+    "summary": "The Indian Contract Act, 1872 is the primary legislation governing contracts in India. It defines the essentials of a valid contract, types of contracts, performance of contracts, breach, and remedies available. All agreements enforceable by law are contracts.",
+    "points": [
+      "Offer (Proposal) and Acceptance — Sections 2(a) and 2(b)",
+      "Lawful consideration — Section 2(d); every contract requires consideration except gifts under Sec 25",
+      "Capacity to contract — Section 11; parties must be of age of majority, sound mind, not disqualified by law",
+      "Free consent — Section 14; absence of coercion, undue influence, fraud, misrepresentation, or mistake",
+      "Lawful object — Section 23; the object must not be illegal, immoral, or opposed to public policy",
+      "Void agreements — Sections 24–30 (e.g., agreements in restraint of trade, marriage, or legal proceedings)",
+      "Breach of contract — Section 73 (damages), Section 74 (liquidated damages)"
+    ],
+    "law": "Indian Contract Act, 1872",
+    "case_references": [
+      "Mohori Bibee v. Dharmodas Ghose (1903) — Contract by a minor is void ab initio",
+      "Balfour v. Balfour — Domestic agreements lack intent to create legal relations",
+      "Carlill v. Carbolic Smoke Ball Co. — General offer and acceptance principles"
+    ],
+    "practical_notes": "Specific Relief Act, 1963 provides for specific performance when damages are inadequate. Sale of Goods Act, 1930 and Partnership Act, 1932 also supplement contract law."
+  },
+
+  "ai regulations": {
+    "title": "AI Regulations in India",
+    "summary": "India does not yet have a dedicated AI-specific legislation. The regulatory approach is evolving through advisories, data protection laws, and sectoral regulations. MEITY (Ministry of Electronics and IT) has issued guidelines, and the Digital Personal Data Protection Act (DPDP), 2023 has implications for AI systems processing personal data.",
+    "points": [
+      "Digital Personal Data Protection Act (DPDP), 2023 — regulates processing of digital personal data, relevant to AI/ML systems",
+      "IT Act, 2000 — covers cyber crimes, data protection, and electronic governance; Sec 43A for data breach liability",
+      "MEITY Advisories (2024) — mandated labeling of AI-generated content and prior government approval for untested AI models",
+      "NITI Aayog's Responsible AI Framework — principles-based approach covering fairness, transparency, accountability",
+      "RBI guidelines on AI in financial services — mandates explainability and fairness in credit scoring AI",
+      "No comprehensive AI Act yet — India follows a sectoral, principles-based regulatory model"
+    ],
+    "law": "DPDP Act, 2023; IT Act, 2000; MEITY Advisories",
+    "practical_notes": "India's approach balances innovation with regulation. Startups should track MEITY advisories and ensure DPDP compliance when deploying AI systems processing Indian citizens' data."
+  },
+
+  "property disputes": {
+    "title": "Property Disputes in India",
+    "summary": "Property disputes in India typically involve conflicts over title, possession, boundaries, or inheritance. They are governed by multiple laws depending on the nature of the dispute and are adjudicated in civil courts. Property matters constitute one of the largest categories of civil litigation in India.",
+    "points": [
+      "Title suits — to establish legal ownership (governed by Transfer of Property Act, 1882)",
+      "Partition suits — division of jointly held property among co-owners",
+      "Injunction suits — to prevent illegal interference with possession or enjoyment",
+      "Specific performance — compelling a party to complete a property transaction",
+      "Encroachment disputes — unlawful occupation of another's property",
+      "Registration of property — compulsory under Registration Act, 1908 for immovable property above ₹100"
+    ],
+    "law": "Transfer of Property Act, 1882; Registration Act, 1908; Indian Succession Act, 1925",
+    "case_references": [
+      "Suraj Lamp & Industries Pvt. Ltd. v. State of Haryana (2012) — SC held that sale agreements and GPA sales are not valid modes of transfer",
+      "K. Kameswara Rao v. A. Kathyayani (2020) — burden of proof in title disputes"
+    ],
+    "practical_notes": "Always verify title through encumbrance certificate, mutation records, and chain of ownership before purchasing property. RERA (Real Estate Regulation Act, 2016) provides additional protections for homebuyers."
+  },
+
+  "fundamental rights": {
+    "title": "Fundamental Rights under the Indian Constitution",
+    "summary": "Part III of the Indian Constitution (Articles 12–35) guarantees Fundamental Rights to all citizens. These rights are justiciable and enforceable through the Supreme Court (Article 32) and High Courts (Article 226). They form the backbone of Indian constitutional democracy.",
+    "points": [
+      "Right to Equality (Articles 14–18) — equality before law, prohibition of discrimination, abolition of untouchability and titles",
+      "Right to Freedom (Articles 19–22) — six freedoms including speech, assembly, movement; protection of life and personal liberty",
+      "Right against Exploitation (Articles 23–24) — prohibition of trafficking, forced labour, and child labour",
+      "Right to Freedom of Religion (Articles 25–28) — freedom of conscience, practice, propagation, and management of religious affairs",
+      "Cultural and Educational Rights (Articles 29–30) — protection of minorities' interests, right to establish educational institutions",
+      "Right to Constitutional Remedies (Article 32) — 'heart and soul of the Constitution' per Dr. Ambedkar",
+      "Right to Privacy — recognized as a Fundamental Right under Article 21 by the SC in 2017"
+    ],
+    "law": "Constitution of India, Part III (Articles 12–35)",
+    "case_references": [
+      "Kesavananda Bharati v. State of Kerala (1973) — Basic Structure Doctrine",
+      "Maneka Gandhi v. Union of India (1978) — expanded scope of Article 21",
+      "K.S. Puttaswamy v. Union of India (2017) — Right to Privacy as Fundamental Right"
+    ],
+    "practical_notes": "Fundamental Rights are not absolute — they are subject to reasonable restrictions. Article 32 allows direct approach to the Supreme Court via writs (Habeas Corpus, Mandamus, Prohibition, Certiorari, Quo Warranto)."
+  },
+
+  "ipc offences": {
+    "title": "Indian Penal Code — Key Offences",
+    "summary": "The Indian Penal Code (IPC), 1860 was the primary criminal code of India (now being replaced by the Bharatiya Nyaya Sanhita, 2023). It classified criminal offences, defined punishments, and established the framework for criminal liability in India.",
+    "points": [
+      "Section 302 — Murder (punishment: death or life imprisonment)",
+      "Section 304 — Culpable homicide not amounting to murder",
+      "Section 376 — Rape (stringent punishment post-2013 amendment)",
+      "Section 420 — Cheating and dishonestly inducing delivery of property",
+      "Section 498A — Cruelty by husband or relatives (dowry-related harassment)",
+      "Section 354 — Assault or criminal force to outrage modesty of a woman",
+      "Section 307 — Attempt to murder",
+      "Section 120B — Criminal conspiracy"
+    ],
+    "law": "Indian Penal Code, 1860 (being replaced by Bharatiya Nyaya Sanhita, 2023 — BNS)",
+    "case_references": [
+      "Bachan Singh v. State of Punjab (1980) — 'rarest of rare' doctrine for death penalty",
+      "Vishaka v. State of Rajasthan (1997) — guidelines on sexual harassment at workplace"
+    ],
+    "practical_notes": "The Bharatiya Nyaya Sanhita (BNS), 2023 replaces the IPC effective from July 1, 2024. Key provisions are retained with new section numbers and some additions like community service as punishment."
+  },
+
+  "bail": {
+    "title": "Bail Provisions in India",
+    "summary": "Bail is the temporary release of an accused person awaiting trial, upon furnishing a bond or surety. Indian law distinguishes between bailable and non-bailable offences. The principle is 'bail is the rule, jail is the exception.'",
+    "points": [
+      "Bailable offences (Section 436 CrPC) — bail is a matter of right; police must grant it",
+      "Non-bailable offences (Section 437 CrPC) — bail is at the court's discretion",
+      "Anticipatory bail (Section 438 CrPC) — pre-arrest bail when apprehending arrest",
+      "Default bail (Section 167(2) CrPC) — if chargesheet not filed within 60/90 days",
+      "Bail conditions — may include surrender of passport, regular attendance, travel restrictions",
+      "Cancellation of bail (Section 439(2) CrPC) — if conditions violated or accused absconds"
+    ],
+    "law": "Code of Criminal Procedure (CrPC), 1973 — Sections 436–450 (now BNSS, 2023)",
+    "case_references": [
+      "Arnesh Kumar v. State of Bihar (2014) — SC guidelines on arrest in Sec 498A cases",
+      "Satender Kumar Antil v. CBI (2022) — SC mandated bail for offences up to 7 years"
+    ],
+    "practical_notes": "When applying for bail, courts consider: nature and gravity of offence, criminal antecedents, likelihood of fleeing justice, and possibility of tampering with evidence."
+  },
+
+  "consumer protection": {
+    "title": "Consumer Protection in India",
+    "summary": "The Consumer Protection Act, 2019 replaced the 1986 Act and provides enhanced protection to consumers. It covers goods and services including e-commerce, establishes Consumer Dispute Redressal Commissions at district, state, and national levels, and introduces product liability and unfair trade practices provisions.",
+    "points": [
+      "Six consumer rights — Right to safety, information, choice, hearing, redressal, and consumer education",
+      "Three-tier redressal mechanism — District Commission (up to ₹1 crore), State Commission (₹1–10 crore), National Commission (above ₹10 crore)",
+      "E-commerce rules — apply to all online marketplaces and sellers operating in India",
+      "Product liability — manufacturers, sellers, and service providers can be held liable for defective goods/services",
+      "Central Consumer Protection Authority (CCPA) — empowered to take suo moto action",
+      "Complaint filing — can be done online via the e-Daakhil portal",
+      "Misleading advertisements — Section 2(28) defines and penalizes misleading ads"
+    ],
+    "law": "Consumer Protection Act, 2019; Consumer Protection (E-Commerce) Rules, 2020",
+    "case_references": [
+      "Indian Medical Association v. VP Shantha (1995) — medical services fall under consumer protection",
+      "Lucknow Development Authority v. M.K. Gupta (1994) — deficiency in service by government bodies"
+    ],
+    "practical_notes": "Consumers can file complaints online at edaakhil.nic.in. No lawyer is required. Complaints must be filed within 2 years from the cause of action."
+  },
+
+  "divorce law": {
+    "title": "Divorce Law in India",
+    "summary": "Divorce in India is governed by personal laws based on religion, and the secular Special Marriage Act. Each law specifies grounds for divorce, maintenance, custody, and property division. Mutual consent divorce is the most common and fastest route.",
+    "points": [
+      "Hindu Marriage Act, 1955 — Sec 13 (contested divorce), Sec 13B (mutual consent; requires 6-month cooling period)",
+      "Muslim Personal Law — Talaq (various forms), Khula (wife-initiated), Mubarat (mutual)",
+      "Special Marriage Act, 1954 — secular law applicable to inter-religious marriages; Sec 27 (divorce)",
+      "Indian Divorce Act, 1869 — applicable to Christians",
+      "Grounds for divorce — cruelty, adultery, desertion (2+ years), conversion, unsoundness of mind, communicable disease",
+      "Maintenance — Section 125 CrPC provides maintenance irrespective of religion",
+      "Child custody — governed by 'welfare of the child' principle"
+    ],
+    "law": "Hindu Marriage Act, 1955; Special Marriage Act, 1954; Muslim Personal Law; Indian Divorce Act, 1869",
+    "case_references": [
+      "Shayara Bano v. Union of India (2017) — SC struck down Triple Talaq as unconstitutional",
+      "Amardeep Singh v. Harveen Kaur (2017) — SC allowed waiver of 6-month cooling period in mutual consent divorce"
+    ],
+    "practical_notes": "Mutual consent divorce typically takes 6–18 months. Contested divorces can take years. Mediation is encouraged and courts often refer cases to mediation centres."
+  },
+
+  "right to information": {
+    "title": "Right to Information (RTI) in India",
+    "summary": "The Right to Information Act, 2005 empowers Indian citizens to access information from public authorities. It promotes transparency and accountability in governance. Any citizen can file an RTI application to seek information from government bodies.",
+    "points": [
+      "Any Indian citizen can file an RTI application — no reason needs to be given for seeking information",
+      "Public authorities must respond within 30 days (48 hours if life/liberty is at stake)",
+      "Application fee — ₹10 for central government departments",
+      "Two appeals — First Appeal to the designated officer, Second Appeal to the Information Commission",
+      "Exemptions under Section 8 — national security, cabinet papers, trade secrets, personal privacy",
+      "Central Information Commission (CIC) and State Information Commissions — appellate bodies",
+      "Penalties — up to ₹25,000 for non-compliance by Public Information Officer"
+    ],
+    "law": "Right to Information Act, 2005",
+    "case_references": [
+      "CBSE v. Aditya Bandopadhyay (2011) — SC held RTI cannot be used as a tool for harassment",
+      "Supreme Court of India v. Subhash Chandra Agarwal (2019) — office of CJI is a public authority under RTI"
+    ],
+    "practical_notes": "RTI applications can be filed online at rtionline.gov.in for central government departments. State-level RTIs have separate portals."
+  },
+
+  "gst": {
+    "title": "Goods and Services Tax (GST) in India",
+    "summary": "GST is a comprehensive indirect tax levied on the manufacture, sale, and consumption of goods and services in India. Introduced on July 1, 2017 via the 101st Constitutional Amendment, it replaced multiple cascading taxes and follows a dual structure (Central GST + State GST).",
+    "points": [
+      "Dual GST structure — CGST (Central) + SGST (State) for intra-state, IGST for inter-state transactions",
+      "Four main tax slabs — 5%, 12%, 18%, and 28% (with some items at 0% or exempt)",
+      "GST registration mandatory if turnover exceeds ₹40 lakh (₹20 lakh for services / special category states)",
+      "Composition scheme — simplified compliance for small taxpayers with turnover up to ₹1.5 crore",
+      "Input Tax Credit (ITC) — taxes paid on inputs can be claimed as credit against output tax liability",
+      "GST Network (GSTN) — IT backbone managing registration, returns, and compliance",
+      "GST Council — constitutional body (Article 279A) that recommends rates and policy changes"
+    ],
+    "law": "Central GST Act, 2017; IGST Act, 2017; State GST Acts; Constitution (101st Amendment) Act, 2016",
+    "practical_notes": "GST returns include GSTR-1 (outward supplies), GSTR-3B (summary return), and annual return GSTR-9. Late filing attracts penalties and interest."
+  },
+
+  "cyber crime": {
+    "title": "Cyber Crime Laws in India",
+    "summary": "Cyber crimes in India are primarily governed by the Information Technology Act, 2000 (amended in 2008) and relevant IPC/BNS provisions. The Act covers hacking, identity theft, cyber terrorism, data breaches, and online fraud.",
+    "points": [
+      "Section 66 IT Act — computer-related offences (hacking) — up to 3 years imprisonment and ₹5 lakh fine",
+      "Section 66C — identity theft — up to 3 years and ₹1 lakh fine",
+      "Section 66D — cheating by personation using computer resources",
+      "Section 66E — violation of privacy (capturing/publishing private images)",
+      "Section 67 — publishing obscene material in electronic form",
+      "Section 43A — compensation for failure to protect data",
+      "Section 69 — government power to intercept, monitor, or decrypt information",
+      "Section 79 — safe harbour for intermediaries (subject to due diligence)"
+    ],
+    "law": "Information Technology Act, 2000; IT (Amendment) Act, 2008; IT (Intermediary Guidelines) Rules, 2021",
+    "case_references": [
+      "Shreya Singhal v. Union of India (2015) — SC struck down Section 66A as unconstitutional (restriction on free speech)",
+      "K.N. Govindacharya v. Union of India (2015) — intermediary liability and due diligence"
+    ],
+    "practical_notes": "Cyber crime complaints can be filed online at cybercrime.gov.in. For financial fraud, immediately call 1930 (National Cyber Crime Helpline)."
+  },
+
+  "labour law": {
+    "title": "Labour Laws in India",
+    "summary": "India has consolidated its 29 central labour laws into 4 Labour Codes: Code on Wages, Industrial Relations, Social Security, and Occupational Safety. These codes aim to simplify compliance and extend protections to informal and gig workers.",
+    "points": [
+      "Code on Wages, 2019 — universal minimum wage, timely payment, equal remuneration",
+      "Industrial Relations Code, 2020 — trade unions, standing orders, strikes/lockouts, retrenchment",
+      "Social Security Code, 2020 — EPF, ESI, gratuity, maternity benefits; extends to gig/platform workers",
+      "OSH Code, 2020 — occupational safety, health, and working conditions; applies to establishments with 10+ workers",
+      "Minimum Wages — set by central and state governments; vary by region and skill level",
+      "Gratuity — payable after 5 years of continuous service (Payment of Gratuity Act, 1972)",
+      "Maternity Benefit — 26 weeks of paid leave (Maternity Benefit Act, 1961, amended 2017)"
+    ],
+    "law": "Code on Wages, 2019; Industrial Relations Code, 2020; Social Security Code, 2020; OSH Code, 2020",
+    "practical_notes": "The four codes have been passed by Parliament but not yet fully notified in all states. Most states still operate under the older laws pending notification."
+  },
+
+  "writ jurisdiction": {
+    "title": "Writ Jurisdiction in India",
+    "summary": "Under the Indian Constitution, the Supreme Court (Article 32) and High Courts (Article 226) can issue writs to enforce Fundamental Rights and for other purposes. This jurisdiction is a powerful constitutional remedy against arbitrary state action.",
+    "points": [
+      "Habeas Corpus — 'produce the body'; used against illegal detention or imprisonment",
+      "Mandamus — commands a public authority to perform a duty it has failed to do",
+      "Prohibition — prevents a lower court or tribunal from exceeding its jurisdiction",
+      "Certiorari — quashes an order of a lower court or tribunal that has acted beyond jurisdiction",
+      "Quo Warranto — challenges a person's right to hold a public office",
+      "Article 32 — available only for Fundamental Rights enforcement; directly in Supreme Court",
+      "Article 226 — broader scope than Article 32; High Courts can issue writs for any purpose"
+    ],
+    "law": "Constitution of India — Article 32 (Supreme Court), Article 226 (High Courts)",
+    "case_references": [
+      "Romesh Thappar v. State of Madras (1950) — Article 32 is a fundamental right in itself",
+      "A.K. Gopalan v. State of Madras (1950) — early interpretation of habeas corpus and Article 21"
+    ],
+    "practical_notes": "Article 32 cannot be suspended even during a national emergency (44th Amendment). However, the right to move the court for enforcement of rights under Articles 20 and 21 cannot be suspended at all."
+  },
+
+  "motor accident claims": {
+    "title": "Motor Accident Claims in India",
+    "summary": "Motor accident claims in India are governed by the Motor Vehicles Act, 1988. Victims of road accidents (or their legal heirs) can claim compensation from the Motor Accidents Claims Tribunal (MACT) regardless of fault under third-party insurance.",
+    "points": [
+      "No-fault liability — Section 140 provides compensation regardless of fault (up to ₹50,000 for injury, ₹2 lakh for death)",
+      "Fault-based claims — Section 166; unlimited compensation based on multiplier method",
+      "Structured formula — National Insurance Co. v. Pranay Sethi (2017) SC judgment standardized computation",
+      "Hit and run cases — compensation from the Solatium Scheme Fund managed by the government",
+      "Third-party insurance — mandatory for all vehicles; covers injury/death to third parties",
+      "Limitation period — claims must be filed within 6 months (condonable up to reasonable time)"
+    ],
+    "law": "Motor Vehicles Act, 1988 (as amended in 2019)",
+    "case_references": [
+      "National Insurance Co. v. Pranay Sethi (2017) — SC standardized multiplier method for compensation",
+      "Sarla Verma v. Delhi Transport Corporation (2009) — earlier guidelines on multiplier method"
+    ],
+    "practical_notes": "MACT claims do not require court fees. Victims should file an FIR, obtain medical records, and approach the nearest MACT. Legal aid is available for indigent claimants."
+  }
+}
