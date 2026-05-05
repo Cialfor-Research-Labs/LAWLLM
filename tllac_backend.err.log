@@ -1,9 +1,5 @@
-INFO:tllac.routes.chat:\u2705 Trained data loaded — 15 topics available.
-INFO:     Started server process [6864]
+INFO:     Started server process [8244]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:9001 (Press CTRL+C to quit)
-INFO:tllac.routes.chat:\U0001f4e9 Incoming query: Explain IPC 420
-INFO:tllac.services.validation:Query matched trained topic 'ipc offences' with score 16.5.
-INFO:tllac.services.llm:Generated trained-data response for 'ipc offences' (895 chars).
-INFO:tllac.routes.chat:\u2705 Response generated (895 chars).
+INFO:tllac.routes.chat:Incoming query: Explain contract law in simple terms
