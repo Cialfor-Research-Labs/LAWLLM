@@ -3,3 +3,6 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:9001 (Press CTRL+C to quit)
 INFO:tllac.routes.chat:Incoming query: Explain contract law in simple terms
+INFO:tllac.routes.chat:Generated LLM-only response (328 chars).
+INFO:tllac.routes.chat:Incoming query: explain ipc 420
+INFO:tllac.routes.chat:Generated LLM-only response (328 chars).
